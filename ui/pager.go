@@ -103,6 +103,9 @@ type pagerModel struct {
 	currentDocument markdown
 
 	watcher *fsnotify.Watcher
+	
+	// TTS integration
+	tts *TTSController
 }
 
 func newPagerModel(common *commonModel) pagerModel {
@@ -115,6 +118,7 @@ func newPagerModel(common *commonModel) pagerModel {
 		common:   common,
 		state:    pagerStateBrowse,
 		viewport: vp,
+		tts:      NewTTSController(), // Initialize TTS controller
 	}
 	m.initWatcher()
 	return m
@@ -242,6 +246,14 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 			if m.viewport.HighPerformanceRendering {
 				cmds = append(cmds, viewport.Sync(m.viewport))
 			}
+		
+		// TTS keyboard shortcuts
+		case "t", "T", " ", "s", "S", "alt+left", "alt+right":
+			if m.tts != nil {
+				if ttsCmd := m.tts.HandleTTSKeyPress(msg.String()); ttsCmd != nil {
+					cmds = append(cmds, ttsCmd)
+				}
+			}
 		}
 
 	// Glow has rendered the content
@@ -268,6 +280,20 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 	// after a resize
 	case tea.WindowSizeMsg:
 		return m, renderWithGlamour(m, m.currentDocument.Body)
+	
+	// Handle TTS messages
+	default:
+		if m.tts != nil {
+			if handled, ttsCmd := m.tts.HandleTTSMessage(msg); handled {
+				if ttsCmd != nil {
+					cmds = append(cmds, ttsCmd)
+				}
+				// Refresh viewport if sentence changed
+				if m.viewport.HighPerformanceRendering {
+					cmds = append(cmds, viewport.Sync(m.viewport))
+				}
+			}
+		}
 
 	case statusMessageTimeoutMsg:
 		m.state = pagerStateBrowse
@@ -322,6 +348,15 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		helpNote = statusBarHelpStyle(" ? Help ")
 	}
 
+	// TTS status
+	var ttsStatus string
+	if m.tts != nil && m.tts.IsEnabled() {
+		ttsStatus = m.tts.GetTTSStatus()
+		if ttsStatus != "" {
+			ttsStatus = " " + ttsStatus + " |"
+		}
+	}
+
 	// Note
 	var note string
 	if showStatusMessage {
@@ -332,6 +367,7 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 	note = truncate.StringWithTail(" "+note+" ", uint(max(0, //nolint:gosec
 		m.common.width-
 			ansi.PrintableRuneWidth(logo)-
+			ansi.PrintableRuneWidth(ttsStatus)-
 			ansi.PrintableRuneWidth(scrollPercent)-
 			ansi.PrintableRuneWidth(helpNote),
 	)), ellipsis)
@@ -345,6 +381,7 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 	padding := max(0,
 		m.common.width-
 			ansi.PrintableRuneWidth(logo)-
+			ansi.PrintableRuneWidth(ttsStatus)-
 			ansi.PrintableRuneWidth(note)-
 			ansi.PrintableRuneWidth(scrollPercent)-
 			ansi.PrintableRuneWidth(helpNote),
@@ -356,8 +393,9 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		emptySpace = statusBarNoteStyle(emptySpace)
 	}
 
-	fmt.Fprintf(b, "%s%s%s%s%s",
+	fmt.Fprintf(b, "%s%s%s%s%s%s",
 		logo,
+		ttsStatus,
 		note,
 		emptySpace,
 		scrollPercent,
@@ -371,6 +409,7 @@ func (m pagerModel) helpView() (s string) {
 		"G/end   go to bottom",
 		"c       copy contents",
 		"e       edit this document",
+		"t       toggle TTS",
 		"r       reload this document",
 		"esc     back to files",
 		"q       quit",
