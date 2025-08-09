@@ -16,6 +16,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/styles"
+	"github.com/charmbracelet/glow/v2/tts"
 	"github.com/charmbracelet/glow/v2/ui"
 	"github.com/charmbracelet/glow/v2/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -359,6 +360,15 @@ func runTUI(path string, content string) error {
 	cfg.GlamourMaxWidth = width
 	cfg.EnableMouse = mouse
 	cfg.PreserveNewLines = preserveNewLines
+	
+	// Load TTS configuration from Viper
+	ttsConfig, err := tts.LoadConfigFromViper()
+	if err != nil {
+		// Log error but continue with default config
+		log.Warn("Could not load TTS configuration", "error", err)
+		ttsConfig = tts.DefaultConfig()
+	}
+	cfg.TTS = ttsConfig
 
 	// Run Bubble Tea program
 	if _, err := ui.NewProgram(cfg, content).Run(); err != nil {
@@ -419,6 +429,9 @@ func init() {
 	viper.SetDefault("style", styles.AutoStyle)
 	viper.SetDefault("width", 0)
 	viper.SetDefault("all", true)
+	
+	// Set TTS defaults
+	tts.SetDefaults()
 
 	rootCmd.AddCommand(configCmd, manCmd)
 }

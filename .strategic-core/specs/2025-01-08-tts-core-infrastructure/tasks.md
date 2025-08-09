@@ -546,78 +546,89 @@ Create the TTS status display component that shows playback state and progress.
 
 ---
 
-## Task 14: Implement Keyboard Handlers
+## Task 14: Implement Keyboard Handlers ✅
 
 **Type**: implementation
 **Priority**: high
 **Estimated Hours**: 3
+**Status**: COMPLETED
 
 ### Pre-Implementation Checklist
-- [ ] Keyboard shortcuts defined
-- [ ] Key handling pattern understood
-- [ ] Conflict check completed
-- [ ] Help text prepared
+- [x] Keyboard shortcuts defined
+- [x] Key handling pattern understood
+- [x] Conflict check completed
+- [x] Help text prepared
 
 ### Description
 Add keyboard handlers for TTS controls to the existing key handling system.
 
 ### Acceptance Criteria
-- [ ] 'T' toggles TTS on/off
-- [ ] Space plays/pauses
-- [ ] Arrow keys navigate sentences
-- [ ] 'S' stops playback
-- [ ] Help text updated
+- [x] 'T' toggles TTS on/off
+- [x] Space plays/pauses
+- [x] Arrow keys navigate sentences (alt+left/right)
+- [x] 'S' stops playback
+- [x] Help text updated
 
 ### Validation Steps
-- [ ] All shortcuts work correctly
-- [ ] No conflicts with existing keys
-- [ ] Help display shows TTS keys
-- [ ] Keys work in appropriate contexts
+- [x] All shortcuts work correctly
+- [x] No conflicts with existing keys
+- [x] Help display shows TTS keys
+- [x] Keys work in appropriate contexts
 
 ### Technical Notes
-- Add to existing switch statement in keys.go
-- Check TTS state before handling
-- Update help text generation
+- Implemented full keyboard handler in pager.go with context-aware behavior
+- 't'/'T' toggles TTS on/off
+- Space plays/pauses TTS when enabled, otherwise pages down
+- 's'/'S' stops TTS playback when enabled
+- alt+left/right navigates sentences when TTS enabled
+- Enhanced help view with dedicated TTS Controls section
+- Context-aware: Space key has dual functionality (TTS when enabled, page down otherwise)
+- No key conflicts with existing shortcuts
+- Created comprehensive test suite (tts_keyboard_test.go)
+- All tests passing, full functionality verified
 
 ---
 
-## Task 15: Add Configuration Support
+## Task 15: Add Configuration Support ✅
 
 **Type**: implementation
 **Priority**: medium
 **Estimated Hours**: 3
+**Status**: COMPLETED
 
 ### Pre-Implementation Checklist
-- [ ] Viper configuration understood
-- [ ] Config schema defined
-- [ ] Default values determined
-- [ ] Validation rules established
+- [x] Viper configuration understood
+- [x] Config schema defined
+- [x] Default values determined
+- [x] Validation rules established
 
 ### Description
 Extend the Viper configuration to support TTS settings.
 
 ### Acceptance Criteria
-- [ ] TTS config section defined
-- [ ] Settings loaded from config file
-- [ ] Environment variable override works
-- [ ] Defaults are sensible
-- [ ] Validation implemented
+- [x] TTS config section defined
+- [x] Settings loaded from config file
+- [x] Environment variable override works
+- [x] Defaults are sensible
+- [x] Validation implemented
 
 ### Validation Steps
-- [ ] Config loads correctly
-- [ ] Invalid config handled gracefully
-- [ ] Defaults work when config missing
-- [ ] Environment vars override file
+- [x] Config loads correctly
+- [x] Invalid config handled gracefully
+- [x] Defaults work when config missing
+- [x] Environment vars override file
 
 ### Technical Notes
-```yaml
-tts:
-  enabled: true
-  engine: "piper"
-  piper:
-    binary: "piper"
-    model: "en_US-lessac-medium"
-```
+- Created comprehensive `tts/config.go` with full TTS configuration structure
+- Implemented `tts/config_loader.go` for Viper integration
+- Extended `ui/config.go` to include TTS config field
+- Updated `config_cmd.go` with complete TTS configuration template
+- Integrated TTS config loading in `main.go` with fallback to defaults
+- Environment variables supported via GLOW_TTS_* prefix
+- Comprehensive validation for all configuration values
+- Config includes settings for Piper, Google, and Mock engines
+- Created full test coverage in `tts/config_test.go`
+- All tests passing, project builds successfully
 
 ---
 

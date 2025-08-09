@@ -23,6 +23,66 @@ pager: false
 width: 80
 # show all files, including hidden and ignored.
 all: false
+
+# TTS (Text-to-Speech) configuration
+tts:
+  # Enable TTS functionality
+  enabled: false
+  # TTS engine: mock, piper, or google
+  engine: "mock"
+  # Sample rate for audio output
+  sample_rate: 22050
+  # Volume level (0.0 to 2.0)
+  volume: 1.0
+  
+  # Playback settings
+  auto_play: false
+  pause_on_focus_loss: true
+  buffer_size: 3
+  buffer_ahead: true
+  
+  # Navigation settings
+  wrap_navigation: true
+  skip_code_blocks: false
+  skip_urls: false
+  
+  # Visual settings
+  highlight_enabled: true
+  highlight_color: "yellow"
+  show_progress: true
+  
+  # Piper TTS engine configuration
+  piper:
+    binary: "piper"
+    model: "en_US-lessac-medium"
+    # model_path: "/path/to/model.onnx"
+    # config_path: "/path/to/model.onnx.json"
+    # data_dir: "/usr/share/piper"
+    output_raw: true
+    speaker_id: 0
+    length_scale: 1.0
+    noise_scale: 0.667
+    noise_w: 0.8
+    sentence_silence: "200ms"
+    phoneme_gap: "0ms"
+    timeout: "30s"
+  
+  # Google TTS engine configuration
+  google:
+    # api_key: "your-api-key-here"
+    language_code: "en-US"
+    voice_name: "en-US-Standard-A"
+    speaking_rate: 1.0
+    pitch: 0.0
+    volume_gain: 0.0
+    timeout: "10s"
+  
+  # Mock TTS engine configuration (for testing)
+  mock:
+    generation_delay: "100ms"
+    words_per_minute: 150
+    failure_rate: 0.0
+    simulate_latency: true
 `
 
 var configCmd = &cobra.Command{

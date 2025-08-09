@@ -248,8 +248,40 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 			}
 		
 		// TTS keyboard shortcuts
-		case "t", "T", " ", "s", "S", "alt+left", "alt+right":
+		case "t", "T":
+			// Toggle TTS on/off
 			if m.tts != nil {
+				if ttsCmd := m.tts.HandleTTSKeyPress(msg.String()); ttsCmd != nil {
+					cmds = append(cmds, ttsCmd)
+				}
+			}
+			
+		case " ":
+			// Space: TTS play/pause if enabled, otherwise page down
+			if m.tts != nil && m.tts.IsEnabled() {
+				if ttsCmd := m.tts.HandleTTSKeyPress(msg.String()); ttsCmd != nil {
+					cmds = append(cmds, ttsCmd)
+				}
+			} else {
+				// Default space behavior: page down
+				m.viewport.ViewDown()
+				if m.viewport.HighPerformanceRendering {
+					cmds = append(cmds, viewport.Sync(m.viewport))
+				}
+			}
+			
+		case "s", "S":
+			// Stop TTS if enabled
+			if m.tts != nil && m.tts.IsEnabled() {
+				if ttsCmd := m.tts.HandleTTSKeyPress(msg.String()); ttsCmd != nil {
+					cmds = append(cmds, ttsCmd)
+				}
+			}
+			// If TTS not enabled, 's' does nothing (reserved for potential search feature)
+			
+		case "alt+left", "alt+right":
+			// Navigate sentences if TTS is enabled
+			if m.tts != nil && m.tts.IsEnabled() {
 				if ttsCmd := m.tts.HandleTTSKeyPress(msg.String()); ttsCmd != nil {
 					cmds = append(cmds, ttsCmd)
 				}
@@ -409,25 +441,37 @@ func (m pagerModel) helpView() (s string) {
 		"G/end   go to bottom",
 		"c       copy contents",
 		"e       edit this document",
-		"t       toggle TTS",
 		"r       reload this document",
 		"esc     back to files",
 		"q       quit",
 	}
 
-	s += "\n"
-	s += "k/↑      up                  " + col1[0] + "\n"
-	s += "j/↓      down                " + col1[1] + "\n"
-	s += "b/pgup   page up             " + col1[2] + "\n"
-	s += "f/pgdn   page down           " + col1[3] + "\n"
-	s += "u        ½ page up           " + col1[4] + "\n"
-	s += "d        ½ page down         "
-
-	if len(col1) > 5 {
-		s += col1[5]
+	// TTS controls (if enabled)
+	ttsControls := []string{
+		"t       toggle TTS on/off",
+		"space   play/pause TTS",
+		"s       stop TTS playback",
+		"alt+←   previous sentence",
+		"alt+→   next sentence",
 	}
 
-	s = indent(s, 2)
+	s += "\n"
+	s += "  Navigation:\n"
+	s += "  k/↑      up                  " + col1[0] + "\n"
+	s += "  j/↓      down                " + col1[1] + "\n"
+	s += "  b/pgup   page up             " + col1[2] + "\n"
+	s += "  f/pgdn   page down           " + col1[3] + "\n"
+	s += "  u        ½ page up           " + col1[4] + "\n"
+	s += "  d        ½ page down         " + col1[5] + "\n"
+	s += "                               " + col1[6] + "\n"
+	
+	// Add TTS section if TTS is available
+	if m.tts != nil {
+		s += "\n  TTS Controls:\n"
+		for _, ctrl := range ttsControls {
+			s += "  " + ctrl + "\n"
+		}
+	}
 
 	// Fill up empty cells with spaces for background coloring
 	if m.common.width > 0 {

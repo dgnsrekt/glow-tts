@@ -1,5 +1,7 @@
 package ui
 
+import "github.com/charmbracelet/glow/v2/tts"
+
 // Config contains TUI-specific configuration.
 type Config struct {
 	ShowAllFiles     bool
@@ -17,4 +19,7 @@ type Config struct {
 	// For debugging the UI
 	HighPerformancePager bool `env:"GLOW_HIGH_PERFORMANCE_PAGER" envDefault:"true"`
 	GlamourEnabled       bool `env:"GLOW_ENABLE_GLAMOUR"         envDefault:"true"`
+	
+	// TTS configuration
+	TTS tts.Config
 }
