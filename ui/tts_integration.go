@@ -1,11 +1,8 @@
 package ui
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glow/v2/tts"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // TTSController wraps the TTS controller for UI integration.
@@ -15,6 +12,7 @@ type TTSController struct {
 	currentSentence  int
 	totalSentences   int
 	highlightedRange [2]int // Start and end positions for highlighting
+	statusDisplay    *TTSStatusDisplay // Rich status display
 }
 
 // NewTTSController creates a new TTS controller wrapper.
@@ -23,12 +21,23 @@ func NewTTSController() *TTSController {
 		enabled:         false,
 		currentSentence: -1,
 		totalSentences:  0,
+		statusDisplay:   NewTTSStatusDisplay(),
 	}
 }
 
 // HandleTTSMessage handles TTS-related messages for the pager.
 func (tc *TTSController) HandleTTSMessage(msg tea.Msg) (bool, tea.Cmd) {
-	if tc == nil || !tc.enabled {
+	if tc == nil {
+		return false, nil
+	}
+
+	// Update status display for all messages
+	if tc.statusDisplay != nil {
+		tc.statusDisplay.UpdateFromMessage(msg)
+	}
+
+	// Only process if enabled
+	if !tc.enabled {
 		return false, nil
 	}
 
@@ -55,6 +64,15 @@ func (tc *TTSController) HandleTTSMessage(msg tea.Msg) (bool, tea.Cmd) {
 		if !msg.Recoverable {
 			tc.enabled = false
 		}
+		return true, nil
+		
+	case tts.TTSEnabledMsg:
+		tc.enabled = true
+		return true, nil
+		
+	case tts.TTSDisabledMsg:
+		tc.enabled = false
+		tc.statusDisplay.Reset()
 		return true, nil
 	}
 
@@ -144,7 +162,17 @@ func (tc *TTSController) HandleTTSKeyPress(key string) tea.Cmd {
 
 // GetTTSStatus returns a status string for the TTS system.
 func (tc *TTSController) GetTTSStatus() string {
-	if tc == nil || !tc.enabled {
+	if tc == nil {
+		return ""
+	}
+
+	// Use the new status display for rich status information
+	if tc.statusDisplay != nil {
+		return tc.statusDisplay.CompactStatus()
+	}
+
+	// Fallback to simple status if status display not available
+	if !tc.enabled {
 		return ""
 	}
 
@@ -152,40 +180,25 @@ func (tc *TTSController) GetTTSStatus() string {
 		return "TTS: initializing..."
 	}
 
-	state := tc.controller.GetState()
-	
-	switch state.CurrentState {
-	case tts.StatePlaying:
-		if tc.totalSentences > 0 {
-			return lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#00FF00")).
-				Render("▶ TTS: ") + 
-				lipgloss.NewStyle().
-					Foreground(lipgloss.Color("#888888")).
-					Render(fmt.Sprintf("%d/%d", tc.currentSentence+1, tc.totalSentences))
-		}
-		return lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#00FF00")).
-			Render("▶ TTS: playing")
+	return "TTS: active"
+}
 
-	case tts.StatePaused:
-		return lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFF00")).
-			Render("⏸ TTS: paused")
-
-	case tts.StateReady:
-		return lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888888")).
-			Render("■ TTS: ready")
-
-	case tts.StateError:
-		return lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF0000")).
-			Render("✗ TTS: error")
-
-	default:
+// GetDetailedStatus returns detailed TTS status for panels or dialogs.
+func (tc *TTSController) GetDetailedStatus(width int) string {
+	if tc == nil || tc.statusDisplay == nil {
 		return ""
 	}
+	
+	return tc.statusDisplay.DetailedStatus(width)
+}
+
+// GetProgressBar returns a visual progress bar for TTS playback.
+func (tc *TTSController) GetProgressBar(width int) string {
+	if tc == nil || tc.statusDisplay == nil {
+		return ""
+	}
+	
+	return tc.statusDisplay.ProgressBar(width)
 }
 
 // ApplySentenceHighlight applies highlighting to the current sentence in the content.

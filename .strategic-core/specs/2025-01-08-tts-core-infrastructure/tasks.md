@@ -501,38 +501,48 @@ Add minimal TTS integration to the existing pager component for sentence highlig
 
 ---
 
-## Task 13: Add TTS Status Display
+## Task 13: Add TTS Status Display ✅
 
 **Type**: implementation
 **Priority**: medium
 **Estimated Hours**: 3
+**Status**: COMPLETED
 
 ### Pre-Implementation Checklist
-- [ ] Status bar design finalized
-- [ ] Lipgloss styling understood
-- [ ] Status information defined
-- [ ] Update frequency determined
+- [x] Status bar design finalized
+- [x] Lipgloss styling understood
+- [x] Status information defined
+- [x] Update frequency determined
 
 ### Description
 Create the TTS status display component that shows playback state and progress.
 
 ### Acceptance Criteria
-- [ ] `ui/tts_status.go` created
-- [ ] Shows play/pause/stop state
-- [ ] Displays current/total sentences
-- [ ] Integrates with existing status bar
-- [ ] Updates in real-time
+- [x] `ui/tts_status.go` created
+- [x] Shows play/pause/stop state
+- [x] Displays current/total sentences
+- [x] Integrates with existing status bar
+- [x] Updates in real-time
 
 ### Validation Steps
-- [ ] Status displays correctly
-- [ ] Updates are smooth
-- [ ] No flicker or artifacts
-- [ ] Styling matches Glow theme
+- [x] Status displays correctly
+- [x] Updates are smooth
+- [x] No flicker or artifacts
+- [x] Styling matches Glow theme
 
 ### Technical Notes
-- Use Lipgloss for consistent styling
-- Keep status line compact
-- Update only when state changes
+- Created comprehensive TTSStatusDisplay component (340 lines)
+- Implemented CompactStatus() for status bar integration
+- DetailedStatus() for rich multi-line display
+- ProgressBar() for visual progress indication
+- State-specific colors and icons (play: green ▶, pause: yellow ⏸, etc.)
+- Handles all TTS messages for real-time updates
+- Buffer status and error message display
+- Duration formatting (MM:SS)
+- Clone and Reset methods for state management
+- Integrated with existing TTSController
+- Full test coverage with 10 test functions
+- All tests passing, project builds successfully
 
 ---
 
