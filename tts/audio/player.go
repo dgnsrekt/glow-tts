@@ -161,11 +161,14 @@ func (p *Player) Play(audio *tts.Audio) error {
 		return errors.New("audio is nil")
 	}
 	
-	// Stop any current playback
+	// If already playing, just replace the buffer instead of stopping
+	// This prevents oto context recreation issues
 	if atomic.LoadInt32(&p.playing) == 1 {
-		if err := p.Stop(); err != nil {
-			return fmt.Errorf("failed to stop current playback: %w", err)
+		// Pause current playback
+		if p.otoPlayer != nil {
+			p.otoPlayer.Pause()
 		}
+		// We'll replace the buffer below
 	}
 	
 	// Initialize audio context if needed or if format changed
@@ -201,7 +204,13 @@ func (p *Player) Play(audio *tts.Audio) error {
 	p.pausedDuration = 0
 	p.startTime = time.Now()
 	
-	// Create oto player
+	// Close old player if exists before creating new one
+	if p.otoPlayer != nil {
+		p.otoPlayer.Close()
+		p.otoPlayer = nil
+	}
+	
+	// Create new oto player
 	p.otoPlayer = p.otoContext.NewPlayer(p.audioBuffer)
 	
 	// Set state
@@ -209,13 +218,17 @@ func (p *Player) Play(audio *tts.Audio) error {
 	atomic.StoreInt32(&p.paused, 0)
 	atomic.StoreInt32(&p.stopping, 0)
 	
-	// Create new done channel
-	p.playbackDone = make(chan struct{})
+	// Create new done channel only if nil
+	if p.playbackDone == nil {
+		p.playbackDone = make(chan struct{})
+	}
 	
 	p.mu.Unlock()
 	
-	// Start playback goroutine
-	go p.playbackLoop()
+	// Start playback goroutine only if not already running
+	if atomic.LoadInt32(&p.playing) == 1 {
+		go p.playbackLoop()
+	}
 	
 	// Start position tracking
 	go p.trackPosition()
@@ -229,7 +242,20 @@ func (p *Player) Play(audio *tts.Audio) error {
 // playbackLoop manages the audio playback.
 func (p *Player) playbackLoop() {
 	defer func() {
-		close(p.playbackDone)
+		// Safely close channel with recovery
+		defer func() {
+			if r := recover(); r != nil {
+				// Channel was already closed, ignore
+			}
+		}()
+		
+		select {
+		case <-p.playbackDone:
+			// Already closed
+		default:
+			close(p.playbackDone)
+		}
+		
 		// Auto-stop when playback completes
 		if atomic.LoadInt32(&p.stopping) == 0 {
 			atomic.StoreInt32(&p.playing, 0)
