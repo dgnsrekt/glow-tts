@@ -7,6 +7,11 @@
 
 This file configures Claude Code to use Strategic Core commands and standards for this project.
 
+## Quick Start
+
+**🚀 Implementation Guide**: @.strategic-core/IMPLEMENTATION_GUIDE.md
+**⚠️ Critical Lessons**: @.strategic-core/ideas/tts-lessons-learned.md
+
 ## Available Commands
 
 Strategic Core provides these commands:
@@ -44,29 +49,62 @@ The commands are defined in your project's Strategic Core installation:
 
 Your project-specific standards are located in:
 
+### Version Control & Practices
 - **Git Workflow**: @.strategic-core/standards/active/2025-01-10-0001-git-simple.md
 - **General Best Practices**: @.strategic-core/standards/active/2025-01-10-0002-general-best-practices.md
+
+### Go Development
 - **Go Code Style**: @.strategic-core/standards/active/2025-01-10-0003-go-code-style.md
-- **Bubble Tea TUI**: @.strategic-core/standards/active/2025-01-10-0004-bubble-tea-tui.md
 - **Go Testing**: @.strategic-core/standards/active/2025-01-10-0005-go-testing.md
-- **API & Interface Design**: @.strategic-core/standards/active/2025-01-10-0006-api-interface-design.md
 - **Go Concurrency**: @.strategic-core/standards/active/2025-01-10-0007-go-concurrency.md
+- **Subprocess Handling** ⚠️: @.strategic-core/standards/active/2025-01-10-0010-subprocess-handling.md
+
+### Architecture & Design
+- **Bubble Tea TUI**: @.strategic-core/standards/active/2025-01-10-0004-bubble-tea-tui.md
+- **API & Interface Design**: @.strategic-core/standards/active/2025-01-10-0006-api-interface-design.md
+
+### Quality & Documentation
 - **Documentation**: @.strategic-core/standards/active/2025-01-10-0008-documentation.md
 - **Performance**: @.strategic-core/standards/active/2025-01-10-0009-performance.md
 
 ## Project Documentation
 
-Your product documentation is located in:
-
+### Product Documentation
 - **Mission & Vision**: @.strategic-core/product/mission.md
 - **Current State**: @.strategic-core/product/current-state.md
 - **Tech Architecture**: @.strategic-core/product/tech-stack.md
 - **Decisions**: @.strategic-core/product/decisions.md
 - **Roadmap**: @.strategic-core/product/roadmap.md (to be created)
 
+### Ideas & Lessons Learned
+- **Original PRD**: @.strategic-core/ideas/idea.md
+- **TTS Lessons Learned** ⚠️: @.strategic-core/ideas/tts-lessons-learned.md
+
+### Implementation Resources
+- **Implementation Guide** 🚀: @.strategic-core/IMPLEMENTATION_GUIDE.md
+
 ## Active Specifications
 
-Feature specifications are stored in: @.strategic-core/specs/
+### Current TTS Specification
+- **Main Spec**: @.strategic-core/specs/2025-01-10-tts-core-infrastructure/spec.md
+- **Tasks**: @.strategic-core/specs/2025-01-10-tts-core-infrastructure/tasks.md
+- **Technical Design**: @.strategic-core/specs/2025-01-10-tts-core-infrastructure/sub-specs/technical-spec.md
+- **Test Requirements**: @.strategic-core/specs/2025-01-10-tts-core-infrastructure/sub-specs/tests.md
+
+## Critical Implementation Notes
+
+### ⚠️ Stdin Race Condition Prevention
+
+**NEVER** use `StdinPipe()` with subprocess communication. This causes race conditions.
+
+**ALWAYS** use this pattern:
+```go
+cmd := exec.Command("piper", args...)
+cmd.Stdin = strings.NewReader(text)  // Pre-set stdin
+cmd.Run()                            // Synchronous execution
+```
+
+See @.strategic-core/standards/active/2025-01-10-0010-subprocess-handling.md for details.
 
 ## How to Use
 
@@ -77,11 +115,19 @@ Feature specifications are stored in: @.strategic-core/specs/
 5. **Build Feature**: Use `/execute-tasks`
 6. **Validate Work**: Use `/lint-spec` to check specifications
 
+## Implementation Workflow for TTS
+
+1. **Review lessons learned**: @.strategic-core/ideas/tts-lessons-learned.md
+2. **Follow implementation guide**: @.strategic-core/IMPLEMENTATION_GUIDE.md
+3. **Check subprocess standard**: @.strategic-core/standards/active/2025-01-10-0010-subprocess-handling.md
+4. **Execute tasks**: @.strategic-core/specs/2025-01-10-tts-core-infrastructure/tasks.md
+
 ## Important Notes
 
 - This configuration is specific to this project
 - Commands reference local files in .strategic-core/
-- Customize standards before starting development
+- The stdin race condition is a critical issue - always review the subprocess handling standard
+- Use the implementation guide for quick reference
 - All specifications follow a structured format
 
 ---
