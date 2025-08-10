@@ -226,41 +226,47 @@ Create a mock audio player for testing before implementing real audio.
 
 ## Phase 3: Engine Integration
 
-### Task 7: Implement Piper TTS Engine
+### Task 7: Implement Piper TTS Engine (Optimal Approach)
 
 **Type**: implementation
 **Priority**: high
-**Estimated Hours**: 6
+**Estimated Hours**: 4
 
 #### Pre-Implementation Checklist
 - [ ] Install Piper locally for testing
 - [ ] Understand Piper CLI interface
-- [ ] Plan process management
-- [ ] Design error handling
+- [ ] Review stdin race condition documentation
+- [ ] Design caching strategy
 - [ ] Consider model management
 
 #### Description
-Implement the Piper TTS engine wrapper that manages the Piper subprocess.
+Implement the Piper TTS engine using the optimal approach with pre-configured stdin to avoid race conditions.
 
 #### Acceptance Criteria
-- [ ] Spawns Piper subprocess correctly
-- [ ] Handles stdin/stdout communication
-- [ ] Manages process lifecycle
-- [ ] Implements error recovery
-- [ ] Supports multiple voices
-- [ ] Handles process crashes gracefully
+- [ ] Uses `cmd.Stdin = strings.NewReader(text)` pattern
+- [ ] Runs synchronously with `cmd.Run()`
+- [ ] NO use of `StdinPipe()` anywhere
+- [ ] Implements memory and disk caching
+- [ ] Handles errors with stderr capture
+- [ ] Validates output size
 
 #### Validation Steps
 - [ ] Synthesis produces valid audio
-- [ ] Process management is robust
-- [ ] No zombie processes
-- [ ] Resource cleanup works
-- [ ] Integration tests pass
+- [ ] No race conditions (test 100+ times)
+- [ ] Cache works correctly
+- [ ] No process leaks
+- [ ] Performance meets targets
 
 #### Technical Notes
-- Use `exec.CommandContext` for process management
-- Implement heartbeat for health checking
-- Buffer I/O for efficiency
+```go
+// Critical pattern to follow:
+cmd := exec.CommandContext(ctx, "piper", "--model", model, "--output-raw")
+cmd.Stdin = strings.NewReader(text)  // Pre-set stdin
+err := cmd.Run()  // Synchronous execution
+```
+- Fresh process per request (simpler, more reliable)
+- Cache aggressively to mitigate spawn overhead
+- Expected cache hit rate: 80%+
 
 ---
 

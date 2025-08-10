@@ -48,16 +48,23 @@
 - Environment variable integration
 - Hierarchical configuration
 
-## Planned Architectural Decisions (from PRD)
+## TTS Architectural Decisions (Updated with Lessons Learned)
 
-### 6. Background Service for TTS
-**Decision**: Implement TTS as a separate background service
+### 6. Subprocess Execution Model for TTS
+**Decision**: Use synchronous subprocess execution with pre-configured stdin
 **Rationale**:
-- Prevents UI blocking during audio generation
-- Allows preprocessing while playing
-- Better resource management
-- Clean separation of concerns
-**Implementation**: Child process with IPC communication
+- Avoids stdin race condition discovered in experimental branch
+- Simpler than long-running processes or process pools
+- More reliable and predictable
+- Easier to debug and maintain
+**Implementation**: 
+```go
+cmd.Stdin = strings.NewReader(text)  // Pre-set stdin
+cmd.Run()  // Synchronous execution
+```
+**Trade-offs**:
+- Higher process spawn overhead (mitigated by caching)
+- No process reuse (but more stable)
 
 ### 7. Queue-Based Audio Processing
 **Decision**: Use a queue system for sentence processing
@@ -85,13 +92,32 @@
 - Engine selection at startup
 - Forces TUI mode automatically
 
-### 10. Process Singleton Enforcement
-**Decision**: Only allow one TTS instance per system
+### 10. Caching Strategy for TTS
+**Decision**: Implement aggressive in-memory and disk caching
 **Rationale**:
-- Prevents resource conflicts
-- Avoids audio device contention
-- Simpler process management
-- Clear user experience
+- Mitigates process spawn overhead
+- Provides instant response for repeated content
+- Reduces CPU usage significantly
+- Improves user experience
+**Implementation**:
+- LRU memory cache with 100MB limit
+- Persistent disk cache in temp directory
+- SHA256-based cache keys
+- 80% expected cache hit rate
+
+### 11. Stdin Race Prevention
+**Decision**: Never use StdinPipe() for subprocess communication
+**Rationale**:
+- StdinPipe() creates race conditions with programs that read immediately
+- Piper reads stdin on startup before pipe is ready
+- Race is non-deterministic and platform-dependent
+**Lesson Learned**: Experimental branch discovered this critical issue
+**Correct Pattern**:
+```go
+// Always use this pattern for stdin
+cmd.Stdin = strings.NewReader(text)
+cmd.Run()  // Not Start()
+```
 
 ## Code Organization Patterns
 

@@ -93,20 +93,21 @@ type AudioQueue struct {
 
 ```go
 type PiperEngine struct {
-    process    *exec.Cmd
-    stdin      io.WriteCloser
-    stdout     io.ReadCloser
     modelPath  string
+    configPath string
     voice      string
+    cache      map[string][]byte
+    cacheMu    sync.RWMutex
     config     PiperConfig
 }
 ```
 
 **Implementation:**
-- Spawns Piper as subprocess
-- Communicates via stdin/stdout
-- Handles process lifecycle
-- Supports multiple voice models
+- Fresh process per synthesis request
+- Pre-configured stdin to avoid race condition
+- Synchronous execution with cmd.Run()
+- Aggressive caching for performance
+- **Critical**: Never uses StdinPipe()
 
 ##### Google TTS Engine (`internal/tts/engines/google.go`)
 
@@ -322,6 +323,51 @@ google:
   language: en-US
 ```
 
+## Critical Implementation Patterns
+
+### Avoiding the Stdin Race Condition
+
+**NEVER DO THIS:**
+```go
+// ❌ BROKEN - Race condition
+cmd := exec.Command("piper", args...)
+cmd.Start()
+stdin, _ := cmd.StdinPipe()
+stdin.Write(text)  // Too late!
+```
+
+**ALWAYS DO THIS:**
+```go
+// ✅ CORRECT - No race possible
+func (e *PiperEngine) Synthesize(ctx context.Context, text string) ([]byte, error) {
+    // Check cache first
+    if audio := e.getFromCache(text); audio != nil {
+        return audio, nil
+    }
+    
+    cmd := exec.CommandContext(ctx, "piper",
+        "--model", e.modelPath,
+        "--config", e.configPath,
+        "--output-raw")
+    
+    // Critical: Pre-set stdin before starting
+    cmd.Stdin = strings.NewReader(text)
+    
+    var stdout, stderr bytes.Buffer
+    cmd.Stdout = &stdout
+    cmd.Stderr = &stderr
+    
+    // Run synchronously
+    if err := cmd.Run(); err != nil {
+        return nil, fmt.Errorf("piper failed: %w, stderr: %s", err, stderr.String())
+    }
+    
+    audio := stdout.Bytes()
+    e.saveToCache(text, audio)
+    return audio, nil
+}
+```
+
 ## Security Considerations
 
 ### API Key Management
@@ -335,6 +381,6 @@ google:
 - No PII in cache keys
 
 ### Process Isolation
-- Subprocess sandboxing for Piper
-- Limited resource allocation
-- No network access for offline mode
+- Fresh process per request (more secure)
+- No long-running processes to exploit
+- Limited lifetime per synthesis

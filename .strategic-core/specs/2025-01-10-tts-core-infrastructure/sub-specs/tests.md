@@ -59,6 +59,12 @@
   - Special characters
   - Multiple languages
 
+- **Race Condition Prevention**
+  - No stdin race with rapid requests
+  - Concurrent synthesis safety
+  - Process spawn reliability
+  - 100+ iteration stress test
+
 - **Configuration**
   - Voice selection
   - Speed adjustment
@@ -67,9 +73,27 @@
 
 - **Error Handling**
   - Invalid configuration
-  - Process crash recovery
+  - Process not found
   - Network failures (Google TTS)
   - Model not found (Piper)
+
+#### Critical Race Condition Test
+```go
+func TestPiperEngine_NoStdinRace(t *testing.T) {
+    engine := NewPiperEngine("model.onnx")
+    
+    // Run many times to catch race
+    for i := 0; i < 100; i++ {
+        t.Run(fmt.Sprintf("iteration_%d", i), func(t *testing.T) {
+            t.Parallel()
+            
+            audio, err := engine.Synthesize(context.Background(), "test")
+            assert.NoError(t, err)
+            assert.NotEmpty(t, audio)
+        })
+    }
+}
+```
 
 ### 3. Audio Queue Tests
 
