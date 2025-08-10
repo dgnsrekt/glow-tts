@@ -3,7 +3,23 @@ package ui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glow/v2/tts"
+	"github.com/charmbracelet/glow/v2/tts/audio"
+	"github.com/charmbracelet/glow/v2/tts/engines"
+	"github.com/charmbracelet/glow/v2/tts/engines/mock"
+	"github.com/charmbracelet/glow/v2/tts/engines/piper"
+	"github.com/charmbracelet/glow/v2/tts/sentence"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
 )
+
+// fileExists checks if a file exists.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
 
 // TTSController wraps the TTS controller for UI integration.
 type TTSController struct {
@@ -17,7 +33,16 @@ type TTSController struct {
 
 // NewTTSController creates a new TTS controller wrapper.
 func NewTTSController() *TTSController {
+	// Setup debug logging to file
+	debugFile, err := os.OpenFile("/tmp/glow_tts_debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err == nil {
+		log.SetOutput(debugFile)
+		log.Println("=== TTS Debug Session Started ===")
+		debugFile.Sync()
+	}
+	
 	return &TTSController{
+		controller:      nil,
 		enabled:         false,
 		currentSentence: -1,
 		totalSentences:  0,
@@ -68,6 +93,7 @@ func (tc *TTSController) HandleTTSMessage(msg tea.Msg) (bool, tea.Cmd) {
 		
 	case tts.TTSEnabledMsg:
 		tc.enabled = true
+		log.Printf("[DEBUG TTS] TTS enabled via message")
 		return true, nil
 		
 	case tts.TTSDisabledMsg:
@@ -81,7 +107,7 @@ func (tc *TTSController) HandleTTSMessage(msg tea.Msg) (bool, tea.Cmd) {
 
 // HandleTTSKeyPress handles TTS-related keyboard shortcuts.
 func (tc *TTSController) HandleTTSKeyPress(key string) tea.Cmd {
-	if tc == nil || tc.controller == nil {
+	if tc == nil {
 		return nil
 	}
 
@@ -89,22 +115,157 @@ func (tc *TTSController) HandleTTSKeyPress(key string) tea.Cmd {
 	case "T", "t":
 		// Toggle TTS on/off
 		tc.enabled = !tc.enabled
-		if tc.enabled && tc.controller != nil {
-			// Initialize if needed
-			return func() tea.Msg {
-				return tts.TTSEnabledMsg{Engine: "active"}
+		// Debug: log the state change
+		if tc.enabled {
+			// Enable TTS - create controller if needed
+			var engine tts.Engine
+			var engineName string
+			
+			if tc.controller == nil {
+				// Initialize with real Piper TTS
+				
+				// Try to create Piper engine first
+				homeDir, _ := os.UserHomeDir()
+				
+				// Try to find Piper in multiple locations
+				piperBinary := ""
+				possiblePaths := []string{
+					"piper", // In PATH
+					filepath.Join(homeDir, ".local", "bin", "piper"),
+					filepath.Join(homeDir, "bin", "piper"),
+					"/usr/local/bin/piper",
+					"/usr/bin/piper",
+				}
+				
+				for _, path := range possiblePaths {
+					if _, err := os.Stat(path); err == nil {
+						piperBinary = path
+						break
+					}
+				}
+				
+				if piperBinary == "" {
+					// Try with exec.LookPath
+					if path, err := exec.LookPath("piper"); err == nil {
+						piperBinary = path
+					}
+				}
+				
+				log.Printf("[DEBUG TTS] Piper binary path: %s", piperBinary)
+				
+				piperModel := filepath.Join(homeDir, "piper-voices", "en_US-amy-medium.onnx")
+				piperConfigPath := filepath.Join(homeDir, "piper-voices", "en_US-amy-medium.onnx.json")
+				
+				log.Printf("[DEBUG TTS] Piper model path: %s (exists: %v)", piperModel, fileExists(piperModel))
+				
+				piperConfig := piper.Config{
+					BinaryPath:          piperBinary,
+					ModelPath:           piperModel,
+					ConfigPath:          piperConfigPath,
+					OutputRaw:           true, // Critical for SimpleEngine
+					SampleRate:          22050,
+					MaxRestarts:         5, // Triggers V2 with better stability
+					HealthCheckInterval: 5 * time.Second,
+					RequestTimeout:      30 * time.Second,
+				}
+				
+				piperEngine, err := piper.NewEngine(piperConfig)
+				if err != nil {
+					// Fallback to mock if Piper setup fails completely
+					log.Printf("[WARNING TTS] Piper setup failed: %v, using mock engine only", err)
+					engine = mock.New()
+					engineName = "mock (Piper unavailable)"
+				} else {
+					// Wrap Piper with automatic fallback to mock
+					log.Printf("[INFO TTS] Piper engine created, wrapping with fallback capability")
+					mockEngine := mock.New()
+					engine = engines.NewFallbackEngine(piperEngine, mockEngine, 3)
+					engineName = "piper (with mock fallback)"
+					log.Printf("[INFO TTS] FallbackEngine created successfully")
+				}
+				
+				// Initialize audio player
+				var player tts.AudioPlayer
+				realPlayer, err := audio.NewPlayer()
+				if err != nil {
+					// Fallback to mock player if real one fails
+					log.Printf("[DEBUG TTS] Real audio player failed: %v, using mock\n", err)
+					player = audio.NewMockPlayer()
+				} else {
+					log.Printf("[DEBUG TTS] Real audio player initialized successfully\n")
+					player = realPlayer
+				}
+				
+				parser := sentence.NewParser()
+				tc.controller = tts.NewController(engine, player, parser)
+				
+				// Initialize the engine with appropriate config
+				var config tts.EngineConfig
+				// Check for FallbackEngine
+				if _, isFallback := engine.(*engines.FallbackEngine); isFallback {
+					log.Printf("[DEBUG TTS] Initializing FallbackEngine with config")
+					config = tts.EngineConfig{
+						Voice:  "amy",  // Piper voice (fallback will handle mock internally)
+						Rate:   1.0,
+						Pitch:  1.0,
+						Volume: 1.0,
+					}
+				} else if _, isPiper := engine.(*piper.Engine); isPiper {
+					config = tts.EngineConfig{
+						Voice:  "amy",  // Piper voice
+						Rate:   1.0,
+						Pitch:  1.0,
+						Volume: 1.0,
+					}
+				} else {
+					config = tts.EngineConfig{
+						Voice:  "mock-voice-1",
+						Rate:   1.0,
+						Pitch:  1.0,
+						Volume: 1.0,
+					}
+				}
+				tc.controller.Initialize(config)
 			}
-		}
-		return func() tea.Msg {
-			tc.controller.Stop()
-			return tts.TTSDisabledMsg{Reason: "user"}
+			// Update status display immediately
+			if tc.statusDisplay != nil {
+				tc.statusDisplay.UpdateFromMessage(tts.TTSEnabledMsg{Engine: engineName})
+			}
+			
+			// Log engine status if it's a fallback engine
+			if fe, ok := engine.(*engines.FallbackEngine); ok {
+				log.Printf("[INFO TTS] Engine status: %s", fe.GetStatus())
+			}
+			
+			// Return a command that will trigger content loading
+			return func() tea.Msg {
+				log.Printf("[INFO TTS] TTS enabled with engine: %s", engineName)
+				return tts.TTSEnabledMsg{Engine: engineName}
+			}
+		} else {
+			// Disable TTS
+			if tc.controller != nil {
+				tc.controller.Stop()
+				tc.controller.Shutdown()
+				tc.controller = nil
+			}
+			// Update status display immediately
+			if tc.statusDisplay != nil {
+				tc.statusDisplay.UpdateFromMessage(tts.TTSDisabledMsg{Reason: "user"})
+			}
+			return func() tea.Msg {
+				return tts.TTSDisabledMsg{Reason: "user"}
+			}
 		}
 
 	case " ":
 		// Play/pause
 		if tc.enabled && tc.controller != nil {
 			state := tc.controller.GetState()
+			log.Printf("[DEBUG TTS] Space pressed, current state: %v\n", state.CurrentState)
+			
 			if state.CurrentState == tts.StatePlaying {
+				log.Printf("[DEBUG TTS] Pausing TTS\n")
 				tc.controller.Pause()
 				return func() tea.Msg {
 					return tts.PausedMsg{
@@ -113,6 +274,7 @@ func (tc *TTSController) HandleTTSKeyPress(key string) tea.Cmd {
 					}
 				}
 			} else if state.CurrentState == tts.StatePaused || state.CurrentState == tts.StateReady {
+				log.Printf("[DEBUG TTS] Starting/Resuming TTS\n")
 				tc.controller.Play()
 				return func() tea.Msg {
 					return tts.PlayingMsg{
@@ -120,6 +282,8 @@ func (tc *TTSController) HandleTTSKeyPress(key string) tea.Cmd {
 						Total:    tc.totalSentences,
 					}
 				}
+			} else {
+				log.Printf("[DEBUG TTS] State %v - no action taken\n", state.CurrentState)
 			}
 		}
 
@@ -201,6 +365,44 @@ func (tc *TTSController) GetProgressBar(width int) string {
 	return tc.statusDisplay.ProgressBar(width)
 }
 
+// LoadContent loads markdown content into the TTS system.
+func (tc *TTSController) LoadContent(content string) error {
+	if tc == nil || tc.controller == nil || !tc.enabled {
+		log.Printf("[DEBUG TTS] LoadContent skipped - enabled=%v, controller=%v", tc.enabled, tc.controller != nil)
+		return nil // No error, just not enabled
+	}
+	
+	log.Printf("[DEBUG TTS] Loading content (%d chars)", len(content))
+	err := tc.controller.SetContent(content)
+	if err != nil {
+		log.Printf("[DEBUG TTS] SetContent failed: %v", err)
+	} else {
+		state := tc.controller.GetState()
+		log.Printf("[DEBUG TTS] Content loaded, total sentences: %d", state.TotalSentences)
+	}
+	return err
+}
+
+// LoadContentIfEnabled loads content only if TTS is enabled and controller exists.
+func (tc *TTSController) LoadContentIfEnabled(content string) {
+	if tc != nil && tc.enabled && tc.controller != nil {
+		log.Printf("[DEBUG TTS] LoadContentIfEnabled called")
+		tc.LoadContent(content)
+	} else {
+		log.Printf("[DEBUG TTS] LoadContentIfEnabled skipped - enabled=%v, controller=%v", tc != nil && tc.enabled, tc != nil && tc.controller != nil)
+	}
+}
+
+// GetContentForTTS gets current content for TTS from the controller.
+func (tc *TTSController) GetContentForTTS() string {
+	if tc == nil || tc.controller == nil {
+		return ""
+	}
+	
+	// For now, we'll return empty - content is stored internally in controller
+	return ""
+}
+
 // ApplySentenceHighlight applies highlighting to the current sentence in the content.
 func (tc *TTSController) ApplySentenceHighlight(content string) string {
 	if tc == nil || !tc.enabled || tc.currentSentence < 0 {
@@ -224,4 +426,12 @@ func (tc *TTSController) GetCurrentSentence() int {
 		return -1
 	}
 	return tc.currentSentence
+}
+
+// GetTotalSentences returns the total number of sentences.
+func (tc *TTSController) GetTotalSentences() int {
+	if tc == nil || tc.controller == nil {
+		return 0
+	}
+	return tc.controller.GetTotalSentences()
 }

@@ -118,7 +118,7 @@ func newPagerModel(common *commonModel) pagerModel {
 		common:   common,
 		state:    pagerStateBrowse,
 		viewport: vp,
-		tts:      NewTTSController(), // Initialize TTS controller
+		tts:      NewTTSController(),
 	}
 	m.initWatcher()
 	return m
@@ -127,6 +127,11 @@ func newPagerModel(common *commonModel) pagerModel {
 func (m *pagerModel) setSize(w, h int) {
 	m.viewport.Width = w
 	m.viewport.Height = h - statusBarHeight
+
+	// Account for TTS indicator if enabled
+	if m.tts != nil && m.tts.IsEnabled() && m.tts.GetCurrentSentence() >= 0 {
+		m.viewport.Height -= 1 // TTS indicator takes 1 line
+	}
 
 	if m.showHelp {
 		if pagerHelpHeight == 0 {
@@ -262,6 +267,8 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 				if ttsCmd := m.tts.HandleTTSKeyPress(msg.String()); ttsCmd != nil {
 					cmds = append(cmds, ttsCmd)
 				}
+				// Return here to prevent fallthrough to page down
+				return m, tea.Batch(cmds...)
 			} else {
 				// Default space behavior: page down
 				m.viewport.ViewDown()
@@ -293,6 +300,13 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 		log.Info("content rendered", "state", m.state)
 
 		m.setContent(string(msg))
+		
+		// Load content into TTS if enabled
+		if m.tts != nil && m.tts.IsEnabled() {
+			log.Printf("[DEBUG] Loading content into TTS from pager")
+			m.tts.LoadContent(m.currentDocument.Body)
+		}
+		
 		if m.viewport.HighPerformanceRendering {
 			cmds = append(cmds, viewport.Sync(m.viewport))
 		}
@@ -320,7 +334,22 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 				if ttsCmd != nil {
 					cmds = append(cmds, ttsCmd)
 				}
-				// Refresh viewport if sentence changed
+				// Load content when TTS is enabled
+				if msgType := fmt.Sprintf("%T", msg); msgType == "tts.TTSEnabledMsg" {
+					log.Printf("[DEBUG] TTS enabled message received, loading content")
+					log.Printf("[DEBUG] currentDocument.Body length: %d", len(m.currentDocument.Body))
+					log.Printf("[DEBUG] currentDocument.Body preview: %.100s", m.currentDocument.Body)
+					m.tts.LoadContentIfEnabled(m.currentDocument.Body)
+				}
+				// Resize viewport if TTS state changed
+				if msgType := fmt.Sprintf("%T", msg); 
+				   msgType == "tts.TTSEnabledMsg" || msgType == "tts.TTSDisabledMsg" ||
+				   msgType == "tts.PlayingMsg" || msgType == "tts.StoppedMsg" {
+					// Recalculate size to account for TTS indicator
+					m.setSize(m.common.width, m.common.height)
+				}
+				
+				// Always refresh viewport when TTS state changes
 				if m.viewport.HighPerformanceRendering {
 					cmds = append(cmds, viewport.Sync(m.viewport))
 				}
@@ -339,7 +368,30 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 
 func (m pagerModel) View() string {
 	var b strings.Builder
-	fmt.Fprint(&b, m.viewport.View()+"\n")
+	
+	// Add TTS indicator ABOVE viewport if TTS is playing
+	if m.tts != nil && m.tts.IsEnabled() {
+		currentSentence := m.tts.GetCurrentSentence()
+		totalSentences := m.tts.GetTotalSentences()
+		// Only show indicator when actually playing (sentence >= 0)
+		if currentSentence >= 0 && totalSentences > 0 {
+			// Create indicator with styling
+			indicator := fmt.Sprintf("🔊 Playing: Sentence %d of %d", currentSentence+1, totalSentences)
+			indicatorStyle := lipgloss.NewStyle().
+				Background(lipgloss.Color("226")). // Yellow background
+				Foreground(lipgloss.Color("0")).   // Black text
+				Bold(true).
+				Padding(0, 1).
+				Width(m.viewport.Width) // Full width to stand out
+			
+			fmt.Fprint(&b, indicatorStyle.Render(indicator))
+			fmt.Fprint(&b, "\n")
+		}
+	}
+	
+	// Then add viewport content
+	content := m.viewport.View()
+	fmt.Fprint(&b, content)
 
 	// Footer
 	m.statusBarView(&b)

@@ -102,6 +102,14 @@ func (s *TTSStatusDisplay) UpdateFromMessage(msg interface{}) {
 	case tts.TTSErrorMsg:
 		s.state = tts.StateError
 		s.errorMessage = m.Error.Error()
+		
+	case tts.TTSEnabledMsg:
+		s.state = tts.StateReady
+		
+	case tts.TTSDisabledMsg:
+		s.state = tts.StateIdle
+		s.currentSentence = -1
+		s.position = 0
 	}
 }
 
