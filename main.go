@@ -313,6 +313,11 @@ func executeCLI(cmd *cobra.Command, src *source, w io.Writer) error {
 	}
 
 	// display
+	// Auto-enable TUI if we have a terminal and a file (not stdin)
+	autoTUI := term.IsTerminal(int(os.Stdout.Fd())) && 
+		src.URL != "" && !isURL(src.URL) && 
+		!cmd.Flags().Changed("pager") && !pager
+	
 	switch {
 	case pager || cmd.Flags().Changed("pager"):
 		pagerCmd := os.Getenv("PAGER")
@@ -328,7 +333,7 @@ func executeCLI(cmd *cobra.Command, src *source, w io.Writer) error {
 			return fmt.Errorf("unable to run command: %w", err)
 		}
 		return nil
-	case tui || cmd.Flags().Changed("tui"):
+	case tui || cmd.Flags().Changed("tui") || autoTUI:
 		path := ""
 		if !isURL(src.URL) {
 			path = src.URL
