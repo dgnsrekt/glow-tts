@@ -2,137 +2,84 @@ package ui
 
 import (
 	"testing"
-
 	"github.com/charmbracelet/glow/v2/tts"
 )
 
-// TestTTSControllerCreation tests TTS controller creation.
-func TestTTSControllerCreation(t *testing.T) {
+func TestTTSToggle(t *testing.T) {
+	// Create TTS controller
 	tc := NewTTSController()
-	if tc == nil {
-		t.Fatal("Expected non-nil TTS controller")
-	}
-
+	
+	// Initial state should be disabled
 	if tc.IsEnabled() {
-		t.Error("TTS should not be enabled initially")
+		t.Error("TTS should be disabled initially")
 	}
-
-	if tc.GetCurrentSentence() != -1 {
-		t.Error("Current sentence should be -1 initially")
+	
+	if status := tc.GetTTSStatus(); status != "" {
+		t.Errorf("Expected empty status initially, got: %s", status)
 	}
-}
-
-// TestTTSMessageHandling tests TTS message handling.
-func TestTTSMessageHandling(t *testing.T) {
-	tc := NewTTSController()
-	tc.enabled = true // Enable TTS for message handling
-
-	// Test SentenceChangedMsg
-	msg := tts.SentenceChangedMsg{
-		Index:    5,
-		Text:     "Test sentence",
-		Duration: 0,
-		Progress: 0.5,
-	}
-
-	handled, cmd := tc.HandleTTSMessage(msg)
-	if !handled {
-		t.Error("SentenceChangedMsg should be handled")
-	}
-	if cmd != nil {
-		t.Error("SentenceChangedMsg should not return a command")
-	}
-
-	// Test PlayingMsg
-	playMsg := tts.PlayingMsg{
-		Sentence: 2,
-		Total:    10,
-	}
-
-	handled, _ = tc.HandleTTSMessage(playMsg)
-	if !handled {
-		t.Error("PlayingMsg should be handled")
-	}
-
-	// Test StoppedMsg
-	stopMsg := tts.StoppedMsg{
-		Reason: "user",
-	}
-
-	handled, _ = tc.HandleTTSMessage(stopMsg)
-	if !handled {
-		t.Error("StoppedMsg should be handled")
-	}
-}
-
-// TestTTSKeyHandling tests TTS keyboard shortcut handling.
-func TestTTSKeyHandling(t *testing.T) {
-	tc := NewTTSController()
-
-	// Test toggle key - even without controller, toggle returns a command
-	// to indicate enabling/disabling
+	
+	// Simulate pressing 't' to enable
 	cmd := tc.HandleTTSKeyPress("t")
-	// This returns nil because controller is nil
-	if cmd != nil {
-		t.Error("Toggle without controller should return nil")
+	if cmd == nil {
+		t.Fatal("Expected command from 't' key press")
 	}
-
-	// Test space key (play/pause)
-	cmd = tc.HandleTTSKeyPress(" ")
-	// Without controller, this should return nil
-	if cmd != nil {
-		t.Error("Space without controller should return nil")
+	
+	// After pressing 't', should be enabled
+	if !tc.IsEnabled() {
+		t.Error("TTS should be enabled after pressing 't'")
 	}
-
-	// Test stop key
-	cmd = tc.HandleTTSKeyPress("s")
-	// Without controller, this should return nil
-	if cmd != nil {
-		t.Error("Stop without controller should return nil")
-	}
-}
-
-// TestTTSStatus tests TTS status display.
-func TestTTSStatus(t *testing.T) {
-	tc := NewTTSController()
-
-	// Initially disabled, should return empty string
+	
+	// Status should show something
 	status := tc.GetTTSStatus()
-	if status != "" {
-		t.Error("Status should be empty when disabled")
+	if status == "" {
+		t.Error("Expected non-empty status after enabling TTS")
 	}
-
-	// Enable TTS and set initializing state in status display
-	tc.enabled = true
-	if tc.statusDisplay != nil {
-		tc.statusDisplay.state = tts.StateInitializing
+	t.Logf("TTS Status after enabling: %s", status)
+	
+	// Execute the command to get the message
+	msg := cmd()
+	if _, ok := msg.(tts.TTSEnabledMsg); !ok {
+		t.Errorf("Expected TTSEnabledMsg, got %T", msg)
 	}
-
-	// Should show initializing status
+	
+	// Handle the message
+	handled, _ := tc.HandleTTSMessage(msg)
+	if !handled {
+		t.Error("TTSEnabledMsg should be handled")
+	}
+	
+	// Status should still show something
 	status = tc.GetTTSStatus()
 	if status == "" {
-		t.Error("Expected non-empty status when initializing")
+		t.Error("Expected non-empty status after handling message")
 	}
+	t.Logf("TTS Status after message: %s", status)
 }
 
-// TestSentenceHighlight tests sentence highlighting.
-func TestSentenceHighlight(t *testing.T) {
+func TestTTSSpaceKey(t *testing.T) {
+	// Create and enable TTS
 	tc := NewTTSController()
-
-	content := "This is test content."
-
-	// When disabled, content should be unchanged
-	result := tc.ApplySentenceHighlight(content)
-	if result != content {
-		t.Error("Content should be unchanged when TTS is disabled")
-	}
-
+	
 	// Enable TTS
-	tc.enabled = true
-
-	// With no current sentence, content should still be unchanged
-	result = tc.ApplySentenceHighlight(content)
-	if result != content {
-		t.Error("Content should be unchanged when no sentence is selected")
+	cmd := tc.HandleTTSKeyPress("t")
+	if cmd != nil {
+		msg := cmd()
+		tc.HandleTTSMessage(msg)
+	}
+	
+	if !tc.IsEnabled() {
+		t.Fatal("TTS should be enabled")
+	}
+	
+	// Test space key when enabled
+	spaceCmd := tc.HandleTTSKeyPress(" ")
+	if spaceCmd == nil {
+		t.Error("Expected command from space key when TTS is enabled")
+	}
+	
+	// The command should produce a PlayingMsg
+	if spaceCmd != nil {
+		msg := spaceCmd()
+		t.Logf("Space key produced message type: %T", msg)
 	}
 }

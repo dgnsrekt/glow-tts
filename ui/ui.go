@@ -156,6 +156,7 @@ func newModel(cfg Config, content string) tea.Model {
 	if path == "" && content != "" {
 		m.state = stateShowDocument
 		m.pager.currentDocument = markdown{Body: content}
+		log.Printf("[DEBUG] currentDocument.Body set with %d chars: %.100s", len(content), content)
 		return m
 	}
 
@@ -176,8 +177,10 @@ func newModel(cfg Config, content string) tea.Model {
 		m.pager.currentDocument = markdown{
 			localPath: path,
 			Note:      stripAbsolutePath(path, cwd),
+			Body:      content, // Set Body when content is provided
 			Modtime:   info.ModTime(),
 		}
+		log.Printf("[DEBUG] currentDocument.Body set with %d chars from content: %.100s", len(content), content)
 	}
 
 	return m
@@ -276,6 +279,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// We've loaded a markdown file's contents for rendering
 		m.pager.currentDocument = *msg
 		body := string(utils.RemoveFrontmatter([]byte(msg.Body)))
+		log.Printf("[DEBUG] fetchedMarkdownMsg: original Body length=%d, processed body length=%d", len(msg.Body), len(body))
+		log.Printf("[DEBUG] currentDocument.Body set to: %.100s...", msg.Body)
 		cmds = append(cmds, renderWithGlamour(m.pager, body))
 
 	case contentRenderedMsg:

@@ -3,6 +3,7 @@ package mock
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/charmbracelet/glow/v2/tts"
@@ -56,11 +57,24 @@ func (e *MockEngine) GenerateAudio(text string) (*tts.Audio, error) {
 	// Simulate processing delay
 	time.Sleep(e.delay)
 
-	// Generate mock audio (silence)
+	// Generate mock audio (simple tone for testing)
 	duration := e.estimateDuration(text)
 	sampleRate := 22050
 	samples := int(duration.Seconds() * float64(sampleRate))
 	audioData := make([]byte, samples*2) // 16-bit audio
+	
+	// Generate a simple sine wave tone (440 Hz - A4 note)
+	frequency := 440.0
+	amplitude := 0.1 // Low volume to not be too loud
+	for i := 0; i < samples; i++ {
+		t := float64(i) / float64(sampleRate)
+		value := amplitude * math.Sin(2*math.Pi*frequency*t)
+		// Convert to 16-bit PCM
+		sample := int16(value * 32767)
+		// Little-endian encoding
+		audioData[i*2] = byte(sample & 0xFF)
+		audioData[i*2+1] = byte((sample >> 8) & 0xFF)
+	}
 
 	return &tts.Audio{
 		Data:       audioData,

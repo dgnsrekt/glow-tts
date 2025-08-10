@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -211,7 +212,12 @@ func (c *Controller) Play() error {
 	c.notifyStateChange(StatePlaying)
 
 	// Start playback goroutine
-	go c.playbackLoop()
+	log.Printf("[DEBUG TTS Controller] Starting playbackLoop with %d sentences", len(c.sentences))
+	log.Printf("[DEBUG TTS Controller] About to start goroutine")
+	go func() {
+		log.Printf("[DEBUG TTS Controller] Goroutine started, calling playbackLoop")
+		c.playbackLoop()
+	}()
 
 	return nil
 }
@@ -348,6 +354,13 @@ func (c *Controller) GetCurrentSentence() (Sentence, error) {
 	return c.sentences[c.currentIndex], nil
 }
 
+// GetTotalSentences returns the total number of sentences.
+func (c *Controller) GetTotalSentences() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.sentences)
+}
+
 // SetConfiguration updates the controller configuration.
 func (c *Controller) SetConfiguration(config ControllerConfig) {
 	c.mu.Lock()
@@ -462,103 +475,151 @@ func (c *Controller) setupStateMachine() {
 }
 
 func (c *Controller) playbackLoop() {
+	log.Printf("[DEBUG TTS Controller] playbackLoop ENTRY - currentIndex=%d, totalSentences=%d", c.currentIndex, len(c.sentences))
+	
+	// Check if we have sentences
+	if len(c.sentences) == 0 {
+		log.Printf("[DEBUG TTS Controller] playbackLoop EARLY EXIT - no sentences")
+		return
+	}
+	
+	log.Printf("[DEBUG TTS Controller] playbackLoop entering main loop")
 	for c.currentIndex < len(c.sentences) {
+		log.Printf("[DEBUG TTS Controller] playbackLoop iteration START - currentIndex=%d", c.currentIndex)
 		select {
 		case <-c.ctx.Done():
+			log.Printf("[DEBUG TTS Controller] playbackLoop EXIT - context done")
 			return
 		case <-c.stopCh:
+			log.Printf("[DEBUG TTS Controller] playbackLoop EXIT - stop received")
 			return
 		case <-c.pauseCh:
+			log.Printf("[DEBUG TTS Controller] playbackLoop PAUSE received")
 			// Wait for resume
 			select {
 			case <-c.ctx.Done():
+				log.Printf("[DEBUG TTS Controller] playbackLoop EXIT - context done while paused")
 				return
 			case <-c.stopCh:
+				log.Printf("[DEBUG TTS Controller] playbackLoop EXIT - stop while paused")
 				return
 			case <-c.resumeCh:
+				log.Printf("[DEBUG TTS Controller] playbackLoop RESUME received")
 				// Continue playback
 			}
 		default:
+			log.Printf("[DEBUG TTS Controller] playbackLoop DEFAULT - playing sentence %d", c.currentIndex)
 			// Play current sentence
 			if err := c.playSentence(c.currentIndex); err != nil {
+				log.Printf("[DEBUG TTS Controller] playbackLoop ERROR - playSentence failed: %v", err)
 				c.handleError(fmt.Errorf("playback error: %w", err))
 				return
 			}
 
 			// Move to next sentence
+			log.Printf("[DEBUG TTS Controller] playbackLoop advancing to next sentence")
 			c.currentIndex++
 			c.state.Sentence = c.currentIndex
 
 			// Notify about sentence change
 			if c.onSentenceChange != nil {
+				log.Printf("[DEBUG TTS Controller] playbackLoop notifying sentence change")
 				c.onSentenceChange(c.currentIndex)
 			}
 		}
+		log.Printf("[DEBUG TTS Controller] playbackLoop iteration END - currentIndex=%d", c.currentIndex)
 	}
 
+	log.Printf("[DEBUG TTS Controller] playbackLoop COMPLETE - stopping")
 	// Playback complete
 	c.Stop()
 }
 
 func (c *Controller) playSentence(index int) error {
+	log.Printf("[DEBUG TTS Controller] playSentence ENTRY - index=%d, total_sentences=%d", index, len(c.sentences))
+	
 	if index >= len(c.sentences) {
+		log.Printf("[DEBUG TTS Controller] playSentence ERROR - index out of range")
 		return errors.New("sentence index out of range")
 	}
 
 	sentence := c.sentences[index]
+	log.Printf("[DEBUG TTS Controller] playSentence processing sentence: %.50s...", sentence.Text)
 
 	// Get or generate audio
+	log.Printf("[DEBUG TTS Controller] playSentence calling getOrGenerateAudio")
 	audio, err := c.getOrGenerateAudio(index)
 	if err != nil {
+		log.Printf("[DEBUG TTS Controller] playSentence ERROR - audio generation failed: %v", err)
 		return fmt.Errorf("failed to get audio for sentence %d: %w", index, err)
 	}
+	log.Printf("[DEBUG TTS Controller] playSentence audio generated successfully, size=%d bytes", len(audio.Data))
 
 	// Play the audio
+	log.Printf("[DEBUG TTS Controller] playSentence calling player.Play")
 	if err := c.player.Play(audio); err != nil {
+		log.Printf("[DEBUG TTS Controller] playSentence ERROR - audio playback failed: %v", err)
 		return fmt.Errorf("failed to play audio: %w", err)
 	}
+	log.Printf("[DEBUG TTS Controller] playSentence audio playback started")
 
 	// Wait for playback to complete
+	log.Printf("[DEBUG TTS Controller] playSentence waiting for duration: %v", sentence.Duration)
 	// This is simplified - real implementation would monitor player state
 	time.Sleep(sentence.Duration)
 
+	log.Printf("[DEBUG TTS Controller] playSentence COMPLETE")
 	return nil
 }
 
 func (c *Controller) getOrGenerateAudio(index int) (*Audio, error) {
+	log.Printf("[DEBUG TTS Controller] getOrGenerateAudio ENTRY - index=%d", index)
+	
 	// Check buffer first
 	c.bufferMu.RLock()
 	if audio, ok := c.audioBuffer[index]; ok {
 		c.bufferMu.RUnlock()
+		log.Printf("[DEBUG TTS Controller] getOrGenerateAudio using cached audio - size=%d bytes", len(audio.Data))
 		return audio, nil
 	}
 	c.bufferMu.RUnlock()
 
 	// Generate audio
 	sentence := c.sentences[index]
+	log.Printf("[DEBUG TTS Controller] getOrGenerateAudio generating for text: %.100s...", sentence.Text)
+	
 	ctx, cancel := context.WithTimeout(c.ctx, c.config.GenerationTimeout)
 	defer cancel()
+
+	log.Printf("[DEBUG TTS Controller] getOrGenerateAudio context timeout: %v", c.config.GenerationTimeout)
 
 	// Generate with retry logic
 	var audio *Audio
 	var err error
 	for attempt := 0; attempt < c.config.RetryAttempts; attempt++ {
+		log.Printf("[DEBUG TTS Controller] getOrGenerateAudio attempt %d/%d", attempt+1, c.config.RetryAttempts)
 		audio, err = c.generateAudioWithContext(ctx, sentence.Text)
 		if err == nil {
+			log.Printf("[DEBUG TTS Controller] getOrGenerateAudio SUCCESS - generated %d bytes", len(audio.Data))
 			break
 		}
+
+		log.Printf("[DEBUG TTS Controller] getOrGenerateAudio attempt %d failed: %v", attempt+1, err)
 
 		if attempt < c.config.RetryAttempts-1 {
 			select {
 			case <-ctx.Done():
+				log.Printf("[DEBUG TTS Controller] getOrGenerateAudio context canceled during retry delay")
 				return nil, ctx.Err()
 			case <-time.After(c.config.RetryDelay):
+				log.Printf("[DEBUG TTS Controller] getOrGenerateAudio retrying after delay")
 				// Retry after delay
 			}
 		}
 	}
 
 	if err != nil {
+		log.Printf("[DEBUG TTS Controller] getOrGenerateAudio FAILED after all attempts: %v", err)
 		return nil, err
 	}
 
@@ -567,15 +628,24 @@ func (c *Controller) getOrGenerateAudio(index int) (*Audio, error) {
 		c.bufferMu.Lock()
 		c.audioBuffer[index] = audio
 		c.bufferMu.Unlock()
+		log.Printf("[DEBUG TTS Controller] getOrGenerateAudio cached audio")
 	}
 
+	log.Printf("[DEBUG TTS Controller] getOrGenerateAudio COMPLETE - returning %d bytes", len(audio.Data))
 	return audio, nil
 }
 
 func (c *Controller) generateAudioWithContext(ctx context.Context, text string) (*Audio, error) {
+	log.Printf("[DEBUG TTS Controller] generateAudioWithContext ENTRY - text: %.50s...", text)
 	// This would integrate with the engine's async generation
 	// For now, use synchronous generation
-	return c.engine.GenerateAudio(text)
+	audio, err := c.engine.GenerateAudio(text)
+	if err != nil {
+		log.Printf("[DEBUG TTS Controller] generateAudioWithContext ENGINE ERROR: %v", err)
+		return nil, err
+	}
+	log.Printf("[DEBUG TTS Controller] generateAudioWithContext ENGINE SUCCESS - %d bytes", len(audio.Data))
+	return audio, err
 }
 
 func (c *Controller) preGenerateAudio(start, end int) {
