@@ -1,141 +1,74 @@
 # Current State - Glow-TTS
 
-## Project Status
+## Implementation Status
 
-This is a fork of the Glow markdown reader (v2) that is in the initial planning phase for adding TTS functionality. The base Glow functionality is fully operational.
+### ✅ Completed Features
 
-## Existing Features (Inherited from Glow)
+1. **Core TTS Infrastructure**
+   - TTSController created and integrated with pager UI
+   - State machine for TTS operations (Idle, Ready, Playing, Paused, Stopped)
+   - Keyboard shortcuts implemented (t=toggle, space=play/pause, s=stop)
+   - Content loading mechanism from markdown documents
+   - Debug logging system to `/tmp/glow_tts_debug.log`
 
-### Core Functionality
-- **Markdown Rendering**: Full markdown-to-terminal rendering using Glamour
-- **TUI Mode**: Interactive file browser and reader using Bubble Tea framework
-- **CLI Mode**: Direct markdown file rendering from command line
-- **Pager Support**: Built-in pager for navigating long documents
-- **Syntax Highlighting**: Code block syntax highlighting via Chroma
-- **Style Support**: Multiple rendering styles (dark, light, custom JSON)
-- **Git Integration**: Automatic discovery of markdown files in git repositories
+2. **Mock TTS Engine**
+   - Fully functional mock engine for testing
+   - Generates 440Hz tone (A4 note) for audio verification
+   - Proper timing simulation for sentences
+   - Successfully integrated with audio player
 
-### User Interface Components
-- **File Browser** (`ui/stash.go`): Browse and select markdown files
-- **Markdown Viewer** (`ui/pager.go`): Read markdown with keyboard navigation
-- **Configuration Editor** (`ui/editor.go`): Edit configuration in-terminal
-- **Key Bindings** (`ui/keys.go`): Comprehensive keyboard shortcuts
-- **Styling System** (`ui/styles.go`): Theme and style management
+3. **Audio Playback System**
+   - Oto audio library integrated
+   - Cross-platform audio output working
+   - PCM audio format support (16-bit, 44100Hz)
+   - Mock engine produces audible output
 
-### Platform Support
-- **Cross-Platform**: Linux, macOS, Windows, FreeBSD, OpenBSD
-- **Terminal Compatibility**: Wide terminal emulator support
-- **Mouse Support**: Optional mouse wheel scrolling in TUI mode
-- **Configuration**: YAML-based configuration system
+4. **Fallback System**
+   - FallbackEngine wrapper implemented
+   - Automatic switching from primary to secondary engine
+   - Configurable failure threshold
+   - Thread-safe operation with sync.RWMutex
 
-### Network Features
-- **GitHub Integration** (`github.go`): Fetch README from GitHub repos
-- **GitLab Integration** (`gitlab.go`): Fetch README from GitLab repos
-- **HTTP Support**: Render markdown from URLs
+### 🚧 Partially Working Features
 
-## Work in Progress
+1. **Piper TTS Integration**
+   - Piper binary is installed and working
+   - Model available (en_US-amy-medium.onnx)
+   - Process management code written but failing
 
-### TTS Feature Development
-Currently, no TTS functionality has been implemented. The project has:
-- Comprehensive PRD (`idea_prd.md`) outlining TTS requirements
-- Strategic Core configuration initialized
-- Base Glow codebase ready for extension
+2. **Sentence Highlighting**
+   - ApplyTTSHighlighting function implemented
+   - Shows "🔊 TTS: Sentence X" indicator
+   - Not visible in actual UI rendering
 
-### Planned TTS Components (Not Yet Implemented)
-Based on the PRD and refined standards, the following components need to be developed in the isolated `tts/` directory:
-- `tts/controller.go` - Main TTS orchestrator
-- `tts/engines/piper/` - Piper TTS integration
-- `tts/engines/google/` - Google TTS integration  
-- `tts/audio/` - Cross-platform audio playback
-- `tts/sentence/` - Sentence parsing and tracking
-- `tts/sync/` - Audio-visual synchronization
-- `ui/tts_status.go` - Minimal status display (only new UI file)
-- Minimal extensions to `ui/pager.go` for highlighting
-- Keyboard shortcuts integrated into existing handlers
+### ❌ Broken Features
 
-## Known Issues
+1. **Piper Process Stability**
+   - Process starts but dies immediately
+   - Health check fails after 500ms
+   - Falls back to mock engine every time
 
-### Current Limitations (Base Glow)
-- No accessibility features for screen readers
-- No audio support of any kind
-- Limited to visual-only content consumption
+2. **UI Rendering Issues**  
+   - Sentence highlighting indicator not showing
+   - TTS status may not update properly
 
-### Technical Debt
-- No TTS-related code exists yet
-- Will need to carefully integrate with Bubble Tea event loop
-- Audio synchronization with terminal rendering will require careful timing
+3. **Command Line Interface**
+   - Requires -t flag to keep TUI open
+   - Without flag, exits immediately
 
-## Project Structure
+## Known Bugs
 
-### Source Organization
-```
-/
-├── main.go                 # Entry point and CLI setup
-├── config_cmd.go          # Configuration command
-├── man_cmd.go            # Manual page generation
-├── github.go             # GitHub integration
-├── gitlab.go             # GitLab integration
-├── style.go              # Style handling
-├── log.go                # Logging utilities
-├── url.go                # URL parsing and handling
-├── ui/                   # Terminal UI components
-│   ├── ui.go            # Main UI controller
-│   ├── pager.go         # Document viewer
-│   ├── stash.go         # File browser
-│   ├── markdown.go      # Markdown rendering
-│   ├── keys.go          # Keyboard handling
-│   └── styles.go        # Visual styling
-└── utils/               # Utility functions
-```
+### 🔴 Critical Bugs
 
-### Configuration Files
-- `go.mod`: Go module dependencies
-- `Taskfile.yaml`: Task automation
-- `Dockerfile`: Container build configuration
-- `.strategic-core/`: Strategic Core project management
+#### Bug #1: Piper Process Dies Immediately
+**Location**: tts/engines/piper/piper_v2.go:281
+**Root Cause**: Process.Signal(nil) health check unreliable
 
-## Dependencies
+#### Bug #2: Sentence Highlighting Not Visible
+**Location**: ui/pager.go:365 and ui/highlighting.go:141
+**Root Cause**: Content rendered by Glamour before highlighting
 
-### Core Libraries
-- **Bubble Tea** (v1.3.6): Terminal UI framework
-- **Glamour** (v0.10.0): Markdown rendering engine
-- **Lipgloss** (v1.1.1): Terminal styling
-- **Cobra** (v1.9.1): CLI framework
-- **Viper** (v1.20.1): Configuration management
-
-### Supporting Libraries
-- **Chroma** (v2.14.0): Syntax highlighting
-- **Goldmark** (v1.7.8): Markdown parsing
-- **Termenv** (v0.16.0): Terminal environment detection
-
-## Testing
-
-Current test coverage includes:
-- Basic Glow functionality tests (`glow_test.go`)
-- URL parsing tests (`url_test.go`)
-
-No TTS-related tests exist yet as the functionality hasn't been implemented.
-
-## Development Environment
-
-- **Language**: Go 1.23.6 (toolchain 1.24.1)
-- **Build System**: Standard Go build tools
-- **Task Runner**: Taskfile for automation
-- **Version Control**: Git
-- **Documentation**: Markdown-based (README, PRD)
-
-## Next Steps
-
-Following the refined architecture standards:
-
-1. Create `tts/` directory structure with clean interfaces
-2. Implement TTS controller in `tts/controller.go`
-3. Add engine implementations in `tts/engines/` (Piper first)
-4. Develop audio playback in `tts/audio/`
-5. Implement sentence parsing in `tts/sentence/`
-6. Add synchronization manager in `tts/sync/`
-7. Create minimal UI integration:
-   - Add `ui/tts_status.go` for status display only
-   - Extend `ui/pager.go` minimally for highlighting
-8. Add comprehensive testing in `tts/*_test.go` files
-9. Update documentation with TTS usage instructions
+#### Bug #3: TUI Exits Without -t Flag
+**Location**: main.go or ui/ui.go
+**Root Cause**: Auto-detection of TUI mode not working
+EOF < /dev/null
