@@ -76,7 +76,10 @@ internal/
 ├── queue/
 │   └── queue.go          # Sentence queue
 └── cache/
-    └── lru.go            # LRU cache
+    ├── manager.go        # Cache orchestration
+    ├── memory.go         # L1 memory cache (100MB)
+    ├── disk.go           # L2 disk cache (1GB)
+    └── session.go        # Session cache (50MB)
 ```
 
 ## ⚠️ Critical Lessons Learned
@@ -143,7 +146,14 @@ cmd.Run()                            // Synchronous, no race
 tts:
   engine: piper
   cache_dir: ~/.cache/glow-tts
-  max_cache_size: 100MB
+  
+  # Cache configuration
+  cache:
+    memory_limit: 100MB     # L1 memory cache
+    disk_limit: 1GB        # L2 disk cache
+    session_limit: 50MB    # Session-specific cache
+    ttl_days: 7           # Keep cached audio for 7 days
+    cleanup_interval: 1h   # Run cleanup every hour
   
 piper:
   model_path: ~/.local/share/piper/models/en_US-amy-medium.onnx
@@ -157,10 +167,13 @@ google:
 ## 📊 Performance Targets
 
 - **First audio**: <500ms (new), <5ms (cached)
-- **Cache hit rate**: >80%
-- **Memory usage**: <75MB total
+- **Cache hit rate**: >80% combined (L1+L2)
+- **Memory usage**: <75MB total (excluding cache)
+- **Cache memory**: <100MB (L1) + session
+- **Disk usage**: <1GB for cache
 - **Process spawn**: ~100ms per synthesis
 - **No UI blocking**: All synthesis async
+- **Cache cleanup**: <100ms per run
 
 ## 🧪 Testing Strategy
 
@@ -203,15 +216,99 @@ func BenchmarkSynthesisWithCache(b *testing.B) {
 6. **No timeout** - Hanging processes
 7. **Ignoring output validation** - Silent failures
 
+## 💾 Cache Implementation Details
+
+### Two-Level Cache Design
+
+```go
+// internal/cache/manager.go
+type CacheManager struct {
+    l1Memory    *MemoryCache  // Fast, limited size
+    l2Disk      *DiskCache    // Slower, persistent
+    session     *SessionCache // Current session only
+    cleanupStop chan struct{}
+}
+
+func (cm *CacheManager) Get(key string) ([]byte, bool) {
+    // Check L1 memory first
+    if data, ok := cm.l1Memory.Get(key); ok {
+        return data, true
+    }
+    
+    // Check L2 disk
+    if data, ok := cm.l2Disk.Get(key); ok {
+        // Promote to L1
+        cm.l1Memory.Put(key, data)
+        return data, true
+    }
+    
+    // Check session cache
+    if data, ok := cm.session.Get(key); ok {
+        return data, true
+    }
+    
+    return nil, false
+}
+```
+
+### Cleanup Strategy
+
+```go
+func (cm *CacheManager) StartCleanup() {
+    ticker := time.NewTicker(1 * time.Hour)
+    go func() {
+        for {
+            select {
+            case <-ticker.C:
+                cm.performCleanup()
+            case <-cm.cleanupStop:
+                ticker.Stop()
+                return
+            }
+        }
+    }()
+}
+
+func (cm *CacheManager) performCleanup() {
+    // Remove expired entries (>7 days)
+    cm.l2Disk.RemoveExpired(7 * 24 * time.Hour)
+    
+    // Enforce size limits with smart eviction
+    if cm.l2Disk.Size() > 1*GB {
+        cm.l2Disk.EvictLRU()
+    }
+    
+    // Clear old session data
+    cm.session.ClearIfStale(24 * time.Hour)
+}
+```
+
+### Key Generation
+
+```go
+func GenerateCacheKey(text, voice string, speed float64) string {
+    // Normalize text (trim, lowercase for consistency)
+    normalized := strings.ToLower(strings.TrimSpace(text))
+    
+    // Create unique key
+    data := fmt.Sprintf("%s|%s|%.2f", normalized, voice, speed)
+    hash := sha256.Sum256([]byte(data))
+    return hex.EncodeToString(hash[:16]) // Use first 16 bytes
+}
+```
+
 ## ✅ Best Practices
 
 1. **Always cache** - 80% of content is repeated
-2. **Validate everything** - Check output size, format
-3. **Handle errors gracefully** - Log, fallback, recover
-4. **Test concurrency** - Run tests in parallel
-5. **Profile performance** - Use pprof, benchmarks
-6. **Document race condition** - Future developers need to know
-7. **Keep it simple** - Optimal solution is simplest
+2. **Implement two-level caching** - Memory for speed, disk for persistence
+3. **Clean up periodically** - Don't let cache grow unbounded
+4. **Use TTL policies** - 7 days is reasonable for most use cases
+5. **Validate everything** - Check output size, format
+6. **Handle errors gracefully** - Log, fallback, recover
+7. **Test concurrency** - Run tests in parallel
+8. **Profile performance** - Use pprof, benchmarks
+9. **Document race condition** - Future developers need to know
+10. **Keep it simple** - Optimal solution is simplest
 
 ## 🔗 Key Files to Reference
 

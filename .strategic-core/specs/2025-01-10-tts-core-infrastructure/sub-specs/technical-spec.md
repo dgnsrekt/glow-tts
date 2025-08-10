@@ -264,10 +264,85 @@ func (h *ErrorHandler) Handle(err error) error {
 ## Performance Optimizations
 
 ### Caching Strategy
-- **LRU Cache** with 100MB limit
-- **Key Format**: `hash(text + voice + speed)`
-- **Compression**: zstd for cached audio
-- **Preemptive Loading**: Next 3 sentences
+
+#### Two-Level Cache Architecture
+
+1. **Memory Cache (L1)**
+   - **Size Limit**: 100MB
+   - **Eviction**: LRU (Least Recently Used)
+   - **Purpose**: Ultra-fast access for active session
+   - **Hit Latency**: <1ms
+   - **Typical Hit Rate**: 40-50%
+
+2. **Disk Cache (L2)**
+   - **Size Limit**: 1GB
+   - **Location**: `~/.cache/glow-tts/audio/`
+   - **TTL**: 7 days per entry
+   - **Purpose**: Persistent storage across sessions
+   - **Hit Latency**: ~10-20ms
+   - **Typical Hit Rate**: 30-40%
+   - **Compression**: zstd level 3
+
+#### Cache Key Generation
+```go
+func generateCacheKey(text, voice string, speed float64) string {
+    data := fmt.Sprintf("%s|%s|%.2f", text, voice, speed)
+    hash := sha256.Sum256([]byte(data))
+    return hex.EncodeToString(hash[:])
+}
+```
+
+#### Cache Cleanup Strategy
+
+##### Cleanup Triggers
+1. **Size-Based Eviction**
+   - Memory: When approaching 100MB limit
+   - Disk: When approaching 1GB limit
+   - Uses smart scoring: `score = age × size / frequency`
+
+2. **Time-Based Cleanup**
+   - **Periodic**: Every hour, remove entries older than 7 days
+   - **On Startup**: Clean expired entries
+   - **On Shutdown**: Optional aggressive cleanup
+
+3. **Session-Based Cleanup**
+   - **Session Cache**: Separate 50MB allocation
+   - **On Exit**: Clear session cache completely
+   - **Crash Recovery**: Stale session detection and cleanup
+
+##### Cleanup Implementation
+```go
+type CacheManager struct {
+    memoryCache *LRUCache      // 100MB limit
+    diskCache   *DiskCache     // 1GB limit
+    sessionCache *SessionCache // 50MB limit
+    
+    cleanupTicker *time.Ticker // Hourly cleanup
+    metrics      *CacheMetrics
+}
+
+func (c *CacheManager) startCleanupRoutine() {
+    c.cleanupTicker = time.NewTicker(1 * time.Hour)
+    go func() {
+        for range c.cleanupTicker.C {
+            c.cleanupExpired()
+            c.enforeceSizeLimits()
+        }
+    }()
+}
+
+func (c *CacheManager) cleanupExpired() {
+    cutoff := time.Now().Add(-7 * 24 * time.Hour)
+    c.diskCache.RemoveOlderThan(cutoff)
+}
+```
+
+#### Cache Performance Targets
+- **Combined Hit Rate**: >80%
+- **Memory Usage**: <100MB for cache
+- **Disk Usage**: <1GB maximum
+- **Cleanup Time**: <100ms
+- **Zero Memory Leaks**: Validated with pprof
 
 ### Memory Management
 - **Ring Buffers** for audio streaming

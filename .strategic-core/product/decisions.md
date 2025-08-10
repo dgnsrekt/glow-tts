@@ -92,18 +92,26 @@ cmd.Run()  // Synchronous execution
 - Engine selection at startup
 - Forces TUI mode automatically
 
-### 10. Caching Strategy for TTS
-**Decision**: Implement aggressive in-memory and disk caching
+### 10. Two-Level Caching Strategy for TTS
+**Decision**: Implement two-level cache (L1 memory + L2 disk) with automatic cleanup
 **Rationale**:
-- Mitigates process spawn overhead
-- Provides instant response for repeated content
+- Mitigates process spawn overhead (~100ms per synthesis)
+- Provides instant response for repeated content (<5ms for L1 hits)
 - Reduces CPU usage significantly
-- Improves user experience
+- Balances memory usage with performance
+- Prevents unbounded cache growth
 **Implementation**:
-- LRU memory cache with 100MB limit
-- Persistent disk cache in temp directory
-- SHA256-based cache keys
-- 80% expected cache hit rate
+- **L1 Memory Cache**: 100MB limit, LRU eviction, <1ms latency
+- **L2 Disk Cache**: 1GB limit, 7-day TTL, zstd compression
+- **Session Cache**: 50MB for current document, cleared on exit
+- **Cleanup**: Hourly routine removes expired entries
+- **Smart Eviction**: Score = age × size / frequency
+- **Cache Keys**: SHA256(text + voice + speed)
+- **Expected Hit Rate**: >80% combined (40% L1, 40% L2)
+**Trade-offs**:
+- More complex than single-level cache
+- Requires ~1.15GB disk space maximum
+- Cleanup overhead every hour (~100ms)
 
 ### 11. Stdin Race Prevention
 **Decision**: Never use StdinPipe() for subprocess communication

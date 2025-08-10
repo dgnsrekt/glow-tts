@@ -156,40 +156,66 @@ Implement the audio queue that manages sentence processing order and preprocessi
 
 ---
 
-### Task 5: Implement Audio Cache
+### Task 5: Implement Two-Level Audio Cache
 
 **Type**: implementation
-**Priority**: medium
-**Estimated Hours**: 3
+**Priority**: high
+**Estimated Hours**: 5
 
 #### Pre-Implementation Checklist
-- [ ] Design cache key strategy
-- [ ] Plan eviction policy
-- [ ] Consider persistence options
+- [ ] Design two-level cache architecture
+- [ ] Plan cache key strategy (SHA256)
+- [ ] Design LRU eviction policy
+- [ ] Plan TTL-based cleanup (7 days)
+- [ ] Design persistence layer
+- [ ] Plan cleanup routines
 - [ ] Design for concurrent access
 - [ ] Plan memory management
 
 #### Description
-Implement LRU cache for synthesized audio with disk persistence.
+Implement two-level cache system with memory (L1) and disk (L2) tiers, automatic cleanup, and session management.
 
 #### Acceptance Criteria
-- [ ] LRU eviction when size limit reached
+- [ ] L1 memory cache with 100MB limit
+- [ ] L2 disk cache with 1GB limit
+- [ ] Session cache with 50MB limit
+- [ ] LRU eviction when size limits reached
+- [ ] TTL cleanup (7-day expiration)
+- [ ] Hourly cleanup routine
 - [ ] Thread-safe operations
-- [ ] Persistent disk cache
-- [ ] Configurable size limits
-- [ ] Cache hit/miss statistics
-- [ ] Compression for stored audio
+- [ ] Persistent disk cache with zstd compression
+- [ ] Cache promotion (L2 → L1)
+- [ ] Cache hit/miss/eviction metrics
+- [ ] Smart eviction scoring (age × size / frequency)
 
 #### Validation Steps
 - [ ] Cache operations are atomic
-- [ ] Eviction works correctly
+- [ ] Two-level lookup works correctly
+- [ ] Eviction maintains size limits
+- [ ] TTL cleanup removes old entries
 - [ ] Persistence survives restart
 - [ ] No memory leaks
+- [ ] Cleanup runs periodically
+- [ ] Session cache clears on exit
 
 #### Technical Notes
+```go
+// Cache hierarchy:
+// 1. L1 Memory (100MB) - fastest
+// 2. L2 Disk (1GB) - persistent
+// 3. Session (50MB) - current session only
+
+type CacheManager struct {
+    l1Memory    *MemoryCache
+    l2Disk      *DiskCache
+    session     *SessionCache
+    cleanupStop chan struct{}
+}
+```
 - Use SHA256 for cache keys
-- Consider zstd for compression
-- Implement with sync.Map or custom mutex
+- Use zstd level 3 for disk compression
+- Implement with sync.Map for concurrent access
+- Run cleanup goroutine every hour
 
 ---
 
@@ -720,8 +746,8 @@ Final integration, testing, and polish before release.
 ## Summary
 
 **Total Tasks**: 20
-**Total Estimated Hours**: 75-80 hours
-**Estimated Duration**: 7-11 days (with parallel work)
+**Total Estimated Hours**: 77-82 hours
+**Estimated Duration**: 8-11 days (with parallel work)
 
 ### Critical Path
 1. Project Setup → Interfaces → Parser → Queue → Piper Engine → Audio Player → Controller → UI Integration
