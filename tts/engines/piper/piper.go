@@ -99,8 +99,8 @@ type Config struct {
 	RestartDelay time.Duration
 }
 
-// DefaultConfig returns the default Piper configuration.
-func DefaultConfig() Config {
+// defaultConfigV1 returns the default Piper configuration for V1.
+func defaultConfigV1() Config {
 	return Config{
 		BinaryPath:          "piper",
 		ModelPath:           "",
@@ -116,8 +116,8 @@ func DefaultConfig() Config {
 	}
 }
 
-// NewEngine creates a new Piper TTS engine.
-func NewEngine(config Config) (*Engine, error) {
+// newEngineOriginal creates a new Piper TTS engine (original V1 implementation).
+func newEngineOriginal(config Config) (*Engine, error) {
 	// Validate configuration
 	if config.BinaryPath == "" {
 		return nil, errors.New("binary path is required")
@@ -227,10 +227,8 @@ func (e *Engine) startProcess() error {
 	
 	if e.config.OutputRaw {
 		args = append(args, "--output-raw")
+		// Note: --output-raw already sends to stdout, no need for --output-file
 	}
-	
-	// Add output to stdout
-	args = append(args, "--output-file", "-")
 	
 	// Create command
 	e.cmd = exec.Command(e.config.BinaryPath, args...)
