@@ -21,3 +21,19 @@ tasks:
         platforms: [darwin]
       - cmd: tail -f ~/.cache/glow/glow.log
         platforms: [linux, windows]
+
+  validate:
+    desc: Run all validation checks (format, vet, lint, test)
+    cmds:
+      - go fmt ./...
+      - go vet ./...
+      - task: lint
+        ignore_error: true  # Don't fail if golangci-lint not installed
+      - task: test
+
+  check:
+    desc: Quick validation (format, vet, test) - no external linter required
+    cmds:
+      - go fmt ./...
+      - go vet ./...
+      - task: test
