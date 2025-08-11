@@ -160,47 +160,48 @@ Implement the audio queue that manages sentence processing order and preprocessi
 
 ---
 
-### Task 5: Implement Two-Level Audio Cache
+### Task 5: Implement Two-Level Audio Cache ✅
 
 **Type**: implementation
 **Priority**: high
 **Estimated Hours**: 5
+**Status**: COMPLETED
 
 #### Pre-Implementation Checklist
-- [ ] Design two-level cache architecture
-- [ ] Plan cache key strategy (SHA256)
-- [ ] Design LRU eviction policy
-- [ ] Plan TTL-based cleanup (7 days)
-- [ ] Design persistence layer
-- [ ] Plan cleanup routines
-- [ ] Design for concurrent access
-- [ ] Plan memory management
+- [x] Design two-level cache architecture
+- [x] Plan cache key strategy (SHA256)
+- [x] Design LRU eviction policy
+- [x] Plan TTL-based cleanup (7 days)
+- [x] Design persistence layer
+- [x] Plan cleanup routines
+- [x] Design for concurrent access
+- [x] Plan memory management
 
 #### Description
 Implement two-level cache system with memory (L1) and disk (L2) tiers, automatic cleanup, and session management.
 
 #### Acceptance Criteria
-- [ ] L1 memory cache with 100MB limit
-- [ ] L2 disk cache with 1GB limit
-- [ ] Session cache with 50MB limit
-- [ ] LRU eviction when size limits reached
-- [ ] TTL cleanup (7-day expiration)
-- [ ] Hourly cleanup routine
-- [ ] Thread-safe operations
-- [ ] Persistent disk cache with zstd compression
-- [ ] Cache promotion (L2 → L1)
-- [ ] Cache hit/miss/eviction metrics
-- [ ] Smart eviction scoring (age × size / frequency)
+- [x] L1 memory cache with 100MB limit
+- [x] L2 disk cache with 1GB limit
+- [x] Session cache with 50MB limit
+- [x] LRU eviction when size limits reached
+- [x] TTL cleanup (7-day expiration)
+- [x] Hourly cleanup routine
+- [x] Thread-safe operations
+- [x] Persistent disk cache with zstd compression
+- [x] Cache promotion (L2 → L1)
+- [x] Cache hit/miss/eviction metrics
+- [x] Smart eviction scoring (age × size / frequency)
 
 #### Validation Steps
-- [ ] Cache operations are atomic
-- [ ] Two-level lookup works correctly
-- [ ] Eviction maintains size limits
-- [ ] TTL cleanup removes old entries
-- [ ] Persistence survives restart
-- [ ] No memory leaks
-- [ ] Cleanup runs periodically
-- [ ] Session cache clears on exit
+- [x] Cache operations are atomic
+- [x] Two-level lookup works correctly
+- [x] Eviction maintains size limits
+- [x] TTL cleanup removes old entries
+- [x] Persistence survives restart
+- [x] No memory leaks
+- [x] Cleanup runs periodically
+- [x] Session cache clears on exit
 
 #### Technical Notes
 ```go
