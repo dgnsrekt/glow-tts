@@ -23,6 +23,28 @@ pager: false
 width: 80
 # show all files, including hidden and ignored.
 all: false
+
+# TTS (Text-to-Speech) Configuration
+tts:
+  # Engine selection: empty means TTS disabled (piper/gtts)
+  engine: ""
+  # Cache settings
+  cache:
+    # Cache directory (default: ~/.cache/glow-tts)
+    dir: ""
+    # Maximum cache size in MB
+    max_size: 100
+  # Engine-specific settings
+  piper:
+    # Model path (empty = auto-detect)
+    model: ""
+    # Speech speed (0.1-3.0, default: 1.0)
+    speed: 1.0
+  gtts:
+    # Language code (default: en)
+    language: "en"
+    # Use slow speech flag
+    slow: false
 `
 
 var configCmd = &cobra.Command{
