@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glow/v2/internal/tts"
 	"github.com/charmbracelet/glow/v2/utils"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
@@ -94,6 +95,7 @@ type pagerModel struct {
 	viewport viewport.Model
 	state    pagerState
 	showHelp bool
+	showTTSHelp bool // Toggle between standard and TTS help views
 
 	statusMessage      string
 	statusMessageTimer *time.Timer
@@ -103,6 +105,16 @@ type pagerModel struct {
 	currentDocument markdown
 
 	watcher *fsnotify.Watcher
+
+	// TTS fields - only active when TTS is enabled
+	ttsController   *tts.TTSController
+	ttsEnabled      bool
+	ttsState        string
+	ttsError        string
+	ttsProgress     float64
+	ttsCurrent      int
+	ttsTotal        int
+	ttsInitializing bool
 }
 
 func newPagerModel(common *commonModel) pagerModel {
@@ -115,6 +127,9 @@ func newPagerModel(common *commonModel) pagerModel {
 		common:   common,
 		state:    pagerStateBrowse,
 		viewport: vp,
+		// TTS fields
+		ttsEnabled: common.cfg.TTSEnabled,
+		ttsState:   "inactive",
 	}
 	m.initWatcher()
 	return m
@@ -138,6 +153,10 @@ func (m *pagerModel) setContent(s string) {
 
 func (m *pagerModel) toggleHelp() {
 	m.showHelp = !m.showHelp
+	// Reset to standard help when toggling help off/on
+	if !m.showHelp {
+		m.showTTSHelp = false
+	}
 	m.setSize(m.common.width, m.common.height)
 	if m.viewport.PastBottom() {
 		m.viewport.GotoBottom()
@@ -239,8 +258,59 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 
 		case "?":
 			m.toggleHelp()
+			// Reset to standard help when opening
+			m.showTTSHelp = false
 			if m.viewport.HighPerformanceRendering {
 				cmds = append(cmds, viewport.Sync(m.viewport))
+			}
+		
+		case "t":
+			// Toggle between standard and TTS help when help is shown and TTS is enabled
+			if m.showHelp && m.ttsEnabled {
+				m.showTTSHelp = !m.showTTSHelp
+				if m.viewport.HighPerformanceRendering {
+					cmds = append(cmds, viewport.Sync(m.viewport))
+				}
+			}
+
+		// TTS Controls (only active when TTS is enabled)
+		case " ": // Space key for play/pause
+			if m.ttsEnabled {
+				if m.ttsController == nil && !m.ttsInitializing {
+					// Initialize TTS first
+					m.ttsInitializing = true
+					m.ttsState = "initializing"
+					cmds = append(cmds, initTTSCmd(m.common.cfg.TTSEngine, m.common.cfg))
+				} else if m.ttsController != nil {
+					if m.ttsState == "playing" {
+						cmds = append(cmds, ttsPauseCmd(m.ttsController))
+					} else if m.ttsState == "paused" || m.ttsState == "ready" {
+						if m.currentDocument.Body != "" {
+							cmds = append(cmds, ttsPlayCmd(m.ttsController, m.currentDocument.Body))
+						}
+					}
+				}
+			}
+		case "n": // Next sentence (only when TTS active)
+			if m.ttsEnabled && m.ttsController != nil {
+				cmds = append(cmds, ttsNextCmd(m.ttsController))
+			}
+		case "p": // Previous sentence (only when TTS active)
+			if m.ttsEnabled && m.ttsController != nil && msg.String() == "p" && !strings.Contains(msg.String(), "ctrl") {
+				cmds = append(cmds, ttsPrevCmd(m.ttsController))
+			}
+		case "s": // Stop TTS (only when TTS active)
+			if m.ttsEnabled && m.ttsController != nil {
+				cmds = append(cmds, ttsStopCmd(m.ttsController))
+			}
+		case "1", "2", "3", "4", "5": // Speed control (only when TTS active)
+			if m.ttsEnabled && m.ttsController != nil {
+				speedMap := map[string]float64{
+					"1": 0.5, "2": 0.75, "3": 1.0, "4": 1.25, "5": 1.5,
+				}
+				if speed, exists := speedMap[msg.String()]; exists {
+					cmds = append(cmds, ttsSetSpeedCmd(m.ttsController, speed))
+				}
 			}
 		}
 
@@ -271,6 +341,87 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 
 	case statusMessageTimeoutMsg:
 		m.state = pagerStateBrowse
+
+	// TTS Message Handlers
+	case TTSInitDoneMsg:
+		m.ttsInitializing = false
+		if msg.Err != nil {
+			m.ttsError = msg.Err.Error()
+			m.ttsState = "error"
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS initialization failed: " + msg.Err.Error(), true}))
+		} else {
+			m.ttsController = msg.Controller
+			m.ttsState = "ready"
+			m.ttsError = ""
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS ready - Press space to start", false}))
+			// Schedule periodic status updates
+			cmds = append(cmds, ttsStatusCmd(m.ttsController))
+		}
+
+	case TTSPlayDoneMsg:
+		if msg.Err != nil {
+			m.ttsError = msg.Err.Error()
+			m.ttsState = "error"
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS play failed: " + msg.Err.Error(), true}))
+		} else {
+			m.ttsState = "playing"
+			m.ttsError = ""
+		}
+
+	case TTSPauseDoneMsg:
+		if msg.Err != nil {
+			m.ttsError = msg.Err.Error()
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS pause failed: " + msg.Err.Error(), true}))
+		} else {
+			m.ttsState = "paused"
+		}
+
+	case TTSStopDoneMsg:
+		if msg.Err != nil {
+			m.ttsError = msg.Err.Error()
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS stop failed: " + msg.Err.Error(), true}))
+		} else {
+			m.ttsState = "ready"
+		}
+
+	case TTSNextDoneMsg:
+		if msg.Err != nil {
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS next failed", true}))
+		}
+
+	case TTSPrevDoneMsg:
+		if msg.Err != nil {
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS previous failed", true}))
+		}
+
+	case TTSSpeedDoneMsg:
+		if msg.Err != nil {
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS speed change failed", true}))
+		} else {
+			cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS speed updated", false}))
+		}
+
+	case TTSStatusMsg:
+		if m.ttsEnabled {
+			m.ttsState = msg.State
+			m.ttsCurrent = msg.Current
+			m.ttsTotal = msg.Total
+			m.ttsProgress = msg.Progress
+			if msg.Error != "" {
+				m.ttsError = msg.Error
+			}
+			// Schedule next status update if still active
+			if msg.State == "playing" || msg.State == "processing" {
+				cmds = append(cmds, tea.Tick(time.Millisecond*100, func(time.Time) tea.Msg {
+					return ttsStatusCmd(m.ttsController)()
+				}))
+			}
+		}
+
+	case TTSErrorMsg:
+		m.ttsError = msg.Err.Error()
+		m.ttsState = "error"
+		cmds = append(cmds, m.showStatusMessage(pagerStatusMessage{"TTS error: " + msg.Err.Error(), true}))
 	}
 
 	m.viewport, cmd = m.viewport.Update(msg)
@@ -322,10 +473,44 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		helpNote = statusBarHelpStyle(" ? Help ")
 	}
 
-	// Note
+	// Note with TTS status
 	var note string
 	if showStatusMessage {
 		note = m.statusMessage
+	} else if m.ttsEnabled {
+		// Show TTS status when TTS is active
+		switch m.ttsState {
+		case "inactive":
+			note = m.currentDocument.Note + " | TTS: Press space to start"
+		case "initializing":
+			note = m.currentDocument.Note + " | TTS: Initializing..."
+		case "ready":
+			note = m.currentDocument.Note + " | TTS: Ready"
+		case "playing":
+			if m.ttsTotal > 0 {
+				note = fmt.Sprintf("%s | TTS: Playing (%d/%d) %.0f%%",
+					m.currentDocument.Note, m.ttsCurrent, m.ttsTotal, m.ttsProgress*100)
+			} else {
+				note = m.currentDocument.Note + " | TTS: Playing"
+			}
+		case "paused":
+			if m.ttsTotal > 0 {
+				note = fmt.Sprintf("%s | TTS: Paused (%d/%d) %.0f%%",
+					m.currentDocument.Note, m.ttsCurrent, m.ttsTotal, m.ttsProgress*100)
+			} else {
+				note = m.currentDocument.Note + " | TTS: Paused"
+			}
+		case "processing":
+			note = m.currentDocument.Note + " | TTS: Processing..."
+		case "error":
+			if m.ttsError != "" {
+				note = m.currentDocument.Note + " | TTS Error: " + m.ttsError
+			} else {
+				note = m.currentDocument.Note + " | TTS: Error"
+			}
+		default:
+			note = m.currentDocument.Note + " | TTS: " + m.ttsState
+		}
 	} else {
 		note = m.currentDocument.Note
 	}
@@ -366,6 +551,15 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 }
 
 func (m pagerModel) helpView() (s string) {
+	// Show TTS help if toggled, otherwise show standard help
+	if m.showTTSHelp && m.ttsEnabled {
+		return m.ttsHelpView()
+	}
+	return m.standardHelpView()
+}
+
+// standardHelpView shows the original help layout
+func (m pagerModel) standardHelpView() (s string) {
 	col1 := []string{
 		"g/home  go to top",
 		"G/end   go to bottom",
@@ -387,6 +581,50 @@ func (m pagerModel) helpView() (s string) {
 	if len(col1) > 5 {
 		s += col1[5]
 	}
+	
+	// Add toggle hint if TTS is enabled
+	if m.ttsEnabled {
+		s += "\n\nt        toggle TTS help"
+	}
+
+	s = indent(s, 2)
+
+	// Fill up empty cells with spaces for background coloring
+	if m.common.width > 0 {
+		lines := strings.Split(s, "\n")
+		for i := 0; i < len(lines); i++ {
+			l := runewidth.StringWidth(lines[i])
+			n := max(m.common.width-l, 0)
+			lines[i] += strings.Repeat(" ", n)
+		}
+
+		s = strings.Join(lines, "\n")
+	}
+
+	return helpViewStyle(s)
+}
+
+// ttsHelpView shows TTS-specific help
+func (m pagerModel) ttsHelpView() (s string) {
+	s += "\n"
+	s += "### TTS Controls ###\n"
+	s += "\n"
+	s += "space    play/pause TTS\n"
+	s += "n        next sentence\n"
+	s += "p        previous sentence\n"
+	s += "s        stop TTS\n"
+	s += "1-5      speed control (0.5x to 1.5x)\n"
+	s += "\n"
+	s += "### Navigation (while playing) ###\n"
+	s += "\n"
+	s += "k/↑      scroll up\n"
+	s += "j/↓      scroll down\n"
+	s += "g/home   go to top\n"
+	s += "G/end    go to bottom\n"
+	s += "\n"
+	s += "t        toggle standard help\n"
+	s += "?        close help\n"
+	s += "q        quit\n"
 
 	s = indent(s, 2)
 
