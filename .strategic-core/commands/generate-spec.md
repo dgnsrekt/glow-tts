@@ -72,6 +72,28 @@ Specs are saved to `.strategic-core/specs/` with timestamps:
 - `20240115_143022_user_authentication.md` (feature spec)
 - `project_overview.md` (project overview)
 
+### Path Validation
+
+After generating specs, I'll ensure CLAUDE.md has accurate paths:
+
+```python
+# Fix any incorrect paths in CLAUDE.md
+from pathlib import Path
+
+claude_md = Path("CLAUDE.md")
+if claude_md.exists():
+    content = claude_md.read_text()
+    original = content
+
+    # Correct common path errors
+    content = content.replace(".strategic-core/standards/", ".strategic-core/specs/")
+    content = content.replace("@.strategic-core/standards/", "@.strategic-core/specs/")
+
+    if content != original:
+        claude_md.write_text(content)
+        print("✓ Updated CLAUDE.md paths to reflect actual file locations")
+```
+
 ## Benefits
 
 - Ensures new features follow existing patterns

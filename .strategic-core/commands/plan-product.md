@@ -18,9 +18,24 @@ Initialize Strategic Core for a new product by creating foundational documentati
 
 This command will guide you through an interactive process to gather information about your product.
 
+### Step 0: Check Ideas Folder
+
+First, let me check if you have any materials in your ideas folder that can inform the planning:
+
+```
+Checking .strategic-core/ideas/ for:
+- Requirements documents
+- Mockups and wireframes
+- Research notes
+- Technical specifications
+- Any other inspiration materials
+```
+
+If I find materials in the ideas folder, I'll analyze them to better understand your vision before asking questions.
+
 ### Step 1: Understand the Product Vision
 
-First, I need to understand your product vision. Please tell me:
+Based on any ideas found (or starting fresh), I need to understand your product vision. Please tell me:
 
 1. **What problem does your product solve?**
 2. **Who are your target users?**
@@ -66,6 +81,14 @@ Finally, I'll create `.strategic-core/product/decisions.md` to track:
 - Trade-offs considered
 - Future considerations
 
+## Ideas Integration
+
+If you have materials in `.strategic-core/ideas/`:
+- I'll extract key requirements and constraints
+- Mockups will inform UI/UX decisions
+- Technical specs will guide architecture choices
+- All insights will be incorporated into the generated documentation
+
 ## Output
 
 After running this command, you'll have:
@@ -79,12 +102,51 @@ After running this command, you'll have:
     └── decisions.md    # Architectural decisions
 ```
 
+All documentation will be informed by:
+- Your interactive responses
+- Materials from the ideas folder (if present)
+- Best practices for your technology choices
+
+## Workflow Guidance
+
+After planning is complete, I'll provide this guidance:
+
+```
+🎯 PRODUCT PLANNING COMPLETE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your product foundation has been established!
+
+NEXT COMMAND SUGGESTIONS:
+
+📋 Review the documentation:
+   • Check mission.md aligns with your vision
+   • Verify roadmap.md priorities
+   • Confirm tech-stack.md choices
+
+🎯 /refine-standards
+   • Choose coding standards for your tech stack
+   • Add project-specific guidelines
+   • Set quality expectations
+
+📝 /create-spec
+   • Plan your first feature from the roadmap
+   • Create detailed specifications
+   • Define implementation tasks
+
+🤖 /generate-agents (after creating specs)
+   • Generate AI agents for your project
+   • Get specialized implementation help
+   • Improve development efficiency
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
 ## Next Steps
 
-Once complete, you can:
-1. Review and refine the generated documentation
-2. Use `/create-spec` to plan your first feature
-3. Use `/execute-tasks` to start building
+The generated documentation serves as your project foundation:
+1. Review and refine all documents
+2. Start with the highest priority feature
+3. Maintain documentation as the project evolves
 
 ## Notes
 

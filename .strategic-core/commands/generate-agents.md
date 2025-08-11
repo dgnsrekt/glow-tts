@@ -135,9 +135,31 @@ The generated agents will be:
 - Registered in the agent registry for discovery
 - Configured with your project standards
 
-### Step 6: Verification
+### Step 6: Path Validation
 
-After generation is complete, I'll provide verification instructions:
+After generation, I'll validate and fix paths in CLAUDE.md:
+
+```python
+# Ensure CLAUDE.md references are accurate
+from pathlib import Path
+
+claude_md = Path("CLAUDE.md")
+if claude_md.exists():
+    content = claude_md.read_text()
+    original = content
+
+    # Fix common path errors
+    content = content.replace(".strategic-core/standards/", ".strategic-core/specs/")
+    content = content.replace("@.strategic-core/standards/", "@.strategic-core/specs/")
+
+    if content != original:
+        claude_md.write_text(content)
+        print("✓ Fixed CLAUDE.md paths to match actual locations")
+```
+
+### Step 7: Verification
+
+After generation and path validation, I'll provide verification instructions:
 
 ```
 ✅ AGENTS GENERATED SUCCESSFULLY
@@ -352,22 +374,28 @@ Specialized agents have been created for your project!
 ⚠️ IMPORTANT: Reload Claude Code to activate agents
 After reloading, your agents will be available.
 
-RECOMMENDED NEXT STEPS:
+NEXT STEPS (IMPORTANT):
 
-1. Reload Claude Code (required)
-   - Close and reopen Claude Code
-   - Your agents will be automatically loaded
+⚠️ Reload Claude Code (required):
+   • Close Claude Code completely
+   • Restart Claude Code
+   • Agents will be automatically loaded
 
-2. Review and refine your project standards (optional)
-   Use: /refine-standards
-   - Customize standards for your tech stack
-   - Add project-specific guidelines
-   - Ensure consistency across agents
+Then continue with:
 
-3. Start implementation with your new agents
-   Use: /execute-tasks
-   - Agents will automatically assist with tasks
-   - Specialized agents handle specific domains
-   - Each agent focuses on its area of expertise
+🔍 Verify agents loaded:
+   • Type: /agents
+   • Should list all your new agents
+   • Each with their specialization
+
+🔨 /execute-tasks
+   • Start implementing with agent assistance
+   • Agents auto-activate based on context
+   • Better code quality guaranteed
+
+🎯 /refine-standards (optional)
+   • Customize standards for your tech stack
+   • Add project-specific guidelines
+   • Ensure consistency across agents
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```

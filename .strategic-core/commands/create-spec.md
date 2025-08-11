@@ -146,35 +146,62 @@ After specification is complete:
 4. Use `/execute-tasks` to start implementation
 5. Track progress against tasks
 
+### Path Validation
+
+After creating the specification, I'll validate all paths in CLAUDE.md:
+
+```python
+# Ensure CLAUDE.md has accurate file paths
+from pathlib import Path
+import re
+
+# Check and fix common path errors
+claude_md = Path("CLAUDE.md")
+if claude_md.exists():
+    content = claude_md.read_text()
+    original = content
+
+    # Fix common path errors
+    content = content.replace(".strategic-core/standards/", ".strategic-core/specs/")
+    content = content.replace("@.strategic-core/standards/", "@.strategic-core/specs/")
+
+    if content != original:
+        claude_md.write_text(content)
+        print("✓ Updated CLAUDE.md paths to match actual file locations")
+```
+
 ### Agent Generation Prompt
 
-After creating the specification, I'll provide workflow guidance:
+After creating the specification and validating paths, I'll provide workflow guidance:
 
 ```
 ✨ SPECIFICATION COMPLETE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Your specification has been created successfully!
+✓ CLAUDE.md paths validated and corrected
 
-RECOMMENDED NEXT STEPS:
+NEXT COMMAND SUGGESTIONS:
 
-1. Review and refine your project standards (optional)
-   Use: /refine-standards
-   - Customize coding standards for this feature
-   - Add feature-specific guidelines
-   - Update best practices
+📚 Review the specification:
+   • Read through all generated documents
+   • Verify requirements match your vision
+   • Adjust tasks.md if needed
 
-2. Generate specialized AI agents for this spec (recommended)
-   Use: /generate-agents
-   - Task tracking and progress management
-   - Implementation of specific components
-   - Test creation and validation
-   - Code review and optimization
+🤖 /generate-agents (recommended)
+   • Creates specialized agents for this spec
+   • Agents will help with implementation
+   • Improves code quality and consistency
 
-3. Start implementation
-   Use: /execute-tasks
-   - Implement features following the spec
-   - Track progress automatically
+🔨 /execute-tasks
+   • Start implementing the specification
+   • Work through tasks systematically
+   • Track progress automatically
+
+🎯 /refine-standards (optional)
+   • Add feature-specific coding guidelines
+   • Update standards for new patterns
+   • Ensure consistency across the feature
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 

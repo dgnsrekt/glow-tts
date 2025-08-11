@@ -24,6 +24,21 @@ Execute implementation tasks from a specification, focusing on one task at a tim
 5. Implement task with specialized agent
 6. Update task status
 
+## Important Implementation Guidelines
+
+⚠️ **NEVER SKIP PRE-IMPLEMENTATION CHECKS**
+- Step 4 is mandatory for every task
+- Review all checklists before coding
+- Confirm understanding of requirements
+- Identify dependencies and approach
+
+📋 **USE TodoWrite TOOL FOR TASK TRACKING**
+- Add ALL pre-implementation checklist items to TodoWrite
+- Add ALL acceptance criteria as individual todos
+- Add ALL validation steps to track completion
+- Mark items as in_progress/completed as you work
+- This ensures nothing is forgotten or skipped
+
 ## Process
 
 ### Step 1: Select Specification
@@ -88,19 +103,38 @@ I'll automatically check for and use specialized agents if available:
 
 ### Step 4: Pre-Implementation Checks
 
-Before starting implementation, I'll verify:
+**IMPORTANT: This step is MANDATORY and must not be skipped.**
 
-1. **Pre-Implementation Checklist** (from task)
-   - [ ] Dependencies reviewed and available
-   - [ ] Acceptance criteria understood
-   - [ ] Technical approach decided
-   - [ ] Required files/modules identified
-   - [ ] Test approach planned
+Before starting ANY implementation, I MUST:
 
-2. **Review Context**
-   - Read specification details
-   - Check project standards
-   - Review existing code
+1. **Load Task Requirements into TodoWrite Tool**
+   ```python
+   # Use TodoWrite to track EVERYTHING:
+   - Pre-implementation checklist items
+   - Each acceptance criterion
+   - Each validation step
+   - Technical subtasks identified
+   ```
+
+2. **Pre-Implementation Checklist** (from task)
+   ```
+   ✓ Dependencies reviewed and available
+   ✓ Acceptance criteria understood
+   ✓ Technical approach decided
+   ✓ Required files/modules identified
+   ✓ Test approach planned
+   ```
+
+   I will explicitly go through each item, add to TodoWrite, and confirm readiness.
+
+3. **Review Context**
+   - Read specification details thoroughly
+   - Check project standards and patterns
+   - Review existing code for consistency
+   - Identify potential integration points
+   - Add any additional discovered tasks to TodoWrite
+
+**Note**: If any checklist item cannot be confirmed, I must address it before proceeding with implementation. The TodoWrite tool ensures complete tracking and accountability.
 
 ### Step 5: Implementation
 
@@ -119,19 +153,53 @@ For the selected task, I will:
 ### Step 6: Task Completion
 
 After implementation:
-1. **Complete Validation Checklist**
+1. **Update TodoWrite Tool**
+   - Mark all completed items as completed
+   - Verify all acceptance criteria are met
+   - Confirm all validation steps passed
+   - Add any follow-up tasks discovered
+
+2. **Complete Validation Checklist**
    - [ ] Code compiles/runs without errors
    - [ ] Tests pass
    - [ ] Standards compliance checked
    - [ ] Documentation updated if needed
 
-2. **Update task status in tasks.md**:
+3. **Update task status in tasks.md**:
    - Mark checkboxes as complete using [x]
    - Update task status
    - Note any issues or blockers
 
-3. Review updated progress
-4. Identify next logical task
+4. Review updated progress in both TodoWrite and tasks.md
+5. Identify next logical task
+
+## Example TodoWrite Usage
+
+When starting a task like "Create HTML Structure", I would use TodoWrite like this:
+
+```python
+# Pre-Implementation Checks
+- Review HTML5 semantic structure requirements
+- Check existing UI patterns in codebase
+- Identify required meta tags
+- Plan file structure approach
+- Review accessibility requirements
+
+# Acceptance Criteria
+- Valid HTML5 document structure created
+- Semantic elements used appropriately
+- Meta tags for viewport and charset included
+- Accessibility attributes added
+- Responsive viewport meta tag works
+
+# Validation Steps
+- HTML validates with W3C validator
+- Page loads without errors
+- Canvas element renders correctly
+- Responsive viewport works on mobile
+```
+
+Each item gets tracked individually, marked as in_progress when working on it, and completed when done.
 
 ## Working Principles
 
@@ -232,22 +300,32 @@ After completing all tasks, provide this guidance:
 
 Congratulations! All implementation tasks are finished.
 
-RECOMMENDED NEXT STEPS:
+NEXT COMMAND SUGGESTIONS:
 
-1. Analyze code quality and standards compliance
-   Use: /analyze-standards-fit
-   - Check how well your code matches project standards
-   - Identify areas for improvement
-   - Get recommendations for refactoring
+✅ Verify your implementation:
+   • Run your test suite
+   • Check all acceptance criteria
+   • Test edge cases
 
-2. Run tests and verify functionality
-   - Execute your test suite
-   - Verify all features work as expected
-   - Check edge cases
+📦 /commit-work (recommended)
+   • Organize changes into logical commits
+   • Generate professional commit messages
+   • Maintain clean git history
+   • Link commits to tasks
 
-3. Review and document
-   - Update documentation if needed
-   - Add code comments where helpful
-   - Create user guides if applicable
+📊 /analyze-standards-fit
+   • Check code compliance with standards
+   • Identify areas for improvement
+   • Get specific refactoring suggestions
+
+📝 /create-spec (if more features needed)
+   • Plan the next feature
+   • Create new specifications
+   • Continue development momentum
+
+🔧 /refactor-to-pure (optional)
+   • Transform code to functional style
+   • Improve testability
+   • Reduce side effects
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```

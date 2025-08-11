@@ -16,6 +16,24 @@ Analyze an existing codebase and create Strategic Core documentation based on **
 
 ## Process
 
+### Step 0: Check Ideas Folder
+
+First, I'll check `.strategic-core/ideas/` for any new feature plans or requirements:
+
+```
+Scanning for:
+- Feature specifications
+- Enhancement proposals
+- Bug fix requirements
+- Architecture changes
+- Any materials describing desired changes
+```
+
+This helps me understand:
+- What new features you're planning to add
+- How existing code should evolve
+- Gaps between current implementation and vision
+
 ### Step 1: Codebase Analysis
 
 I'll analyze your project to understand:
@@ -78,6 +96,14 @@ I'll create `.strategic-core/product/decisions.md` documenting:
 - Patterns that should be followed
 - Areas needing clarification
 
+## Ideas Integration
+
+If materials exist in `.strategic-core/ideas/`:
+- **Feature Gaps**: I'll identify what needs to be built
+- **Enhancement Opportunities**: Where current code can improve
+- **Architecture Evolution**: How structure should change
+- **Implementation Roadmap**: Path from current to desired state
+
 ## Output
 
 After analysis, you'll have:
@@ -88,8 +114,14 @@ After analysis, you'll have:
     ├── mission.md          # Inferred project purpose
     ├── current-state.md    # What exists now (no speculation)
     ├── tech-stack.md       # Detected technologies
-    └── decisions.md        # Observed patterns
+    ├── decisions.md        # Observed patterns
+    └── gaps-analysis.md    # If ideas folder has content
 ```
+
+The documentation will reflect:
+- Current implementation (from code analysis)
+- Future direction (from ideas folder)
+- Clear distinction between what exists and what's planned
 
 ### Optional: Future Planning
 
@@ -108,12 +140,46 @@ After generation:
 3. **Correct any misinterpretations**
 4. **Add missing context**
 
+## Workflow Guidance
+
+After analysis is complete, I'll provide this guidance:
+
+```
+📊 CODEBASE ANALYSIS COMPLETE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your existing codebase has been documented!
+
+NEXT COMMAND SUGGESTIONS:
+
+📋 Review generated documentation:
+   • Verify current-state.md accuracy
+   • Check tech-stack.md completeness
+   • Update mission.md if needed
+
+🎯 /refine-standards
+   • Align standards with detected patterns
+   • Add missing coding guidelines
+   • Standardize existing practices
+
+📝 /create-spec
+   • Plan new features or improvements
+   • Address technical debt
+   • Implement missing functionality
+
+🤖 /generate-agents
+   • Create agents for your tech stack
+   • Get specialized help for refactoring
+   • Improve code quality systematically
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
 ## Next Steps
 
-Once documentation is reviewed:
-1. Use `/create-spec` to plan new features
-2. Use `/execute-tasks` to implement changes
-3. Keep documentation updated going forward
+With your codebase documented:
+1. Review and correct any misinterpretations
+2. Identify highest priority improvements
+3. Plan systematic enhancements
 
 ## Notes
 

@@ -21,6 +21,7 @@ Strategic Core provides these commands:
 - `/analyze-product` - Add Strategic Core to an existing codebase
 - `/create-spec` - Plan a new feature with detailed specifications
 - `/execute-tasks` - Build features following the specifications
+- `/commit-work` - Organize changes into logical, professional commits
 - `/generate-agents` - Generate specialized AI agents for your project
 
 ### Enhancement Commands
@@ -38,6 +39,7 @@ The commands are defined in your project's Strategic Core installation:
 - `/analyze-product` → @.strategic-core/commands/analyze-product.md
 - `/create-spec` → @.strategic-core/commands/create-spec.md
 - `/execute-tasks` → @.strategic-core/commands/execute-tasks.md
+- `/commit-work` → @.strategic-core/commands/commit-work.md
 - `/generate-agents` → @.strategic-core/commands/generate-agents.md
 - `/refine-standards` → @.strategic-core/commands/refine-standards.md
 - `/analyze-standards-fit` → @.strategic-core/commands/analyze-standards-fit.md
@@ -75,7 +77,6 @@ Your project-specific standards are located in:
 - **Current State**: @.strategic-core/product/current-state.md
 - **Tech Architecture**: @.strategic-core/product/tech-stack.md
 - **Decisions**: @.strategic-core/product/decisions.md
-- **Roadmap**: @.strategic-core/product/roadmap.md (to be created)
 
 ### Ideas & Lessons Learned
 - **Original PRD**: @.strategic-core/ideas/idea.md
@@ -114,7 +115,8 @@ See @.strategic-core/standards/active/2025-01-10-0010-subprocess-handling.md for
 3. **Generate Agents**: Use `/generate-agents` to create specialized helpers
 4. **New Feature**: Use `/create-spec`
 5. **Build Feature**: Use `/execute-tasks`
-6. **Validate Work**: Use `/lint-spec` to check specifications
+6. **Commit Changes**: Use `/commit-work` to organize commits professionally
+7. **Validate Work**: Use `/lint-spec` to check specifications
 
 ## Implementation Workflow for TTS
 
