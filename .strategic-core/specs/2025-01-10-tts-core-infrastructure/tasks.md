@@ -569,40 +569,180 @@ Implement the main TTS controller that orchestrates all components.
 
 ## Phase 5: UI Integration
 
-### Task 12: Add CLI Flag Support
+### Task 12: Add CLI Flag Support ✅
 
 **Type**: implementation
 **Priority**: high
 **Estimated Hours**: 2
+**Status**: COMPLETED
 
 #### Pre-Implementation Checklist
-- [ ] Review Cobra flag patterns
-- [ ] Plan configuration structure
-- [ ] Consider validation rules
-- [ ] Design help text
-- [ ] Plan defaults
+- [x] Review Cobra flag patterns
+- [x] Plan configuration structure
+- [x] Consider validation rules
+- [x] Design help text
+- [x] Plan defaults
 
 #### Description
 Add `--tts [engine]` flag to CLI with proper validation and configuration. When flag is not used, all TTS code remains inactive.
 
 #### Acceptance Criteria
-- [ ] Flag parses correctly
-- [ ] Validates engine choice (piper/gtts)
-- [ ] Forces TUI mode when used
-- [ ] Without flag, TTS code is completely inactive
-- [ ] Updates configuration only when flag present
-- [ ] Shows in help text
-- [ ] Requires explicit engine selection
+- [x] Flag parses correctly
+- [x] Validates engine choice (piper/gtts)
+- [x] Forces TUI mode when used
+- [x] Without flag, TTS code is completely inactive
+- [x] Updates configuration only when flag present
+- [x] Shows in help text
+- [x] Requires explicit engine selection
 
 #### Validation Steps
-- [ ] CLI accepts flag
-- [ ] Validation works correctly
-- [ ] TUI mode enforced
-- [ ] Help text is clear
-- [ ] Integration with config works
-- [ ] **Code quality validation**: `task check` (format, vet, test)
-- [ ] **All tests pass**: No regressions introduced
-- [ ] **Build succeeds**: Project compiles cleanly
+- [x] CLI accepts flag
+- [x] Validation works correctly
+- [x] TUI mode enforced
+- [x] Help text is clear
+- [x] Integration with config works
+- [x] **Code quality validation**: `task check` (format, vet, test)
+- [x] **All tests pass**: No regressions introduced
+- [x] **Build succeeds**: Project compiles cleanly
+
+#### Technical Notes
+**IMPLEMENTATION COMPLETE**: Successfully added `--tts [engine]` CLI flag support to main.go
+- **Global Variable**: Added `ttsEngine string` for storing selected engine
+- **Flag Registration**: Registered StringVar flag with clear help text
+- **Viper Integration**: Bound flag to configuration system for config file support
+- **Validation Logic**: Integrated with existing `tts.ValidateEngineSelection()` system
+- **Mode Enforcement**: Automatically forces TUI mode when TTS specified
+- **Error Handling**: Clear error messages for invalid engines and conflicting options
+- **Configuration**: Works with both CLI flags and config file settings
+- **Help Integration**: Appears correctly in `--help` output with descriptive text
+
+**Validation Results:**
+- ✅ **Invalid engines rejected**: Proper error messages with guidance
+- ✅ **Valid engines accepted**: "piper" and "gtts" (with "google" alias)
+- ✅ **TUI mode enforced**: Automatically enabled when TTS flag used  
+- ✅ **Pager conflict handled**: Clear error when trying to use pager with TTS
+- ✅ **Normal operation preserved**: No TTS code active when flag not used
+- ✅ **Configuration binding**: Works with Viper for config file support
+
+**Ready for Task 13**: CLI flag infrastructure complete, ready for UI integration
+
+---
+
+### Task 12.5: Fix Help View Layout with Toggle Between Standard and TTS Help ✅
+
+**Type**: implementation
+**Priority**: high
+**Estimated Hours**: 2
+**Status**: COMPLETED
+
+#### Pre-Implementation Checklist
+- [x] Analyze original help view layout
+- [x] Understand the alignment issues
+- [x] Design toggle mechanism
+- [x] Plan keyboard shortcut for toggle
+- [x] Consider state management
+
+#### Description
+Fix the broken help view layout by:
+1. Restoring the original help view layout for non-TTS mode
+2. Creating a separate TTS help view
+3. Adding a toggle mechanism between standard and TTS help views
+4. Preserving backward compatibility when TTS is not enabled
+
+#### Acceptance Criteria
+- [x] Original help layout restored (2 columns: navigation + actions)
+- [x] TTS help view created separately
+- [x] Toggle key implemented (t for "TTS help")
+- [x] Help header shows current mode (indicated by content)
+- [x] State persists during session
+- [x] No layout issues in either view
+- [x] Proper column alignment maintained
+- [x] Works correctly with and without --tts flag
+
+#### Validation Steps
+- [x] Standard help displays correctly without --tts
+- [x] Toggle only available when --tts is enabled
+- [x] Layout matches original Glow design
+- [x] No visual glitches or misalignment
+- [x] Toggle responds immediately
+- [x] State persists when closing/reopening help
+
+#### Technical Notes
+```go
+// Add to pagerModel struct:
+showTTSHelp bool  // Only relevant when ttsEnabled is true
+
+// Toggle logic in update():
+case "t", "T":  // Only when help is shown and TTS enabled
+    if m.showHelp && m.ttsEnabled {
+        m.showTTSHelp = !m.showTTSHelp
+    }
+
+// Two separate help functions:
+func (m pagerModel) standardHelpView() string { /* original */ }
+func (m pagerModel) ttsHelpView() string { /* TTS specific */ }
+```
+
+---
+
+### Task 12.5: Fix Help View with Toggle Between Standard and TTS Help ✅
+
+**Type**: implementation
+**Priority**: high
+**Estimated Hours**: 2
+**Status**: COMPLETED
+
+#### Pre-Implementation Checklist
+- [x] Restore original help view layout
+- [x] Design toggle mechanism for help views
+- [x] Plan keyboard shortcut for toggle (t key in help mode)
+- [x] Consider visual indicators for current help mode
+- [x] Preserve backward compatibility
+
+#### Description
+Fix the broken help view by restoring the original layout and adding a toggle mechanism between standard help and TTS-specific help when TTS is enabled.
+
+#### Acceptance Criteria
+- [x] Original help view restored (without TTS)
+- [x] Original layout preserved when TTS disabled
+- [x] Toggle between standard/TTS help when TTS enabled
+- [x] Clear visual indicator of current help mode
+- [x] 't' key toggles between help views (when in help mode)
+- [x] Help footer shows toggle hint when TTS enabled
+- [x] No layout breakage in either view
+- [x] Responsive to terminal width changes
+
+#### Validation Steps
+- [x] Standard help displays correctly without --tts
+- [x] Standard help displays correctly with --tts
+- [x] TTS help displays correctly when toggled
+- [x] Toggle works seamlessly
+- [x] Visual indicators are clear
+- [x] Terminal resize doesn't break layout
+- [x] All shortcuts remain functional
+
+#### Technical Notes
+```go
+// Add to pagerModel:
+type pagerModel struct {
+    // ... existing fields ...
+    showHelp     bool
+    showTTSHelp  bool  // New: toggle between help views
+}
+
+// Help view logic:
+// 1. Press ? - shows standard help (always)
+// 2. If TTS enabled, footer shows "Press t for TTS help"
+// 3. Press t - toggles to TTS help
+// 4. In TTS help, footer shows "Press t for standard help"
+```
+
+#### Implementation Strategy
+1. **Restore Original Layout**: Revert helpView to original implementation
+2. **Add TTS Help View**: Create separate ttsHelpView() function
+3. **Add Toggle State**: Track which help is showing
+4. **Handle Toggle Key**: Add 't' key handler in help mode
+5. **Update Footer**: Show toggle hint when applicable
 
 ---
 
