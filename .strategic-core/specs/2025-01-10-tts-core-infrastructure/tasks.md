@@ -807,39 +807,51 @@ func synthesizeCmd(text string) tea.Cmd {
 
 ---
 
-### Task 14: Add TTS Configuration Support
+### Task 14: Add TTS Configuration Support ✅
 
 **Type**: implementation
 **Priority**: medium
 **Estimated Hours**: 3
+**Status**: COMPLETED
 
 #### Pre-Implementation Checklist
-- [ ] Review Viper configuration
-- [ ] Design config schema
-- [ ] Plan defaults
-- [ ] Consider validation
-- [ ] Design migration strategy
+- [x] Review Viper configuration
+- [x] Design config schema
+- [x] Plan defaults
+- [x] Consider validation
+- [x] Design migration strategy
 
 #### Description
 Add TTS configuration to Glow's config file with validation.
 
 #### Acceptance Criteria
-- [ ] Config schema defined
-- [ ] Viper integration works
-- [ ] Environment variables supported
-- [ ] Validation implemented
-- [ ] Defaults are sensible
-- [ ] Migration from old config
+- [x] Config schema defined
+- [x] Viper integration works
+- [x] Environment variables supported
+- [x] Validation implemented
+- [x] Defaults are sensible
+- [x] Migration from old config
 
 #### Validation Steps
-- [ ] Config loads correctly
-- [ ] Validation catches errors
-- [ ] Env vars override file
-- [ ] Defaults work properly
-- [ ] Old configs migrate
-- [ ] **Code quality validation**: `task check` (format, vet, test)
-- [ ] **All tests pass**: No regressions introduced
-- [ ] **Build succeeds**: Project compiles cleanly
+- [x] Config loads correctly
+- [x] Validation catches errors
+- [x] Env vars override file
+- [x] Defaults work properly
+- [x] Old configs migrate
+- [x] **Code quality validation**: `task check` (format, vet, test)
+- [x] **All tests pass**: No regressions introduced
+- [x] **Build succeeds**: Project compiles cleanly
+
+#### Technical Notes
+**IMPLEMENTATION COMPLETE**: TTS configuration support fully implemented
+- **Configuration Schema**: Comprehensive TTS config defined in `config_cmd.go` with all required fields
+- **Viper Integration**: Full integration with Viper for file and environment variable support
+- **Environment Variables**: Enhanced with `SetEnvKeyReplacer` to support nested config via env vars (e.g., GLOW_TTS_CACHE_DIR)
+- **Validation**: Robust validation in `validateTTSConfig()` for cache size, speed, language codes, paths
+- **Defaults**: Sensible defaults set for all TTS configuration values
+- **Migration**: Automatic migration - old configs work seamlessly (TTS disabled by default)
+- **Documentation**: Created comprehensive TTS configuration guide at `/docs/TTS_CONFIG.md`
+- **All validation tests passed**: Config loads, validation catches errors, env vars override correctly
 
 ---
 

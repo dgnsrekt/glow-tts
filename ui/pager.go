@@ -91,10 +91,10 @@ const (
 )
 
 type pagerModel struct {
-	common   *commonModel
-	viewport viewport.Model
-	state    pagerState
-	showHelp bool
+	common      *commonModel
+	viewport    viewport.Model
+	state       pagerState
+	showHelp    bool
 	showTTSHelp bool // Toggle between standard and TTS help views
 
 	statusMessage      string
@@ -269,7 +269,7 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 			if m.viewport.HighPerformanceRendering {
 				cmds = append(cmds, viewport.Sync(m.viewport))
 			}
-		
+
 		case "t":
 			// Toggle between standard and TTS help when help is shown and TTS is enabled
 			if m.showHelp && m.ttsEnabled {
@@ -587,7 +587,7 @@ func (m pagerModel) standardHelpView() (s string) {
 	if len(col1) > 5 {
 		s += col1[5]
 	}
-	
+
 	// Add toggle hint if TTS is enabled
 	if m.ttsEnabled {
 		s += "\n\nt        toggle TTS help"

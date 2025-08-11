@@ -557,6 +557,9 @@ func tryLoadConfigFromDefaultPlaces() {
 	viper.SetConfigType("yaml")
 	viper.SetEnvPrefix("glow")
 	viper.AutomaticEnv()
+	// Enable environment variables for nested TTS config
+	// This allows GLOW_TTS_ENGINE, GLOW_TTS_CACHE_DIR, etc.
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
