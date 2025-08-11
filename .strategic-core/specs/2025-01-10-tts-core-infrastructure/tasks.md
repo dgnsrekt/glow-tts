@@ -266,36 +266,37 @@ Create a mock audio player for testing before implementing real audio.
 
 ## Phase 3: Engine Integration
 
-### Task 7: Implement Piper TTS Engine (Optimal Approach)
+### Task 7: Implement Piper TTS Engine (Optimal Approach) ✅
 
 **Type**: implementation
 **Priority**: high
 **Estimated Hours**: 4
+**Status**: COMPLETED
 
 #### Pre-Implementation Checklist
-- [ ] Install Piper locally for testing
-- [ ] Understand Piper CLI interface
-- [ ] Review stdin race condition documentation
-- [ ] Design caching strategy
-- [ ] Consider model management
+- [x] Install Piper locally for testing
+- [x] Understand Piper CLI interface
+- [x] Review stdin race condition documentation
+- [x] Design caching strategy
+- [x] Consider model management
 
 #### Description
 Implement the Piper TTS engine using the optimal approach with pre-configured stdin to avoid race conditions.
 
 #### Acceptance Criteria
-- [ ] Uses `cmd.Stdin = strings.NewReader(text)` pattern
-- [ ] Runs synchronously with `cmd.Run()`
-- [ ] NO use of `StdinPipe()` anywhere
-- [ ] Implements memory and disk caching
-- [ ] Handles errors with stderr capture
-- [ ] Validates output size
+- [x] Uses `cmd.Stdin = strings.NewReader(text)` pattern
+- [x] Runs synchronously with `cmd.Run()`
+- [x] NO use of `StdinPipe()` anywhere
+- [x] Implements memory and disk caching
+- [x] Handles errors with stderr capture
+- [x] Validates output size
 
 #### Validation Steps
-- [ ] Synthesis produces valid audio
-- [ ] No race conditions (test 100+ times)
-- [ ] Cache works correctly
-- [ ] No process leaks
-- [ ] Performance meets targets
+- [x] Synthesis produces valid audio
+- [x] No race conditions (test 100+ times)
+- [x] Cache works correctly
+- [x] No process leaks
+- [x] Performance meets targets
 
 #### Technical Notes
 ```go
@@ -307,6 +308,15 @@ err := cmd.Run()  // Synchronous execution
 - Fresh process per request (simpler, more reliable)
 - Cache aggressively to mitigate spawn overhead
 - Expected cache hit rate: 80%+
+- **IMPLEMENTATION COMPLETE**: Created `/internal/tts/engines/piper.go` with full Piper engine
+- Uses optimal stdin pattern to avoid race conditions
+- Implements timeout protection (10 seconds)
+- Graceful shutdown attempt before force kill
+- Full cache integration with cache manager
+- Comprehensive error handling and stderr capture
+- Output validation (size checks)
+- Speed control via length-scale parameter
+- All tests passing including race condition verification
 
 ---
 
