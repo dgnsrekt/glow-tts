@@ -191,8 +191,8 @@ type Config struct {
 	// Piper contains Piper-specific configuration
 	Piper PiperConfig
 	
-	// Google contains Google TTS-specific configuration
-	Google GoogleConfig
+	// GTTS contains gTTS-specific configuration
+	GTTS GTTSConfigSection
 }
 
 // PiperConfig contains Piper engine configuration
@@ -210,19 +210,19 @@ type PiperConfig struct {
 	SpeakerID int
 }
 
-// GoogleConfig contains Google TTS configuration
-type GoogleConfig struct {
-	// APIKey is the Google Cloud API key
-	APIKey string
-	
-	// Voice is the selected voice name
-	Voice string
-	
-	// Language is the language code
+// GTTSConfigSection contains gTTS configuration for the TTS config
+type GTTSConfigSection struct {
+	// Language is the language code (e.g., "en", "es", "fr")
 	Language string
 	
-	// AudioEncoding is the output audio format
-	AudioEncoding string
+	// Slow enables slower speech pace
+	Slow bool
+	
+	// TempDir is the directory for temporary files
+	TempDir string
+	
+	// RequestsPerMinute is the rate limit for requests
+	RequestsPerMinute int
 }
 
 // Direction represents navigation direction
