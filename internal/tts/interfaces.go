@@ -3,6 +3,8 @@ package tts
 import (
 	"context"
 	"time"
+
+	"github.com/charmbracelet/glow/v2/internal/ttypes"
 )
 
 // TTSEngine defines the contract for text-to-speech engines.
@@ -91,11 +93,11 @@ type AudioCache interface {
 
 // CacheStats provides cache performance metrics.
 type CacheStats struct {
-	Hits       int64     // Number of cache hits
-	Misses     int64     // Number of cache misses
-	Evictions  int64     // Number of evictions
-	Size       int64     // Current cache size in bytes
-	Capacity   int64     // Maximum cache capacity in bytes
+	Hits        int64     // Number of cache hits
+	Misses      int64     // Number of cache misses
+	Evictions   int64     // Number of evictions
+	Size        int64     // Current cache size in bytes
+	Capacity    int64     // Maximum cache capacity in bytes
 	LastCleanup time.Time // Last cleanup time
 }
 
@@ -104,15 +106,15 @@ type CacheStats struct {
 type SentenceQueue interface {
 	// Enqueue adds a sentence to the queue.
 	// Priority sentences (from navigation) should be processed first.
-	Enqueue(sentence Sentence, priority bool) error
+	Enqueue(sentence ttypes.Sentence, priority bool) error
 
 	// Dequeue removes and returns the next sentence to process.
 	// Returns ErrQueueEmpty if the queue is empty.
-	Dequeue() (Sentence, error)
+	Dequeue() (ttypes.Sentence, error)
 
 	// Peek returns the next sentence without removing it.
 	// Returns ErrQueueEmpty if the queue is empty.
-	Peek() (Sentence, error)
+	Peek() (ttypes.Sentence, error)
 
 	// Size returns the current number of sentences in the queue.
 	Size() int
@@ -128,7 +130,7 @@ type SentenceQueue interface {
 type Parser interface {
 	// Parse extracts speakable sentences from markdown content.
 	// It should strip markdown formatting and skip code blocks.
-	Parse(markdown string) ([]Sentence, error)
+	Parse(markdown string) ([]ttypes.Sentence, error)
 
 	// StripMarkdown removes markdown formatting from text.
 	StripMarkdown(text string) string
@@ -138,7 +140,7 @@ type Parser interface {
 // This is the main interface for the TTS subsystem.
 type Controller interface {
 	// Start initializes the TTS system with the specified engine.
-	Start(ctx context.Context, engineType EngineType) error
+	Start(ctx context.Context, engineType ttypes.EngineType) error
 
 	// Stop halts TTS and releases resources.
 	Stop() error
@@ -162,10 +164,10 @@ type Controller interface {
 	SetSpeed(speed float64) error
 
 	// GetState returns the current TTS state.
-	GetState() State
+	GetState() ttypes.State
 
 	// GetProgress returns the current playback progress.
-	GetProgress() Progress
+	GetProgress() ttypes.Progress
 }
 
 // SpeedController manages playback speed adjustments.

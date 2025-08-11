@@ -9,34 +9,34 @@ import (
 var (
 	// ErrNoEngineConfigured indicates no TTS engine has been selected
 	ErrNoEngineConfigured = errors.New("no TTS engine configured - specify --tts piper or --tts gtts")
-	
+
 	// ErrEngineNotAvailable indicates the selected engine is not available
 	ErrEngineNotAvailable = errors.New("selected TTS engine is not available")
-	
+
 	// ErrInvalidEngine indicates an unknown engine was specified
 	ErrInvalidEngine = errors.New("invalid TTS engine specified")
-	
+
 	// ErrSynthesisFailed indicates synthesis operation failed
 	ErrSynthesisFailed = errors.New("text synthesis failed")
-	
+
 	// ErrAudioDeviceUnavailable indicates audio device cannot be accessed
 	ErrAudioDeviceUnavailable = errors.New("audio device unavailable")
-	
+
 	// ErrQueueFull indicates the sentence queue is at capacity
 	ErrQueueFull = errors.New("sentence queue is full")
-	
+
 	// ErrQueueEmpty indicates the queue has no items
 	ErrQueueEmpty = errors.New("sentence queue is empty")
-	
+
 	// ErrCacheFull indicates cache has reached size limit
 	ErrCacheFull = errors.New("cache size limit reached")
-	
+
 	// ErrInvalidSpeed indicates speed value is out of range
 	ErrInvalidSpeed = errors.New("speed must be between 0.5 and 2.0")
-	
+
 	// ErrTimeout indicates an operation timed out
 	ErrTimeout = errors.New("operation timed out")
-	
+
 	// ErrCanceled indicates an operation was canceled
 	ErrCanceled = errors.New("operation canceled")
 )
@@ -70,24 +70,24 @@ const (
 	ErrorCodeEngineFailure     ErrorCode = "ENGINE_FAILURE"
 	ErrorCodeEngineUnavailable ErrorCode = "ENGINE_UNAVAILABLE"
 	ErrorCodeEngineTimeout     ErrorCode = "ENGINE_TIMEOUT"
-	
+
 	// Audio errors
-	ErrorCodeAudioFailure      ErrorCode = "AUDIO_FAILURE"
-	ErrorCodeAudioDevice       ErrorCode = "AUDIO_DEVICE"
-	ErrorCodeAudioFormat       ErrorCode = "AUDIO_FORMAT"
-	
+	ErrorCodeAudioFailure ErrorCode = "AUDIO_FAILURE"
+	ErrorCodeAudioDevice  ErrorCode = "AUDIO_DEVICE"
+	ErrorCodeAudioFormat  ErrorCode = "AUDIO_FORMAT"
+
 	// Queue errors
-	ErrorCodeQueueFull         ErrorCode = "QUEUE_FULL"
-	ErrorCodeQueueEmpty        ErrorCode = "QUEUE_EMPTY"
-	
+	ErrorCodeQueueFull  ErrorCode = "QUEUE_FULL"
+	ErrorCodeQueueEmpty ErrorCode = "QUEUE_EMPTY"
+
 	// Cache errors
-	ErrorCodeCacheFull         ErrorCode = "CACHE_FULL"
-	ErrorCodeCacheCorrupted    ErrorCode = "CACHE_CORRUPTED"
-	
+	ErrorCodeCacheFull      ErrorCode = "CACHE_FULL"
+	ErrorCodeCacheCorrupted ErrorCode = "CACHE_CORRUPTED"
+
 	// Input errors
-	ErrorCodeInvalidInput      ErrorCode = "INVALID_INPUT"
-	ErrorCodeTextTooLong       ErrorCode = "TEXT_TOO_LONG"
-	
+	ErrorCodeInvalidInput ErrorCode = "INVALID_INPUT"
+	ErrorCodeTextTooLong  ErrorCode = "TEXT_TOO_LONG"
+
 	// System errors
 	ErrorCodeTimeout           ErrorCode = "TIMEOUT"
 	ErrorCodeCanceled          ErrorCode = "CANCELED"

@@ -10,18 +10,18 @@ import (
 type SessionCache struct {
 	capacity int64 // Maximum size in bytes
 	size     int64 // Current size in bytes
-	
+
 	// Simple map-based storage (no LRU for simplicity/speed)
 	items map[string]*sessionCacheEntry
-	
+
 	// Session tracking
-	sessionID   string
-	startTime   time.Time
-	lastClear   time.Time
-	
+	sessionID string
+	startTime time.Time
+	lastClear time.Time
+
 	// Synchronization
 	mu sync.RWMutex
-	
+
 	// Metrics
 	stats CacheStats
 }
@@ -53,17 +53,17 @@ func NewSessionCache(sessionID string, capacity int64) *SessionCache {
 func (sc *SessionCache) Get(key string) ([]byte, bool) {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	
+
 	entry, ok := sc.items[key]
 	if !ok {
 		sc.stats.Misses++
 		return nil, false
 	}
-	
+
 	entry.hits++
 	sc.stats.Hits++
 	sc.stats.LastAccess = time.Now()
-	
+
 	return entry.value, true
 }
 
@@ -71,9 +71,9 @@ func (sc *SessionCache) Get(key string) ([]byte, bool) {
 func (sc *SessionCache) Put(key string, value []byte) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	
+
 	valueSize := int64(len(value))
-	
+
 	// Check if key already exists
 	if existing, ok := sc.items[key]; ok {
 		// Update existing entry
@@ -82,21 +82,21 @@ func (sc *SessionCache) Put(key string, value []byte) error {
 		existing.size = valueSize
 		existing.timestamp = time.Now()
 		sc.size += valueSize
-		
+
 		sc.stats.Size = sc.size
 		return nil
 	}
-	
+
 	// Check if value is too large
 	if valueSize > sc.capacity {
 		return ErrItemTooLarge
 	}
-	
+
 	// Evict items if necessary (simple FIFO for session cache)
 	for sc.size+valueSize > sc.capacity && len(sc.items) > 0 {
 		sc.evictOldest()
 	}
-	
+
 	// Add new entry
 	entry := &sessionCacheEntry{
 		key:       key,
@@ -105,13 +105,13 @@ func (sc *SessionCache) Put(key string, value []byte) error {
 		timestamp: time.Now(),
 		hits:      0,
 	}
-	
+
 	sc.items[key] = entry
 	sc.size += valueSize
-	
+
 	sc.stats.Size = sc.size
 	sc.stats.ItemCount = int64(len(sc.items))
-	
+
 	return nil
 }
 
@@ -119,18 +119,18 @@ func (sc *SessionCache) Put(key string, value []byte) error {
 func (sc *SessionCache) Delete(key string) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	
+
 	entry, ok := sc.items[key]
 	if !ok {
 		return nil
 	}
-	
+
 	delete(sc.items, key)
 	sc.size -= entry.size
-	
+
 	sc.stats.Size = sc.size
 	sc.stats.ItemCount = int64(len(sc.items))
-	
+
 	return nil
 }
 
@@ -138,14 +138,14 @@ func (sc *SessionCache) Delete(key string) error {
 func (sc *SessionCache) Clear() error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	
+
 	sc.items = make(map[string]*sessionCacheEntry)
 	sc.size = 0
 	sc.lastClear = time.Now()
-	
+
 	sc.stats.Size = 0
 	sc.stats.ItemCount = 0
-	
+
 	return nil
 }
 
@@ -153,7 +153,7 @@ func (sc *SessionCache) Clear() error {
 func (sc *SessionCache) Size() int64 {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	
+
 	return sc.size
 }
 
@@ -161,15 +161,15 @@ func (sc *SessionCache) Size() int64 {
 func (sc *SessionCache) Stats() CacheStats {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	
+
 	stats := sc.stats
 	stats.Size = sc.size
 	stats.ItemCount = int64(len(sc.items))
-	
+
 	if stats.Hits+stats.Misses > 0 {
 		stats.HitRate = float64(stats.Hits) / float64(stats.Hits+stats.Misses)
 	}
-	
+
 	return stats
 }
 
@@ -177,7 +177,7 @@ func (sc *SessionCache) Stats() CacheStats {
 func (sc *SessionCache) Contains(key string) bool {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	
+
 	_, ok := sc.items[key]
 	return ok
 }
@@ -186,16 +186,16 @@ func (sc *SessionCache) Contains(key string) bool {
 func (sc *SessionCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	
+
 	entry, ok := sc.items[key]
 	if !ok {
 		sc.stats.Misses++
 		return nil, CacheMetadata{}, false
 	}
-	
+
 	entry.hits++
 	sc.stats.Hits++
-	
+
 	metadata := CacheMetadata{
 		Key:       entry.key,
 		Size:      entry.size,
@@ -203,7 +203,7 @@ func (sc *SessionCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool
 		Hits:      entry.hits,
 		Level:     CacheLevelSession,
 	}
-	
+
 	return entry.value, metadata, true
 }
 
@@ -211,7 +211,7 @@ func (sc *SessionCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool
 func (sc *SessionCache) Keys() []string {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	
+
 	keys := make([]string, 0, len(sc.items))
 	for key := range sc.items {
 		keys = append(keys, key)
@@ -223,18 +223,18 @@ func (sc *SessionCache) Keys() []string {
 func (sc *SessionCache) ClearIfStale(maxAge time.Duration) bool {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	
+
 	if time.Since(sc.lastClear) > maxAge {
 		sc.items = make(map[string]*sessionCacheEntry)
 		sc.size = 0
 		sc.lastClear = time.Now()
-		
+
 		sc.stats.Size = 0
 		sc.stats.ItemCount = 0
-		
+
 		return true
 	}
-	
+
 	return false
 }
 
@@ -242,7 +242,7 @@ func (sc *SessionCache) ClearIfStale(maxAge time.Duration) bool {
 func (sc *SessionCache) GetSessionInfo() (sessionID string, duration time.Duration, itemCount int) {
 	sc.mu.RLock()
 	defer sc.mu.RUnlock()
-	
+
 	return sc.sessionID, time.Since(sc.startTime), len(sc.items)
 }
 
@@ -250,14 +250,14 @@ func (sc *SessionCache) GetSessionInfo() (sessionID string, duration time.Durati
 func (sc *SessionCache) evictOldest() {
 	var oldestKey string
 	var oldestTime time.Time
-	
+
 	for key, entry := range sc.items {
 		if oldestKey == "" || entry.timestamp.Before(oldestTime) {
 			oldestKey = key
 			oldestTime = entry.timestamp
 		}
 	}
-	
+
 	if oldestKey != "" {
 		entry := sc.items[oldestKey]
 		delete(sc.items, oldestKey)
@@ -271,10 +271,10 @@ func (sc *SessionCache) evictOldest() {
 func (sc *SessionCache) Prune(maxAge time.Duration) int {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	
+
 	cutoff := time.Now().Add(-maxAge)
 	pruned := 0
-	
+
 	for key, entry := range sc.items {
 		if entry.timestamp.Before(cutoff) {
 			delete(sc.items, key)
@@ -282,9 +282,9 @@ func (sc *SessionCache) Prune(maxAge time.Duration) int {
 			pruned++
 		}
 	}
-	
+
 	sc.stats.Size = sc.size
 	sc.stats.ItemCount = int64(len(sc.items))
-	
+
 	return pruned
 }

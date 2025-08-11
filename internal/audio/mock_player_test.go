@@ -104,7 +104,7 @@ func TestMockPlayer_PauseResume(t *testing.T) {
 	// Position should have increased
 	resumePosition := player.GetPosition()
 	if resumePosition <= pausePosition {
-		t.Errorf("Position should increase after resume: paused=%v, resumed=%v", 
+		t.Errorf("Position should increase after resume: paused=%v, resumed=%v",
 			pausePosition, resumePosition)
 	}
 }
@@ -535,23 +535,23 @@ func TestMockPlayer_AudioDurationCalculation(t *testing.T) {
 	defer player.Close()
 
 	tests := []struct {
-		name           string
-		audioSize      int
+		name             string
+		audioSize        int
 		expectedDuration time.Duration
 	}{
 		{
-			name:           "1 second",
-			audioSize:      88200, // 44100 * 2
+			name:             "1 second",
+			audioSize:        88200, // 44100 * 2
 			expectedDuration: 1 * time.Second,
 		},
 		{
-			name:           "500ms",
-			audioSize:      44100,
+			name:             "500ms",
+			audioSize:        44100,
 			expectedDuration: 500 * time.Millisecond,
 		},
 		{
-			name:           "100ms",
-			audioSize:      8820,
+			name:             "100ms",
+			audioSize:        8820,
 			expectedDuration: 100 * time.Millisecond,
 		},
 	}
@@ -559,7 +559,7 @@ func TestMockPlayer_AudioDurationCalculation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			audio := make([]byte, tt.audioSize)
-			
+
 			err := player.Play(audio)
 			if err != nil {
 				t.Fatalf("Play failed: %v", err)
@@ -576,8 +576,8 @@ func TestMockPlayer_AudioDurationCalculation(t *testing.T) {
 
 			// Check calculated duration
 			pos := player.GetPosition()
-			if pos < tt.expectedDuration-10*time.Millisecond || 
-			   pos > tt.expectedDuration+10*time.Millisecond {
+			if pos < tt.expectedDuration-10*time.Millisecond ||
+				pos > tt.expectedDuration+10*time.Millisecond {
 				t.Errorf("Duration mismatch: expected ~%v, got %v", tt.expectedDuration, pos)
 			}
 
@@ -597,7 +597,7 @@ func TestMockPlayer_SetAudioDuration(t *testing.T) {
 		t.Fatalf("Play failed: %v", err)
 	}
 
-	// Override duration to 2 seconds  
+	// Override duration to 2 seconds
 	player.SetAudioDuration(2 * time.Second)
 
 	// Don't speed up too much - use 5x speed (0.2 delay factor)
@@ -606,14 +606,14 @@ func TestMockPlayer_SetAudioDuration(t *testing.T) {
 
 	// After 200ms, should still be playing
 	time.Sleep(200 * time.Millisecond)
-	
+
 	if player.GetState() != StatePlaying {
 		t.Error("Should still be playing halfway through duration")
 	}
 
 	// After another 300ms (total 500ms), should be done
 	time.Sleep(300 * time.Millisecond)
-	
+
 	if player.GetState() != StateStopped {
 		t.Error("Should be stopped after duration completes")
 	}

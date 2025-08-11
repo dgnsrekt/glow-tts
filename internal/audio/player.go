@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/charmbracelet/glow/v2/internal/tts"
 	"github.com/ebitengine/oto/v3"
 )
 
@@ -18,36 +17,36 @@ import (
 type Player struct {
 	// OTO context - initialized once and reused
 	context *oto.Context
-	
+
 	// Current playback state
 	player *oto.Player
-	
+
 	// CRITICAL: Keep audio data alive during playback
 	activeStream *AudioStream
-	
+
 	// State management
-	state       atomic.Int32 // PlayerState from mock_player.go
-	volume      atomic.Uint64 // float64 as uint64 bits
-	position    atomic.Int64  // nanoseconds
-	
+	state    atomic.Int32  // PlayerState from mock_player.go
+	volume   atomic.Uint64 // float64 as uint64 bits
+	position atomic.Int64  // nanoseconds
+
 	// Timing and position tracking
-	startTime    time.Time
-	pausedAt     time.Duration
-	totalPause   time.Duration
-	
+	startTime  time.Time
+	pausedAt   time.Duration
+	totalPause time.Duration
+
 	// Synchronization
-	mu          sync.RWMutex
-	stateMu     sync.Mutex  // Separate mutex for state changes
-	
+	mu      sync.RWMutex
+	stateMu sync.Mutex // Separate mutex for state changes
+
 	// Configuration
-	sampleRate   int
-	channels     int
-	bitDepth     int
-	bufferSize   int
-	
+	sampleRate int
+	channels   int
+	bitDepth   int
+	bufferSize int
+
 	// Error handling
-	lastError    error
-	errorMu      sync.RWMutex
+	lastError error
+	errorMu   sync.RWMutex
 }
 
 // AudioStream represents an active audio stream with data kept alive.
@@ -59,7 +58,7 @@ type AudioStream struct {
 	duration   time.Duration
 	sampleRate int
 	channels   int
-	
+
 	// Synchronization for cleanup
 	mu        sync.Mutex
 	closed    bool
@@ -69,7 +68,7 @@ type AudioStream struct {
 // PlayerConfig contains configuration for the audio player.
 type PlayerConfig struct {
 	SampleRate int // 44100 or 48000 Hz only
-	Channels   int // 1 = mono, 2 = stereo  
+	Channels   int // 1 = mono, 2 = stereo
 	BitDepth   int // 16 bits per sample
 	BufferSize int // Buffer size for streaming
 }
@@ -90,7 +89,7 @@ func NewPlayer(config PlayerConfig) (*Player, error) {
 	if err := validateConfig(config); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-	
+
 	// Initialize OTO context
 	op := &oto.NewContextOptions{
 		SampleRate:   config.SampleRate,
@@ -98,15 +97,15 @@ func NewPlayer(config PlayerConfig) (*Player, error) {
 		Format:       oto.FormatSignedInt16LE, // 16-bit little endian
 		BufferSize:   time.Duration(config.BufferSize) * time.Second / time.Duration(config.SampleRate*config.Channels*2),
 	}
-	
+
 	ctx, readyChan, err := oto.NewContext(op)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create oto context: %w", err)
 	}
-	
+
 	// Wait for context to be ready
 	<-readyChan
-	
+
 	player := &Player{
 		context:    ctx,
 		sampleRate: config.SampleRate,
@@ -114,11 +113,11 @@ func NewPlayer(config PlayerConfig) (*Player, error) {
 		bitDepth:   config.BitDepth,
 		bufferSize: config.BufferSize,
 	}
-	
+
 	// Initialize state
 	player.state.Store(int32(StateStopped))
 	player.SetVolume(1.0) // Full volume by default
-	
+
 	return player, nil
 }
 
@@ -128,19 +127,19 @@ func validateConfig(config PlayerConfig) error {
 	if config.SampleRate != 44100 && config.SampleRate != 48000 {
 		return fmt.Errorf("sample rate must be 44100 or 48000 Hz, got %d", config.SampleRate)
 	}
-	
+
 	if config.Channels != 1 && config.Channels != 2 {
 		return fmt.Errorf("channels must be 1 (mono) or 2 (stereo), got %d", config.Channels)
 	}
-	
+
 	if config.BitDepth != 16 {
 		return fmt.Errorf("bit depth must be 16, got %d", config.BitDepth)
 	}
-	
+
 	if config.BufferSize <= 0 {
 		return errors.New("buffer size must be positive")
 	}
-	
+
 	return nil
 }
 
@@ -150,36 +149,36 @@ func (p *Player) Play(audio []byte) error {
 	if len(audio) == 0 {
 		return errors.New("audio data is empty")
 	}
-	
+
 	p.stateMu.Lock()
 	defer p.stateMu.Unlock()
-	
+
 	// Check if player is closed
 	if PlayerState(p.state.Load()) == StateClosed {
 		return errors.New("player is closed")
 	}
-	
+
 	// Stop any current playback
 	if err := p.stopInternal(); err != nil {
 		return fmt.Errorf("failed to stop current playback: %w", err)
 	}
-	
+
 	// Create audio stream with data kept alive
 	stream, err := p.createAudioStream(audio)
 	if err != nil {
 		return fmt.Errorf("failed to create audio stream: %w", err)
 	}
-	
+
 	// Create OTO player from stream
 	player := p.context.NewPlayer(stream.reader)
 	if player == nil {
 		return errors.New("failed to create oto player")
 	}
-	
+
 	// Apply current volume
 	volume := p.getVolume()
 	player.SetVolume(volume)
-	
+
 	// Store references to prevent GC
 	p.mu.Lock()
 	p.player = player
@@ -189,13 +188,13 @@ func (p *Player) Play(audio []byte) error {
 	p.totalPause = 0
 	p.position.Store(0)
 	p.mu.Unlock()
-	
+
 	// Start playback
 	player.Play()
-	
+
 	// Update state
 	p.state.Store(int32(StatePlaying))
-	
+
 	return nil
 }
 
@@ -204,23 +203,23 @@ func (p *Player) createAudioStream(audio []byte) (*AudioStream, error) {
 	// Make a copy to ensure we own the data
 	data := make([]byte, len(audio))
 	copy(data, audio)
-	
+
 	// Calculate duration based on audio format
 	// Formula: samples = bytes / (channels * bytes_per_sample)
 	// Duration = samples / sample_rate
 	bytesPerSample := p.bitDepth / 8
 	samples := len(data) / (p.channels * bytesPerSample)
 	duration := time.Duration(samples) * time.Second / time.Duration(p.sampleRate)
-	
+
 	stream := &AudioStream{
-		data:       data,     // CRITICAL: Keep alive!
+		data:       data, // CRITICAL: Keep alive!
 		reader:     bytes.NewReader(data),
 		size:       len(data),
 		duration:   duration,
 		sampleRate: p.sampleRate,
 		channels:   p.channels,
 	}
-	
+
 	return stream, nil
 }
 
@@ -228,25 +227,25 @@ func (p *Player) createAudioStream(audio []byte) (*AudioStream, error) {
 func (p *Player) Pause() error {
 	p.stateMu.Lock()
 	defer p.stateMu.Unlock()
-	
+
 	currentState := PlayerState(p.state.Load())
 	if currentState != StatePlaying {
 		return fmt.Errorf("cannot pause: player is %s", p.getStateName(currentState))
 	}
-	
+
 	// Pause the OTO player
 	p.mu.Lock()
 	if p.player != nil {
 		p.player.Pause()
 	}
-	
+
 	// Record pause position and time
 	p.pausedAt = p.getPositionInternal()
 	p.mu.Unlock()
-	
+
 	// Update state
 	p.state.Store(int32(StatePaused))
-	
+
 	return nil
 }
 
@@ -254,27 +253,27 @@ func (p *Player) Pause() error {
 func (p *Player) Resume() error {
 	p.stateMu.Lock()
 	defer p.stateMu.Unlock()
-	
+
 	currentState := PlayerState(p.state.Load())
 	if currentState != StatePaused {
 		return fmt.Errorf("cannot resume: player is %s", p.getStateName(currentState))
 	}
-	
+
 	// Resume the OTO player
 	p.mu.Lock()
 	if p.player != nil {
 		p.player.Play()
 	}
-	
+
 	// Update timing - add paused duration to total pause time
 	now := time.Now()
 	pauseDuration := now.Sub(p.startTime.Add(p.pausedAt))
 	p.totalPause += pauseDuration
 	p.mu.Unlock()
-	
+
 	// Update state
 	p.state.Store(int32(StatePlaying))
-	
+
 	return nil
 }
 
@@ -282,7 +281,7 @@ func (p *Player) Resume() error {
 func (p *Player) Stop() error {
 	p.stateMu.Lock()
 	defer p.stateMu.Unlock()
-	
+
 	return p.stopInternal()
 }
 
@@ -292,31 +291,31 @@ func (p *Player) stopInternal() error {
 	if currentState == StateStopped || currentState == StateClosed {
 		return nil
 	}
-	
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	// Stop and close OTO player
 	if p.player != nil {
 		p.player.Pause() // Pause first
 		p.player.Close() // Then close
 		p.player = nil
 	}
-	
+
 	// Clean up audio stream (allows GC)
 	if p.activeStream != nil {
 		p.activeStream.Close()
 		p.activeStream = nil
 	}
-	
+
 	// Reset position and timing
 	p.position.Store(0)
 	p.pausedAt = 0
 	p.totalPause = 0
-	
+
 	// Update state
 	p.state.Store(int32(StateStopped))
-	
+
 	return nil
 }
 
@@ -329,19 +328,19 @@ func (p *Player) IsPlaying() bool {
 func (p *Player) GetPosition() time.Duration {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	return p.getPositionInternal()
 }
 
 // getPositionInternal calculates position without locking.
 func (p *Player) getPositionInternal() time.Duration {
 	currentState := PlayerState(p.state.Load())
-	
+
 	switch currentState {
 	case StatePlaying:
 		// Calculate position based on elapsed time
 		elapsed := time.Since(p.startTime) - p.totalPause
-		
+
 		// Clamp to stream duration if we have one
 		if p.activeStream != nil && elapsed > p.activeStream.duration {
 			elapsed = p.activeStream.duration
@@ -349,13 +348,13 @@ func (p *Player) getPositionInternal() time.Duration {
 			go p.checkPlaybackComplete()
 		}
 		return elapsed
-		
+
 	case StatePaused:
 		return p.pausedAt
-		
+
 	case StateStopped, StateClosed:
 		return 0
-		
+
 	default:
 		return time.Duration(p.position.Load())
 	}
@@ -365,22 +364,22 @@ func (p *Player) getPositionInternal() time.Duration {
 func (p *Player) checkPlaybackComplete() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	if p.activeStream == nil {
 		return
 	}
-	
+
 	// If we've reached the end of the stream, stop playback
 	currentPos := p.getPositionInternal()
 	if currentPos >= p.activeStream.duration {
 		p.state.Store(int32(StateStopped))
-		
+
 		// Clean up player
 		if p.player != nil {
 			p.player.Close()
 			p.player = nil
 		}
-		
+
 		// Clean up stream
 		if p.activeStream != nil {
 			p.activeStream.Close()
@@ -394,17 +393,17 @@ func (p *Player) SetVolume(volume float64) error {
 	if volume < 0.0 || volume > 1.0 {
 		return fmt.Errorf("volume must be between 0.0 and 1.0, got %f", volume)
 	}
-	
+
 	// Store volume atomically
 	p.volume.Store(uint64(volume * 1000000)) // Store as integer for atomic ops
-	
+
 	// Apply to current player if active
 	p.mu.RLock()
 	if p.player != nil {
 		p.player.SetVolume(volume)
 	}
 	p.mu.RUnlock()
-	
+
 	return nil
 }
 
@@ -417,13 +416,13 @@ func (p *Player) getVolume() float64 {
 func (p *Player) Close() error {
 	p.stateMu.Lock()
 	defer p.stateMu.Unlock()
-	
+
 	// Stop playback
 	if err := p.stopInternal(); err != nil {
 		// Log error but continue cleanup
 		p.setError(fmt.Errorf("error stopping playback during close: %w", err))
 	}
-	
+
 	// Close OTO context
 	p.mu.Lock()
 	if p.context != nil {
@@ -432,10 +431,10 @@ func (p *Player) Close() error {
 		p.context = nil
 	}
 	p.mu.Unlock()
-	
+
 	// Update state
 	p.state.Store(int32(StateClosed))
-	
+
 	return p.getError()
 }
 
@@ -453,15 +452,15 @@ func (p *Player) GetVolume() float64 {
 func (p *Player) GetAudioInfo() (sampleRate, channels, bitDepth int, duration time.Duration) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	sampleRate = p.sampleRate
 	channels = p.channels
 	bitDepth = p.bitDepth
-	
+
 	if p.activeStream != nil {
 		duration = p.activeStream.duration
 	}
-	
+
 	return
 }
 
@@ -487,7 +486,7 @@ func (p *Player) getStateName(state PlayerState) string {
 	case StatePlaying:
 		return "playing"
 	case StatePaused:
-		return "paused"  
+		return "paused"
 	case StateClosed:
 		return "closed"
 	default:
@@ -521,5 +520,4 @@ func (s *AudioStream) GetDuration() time.Duration {
 	return s.duration
 }
 
-// Ensure Player implements AudioPlayer interface
-var _ tts.AudioPlayer = (*Player)(nil)
+// Player implements the AudioPlayer interface for cross-platform audio playback

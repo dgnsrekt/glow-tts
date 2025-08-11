@@ -7,15 +7,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/glow/v2/internal/tts"
+	"github.com/charmbracelet/glow/v2/internal/ttypes"
 )
 
 var (
 	// ErrQueueFull is returned when the queue is at capacity
 	ErrQueueFull = errors.New("queue is full")
-	
+
 	// ErrQueueClosed is returned when operations are attempted on a closed queue
 	ErrQueueClosed = errors.New("queue is closed")
+
+	// ErrQueueEmpty is returned when trying to dequeue from an empty queue
+	ErrQueueEmpty = errors.New("queue is empty")
 )
 
 // AudioQueue manages sentence processing order with priority support and lookahead buffering.
@@ -24,82 +27,82 @@ var (
 type AudioQueue struct {
 	// Priority queue for high-priority items (user navigation)
 	priorityQueue *priorityQueue
-	
+
 	// Regular queue for normal priority items
-	regularQueue []tts.Sentence
-	
+	regularQueue []ttypes.Sentence
+
 	// Configuration
-	maxSize       int           // Maximum queue size
-	lookahead     int           // Number of sentences to preprocess
-	memoryLimit   int64         // Maximum memory usage in bytes
-	currentMemory int64         // Current memory usage estimate
-	
+	maxSize       int   // Maximum queue size
+	lookahead     int   // Number of sentences to preprocess
+	memoryLimit   int64 // Maximum memory usage in bytes
+	currentMemory int64 // Current memory usage estimate
+
 	// Synchronization
 	mu       sync.RWMutex
 	notEmpty *sync.Cond
 	notFull  *sync.Cond
-	
+
 	// State
 	closed bool
 	stats  Stats
-	
+
 	// Channels for async operations
 	processRequests chan processRequest
-	done           chan struct{}
+	done            chan struct{}
 }
 
 // processRequest represents a lookahead processing request
 type processRequest struct {
-	sentence tts.Sentence
-	callback func(tts.Sentence)
+	sentence ttypes.Sentence
+	callback func(ttypes.Sentence)
 }
 
 // Stats tracks queue performance metrics
 type Stats struct {
-	TotalEnqueued   int64
-	TotalDequeued   int64
-	TotalDropped    int64
+	TotalEnqueued     int64
+	TotalDequeued     int64
+	TotalDropped      int64
 	HighPriorityCount int64
-	CurrentSize     int
-	PeakSize        int
-	LastEnqueue     time.Time
-	LastDequeue     time.Time
-	AverageWaitTime time.Duration
+	CurrentSize       int
+	PeakSize          int
+	LastEnqueue       time.Time
+	LastDequeue       time.Time
+	AverageWaitTime   time.Duration
 }
 
 // NewAudioQueue creates a new audio queue with the specified configuration.
 func NewAudioQueue(maxSize int, lookahead int, memoryLimit int64) *AudioQueue {
 	q := &AudioQueue{
 		priorityQueue:   &priorityQueue{},
-		regularQueue:    make([]tts.Sentence, 0, maxSize),
-		maxSize:        maxSize,
-		lookahead:      lookahead,
-		memoryLimit:    memoryLimit,
+		regularQueue:    make([]ttypes.Sentence, 0, maxSize),
+		maxSize:         maxSize,
+		lookahead:       lookahead,
+		memoryLimit:     memoryLimit,
 		processRequests: make(chan processRequest, lookahead),
-		done:           make(chan struct{}),
+		done:            make(chan struct{}),
 	}
-	
+
 	heap.Init(q.priorityQueue)
-	
+
 	q.notEmpty = sync.NewCond(&q.mu)
 	q.notFull = sync.NewCond(&q.mu)
-	
+
 	// Start lookahead processor
 	go q.processLookahead()
-	
+
 	return q
 }
 
 // Enqueue adds a sentence to the queue with optional priority.
 // High-priority items (from user navigation) are processed before regular items.
-func (q *AudioQueue) Enqueue(sentence tts.Sentence, priority bool) error {
+func (q *AudioQueue) Enqueue(sentence ttypes.Sentence, priority bool) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
 		return ErrQueueClosed
 	}
-	
+
 	// Check if queue is full
 	totalSize := q.priorityQueue.Len() + len(q.regularQueue)
 	if totalSize >= q.maxSize {
@@ -108,45 +111,45 @@ func (q *AudioQueue) Enqueue(sentence tts.Sentence, priority bool) error {
 			q.notFull.Wait()
 			totalSize = q.priorityQueue.Len() + len(q.regularQueue)
 		}
-		
+
 		if q.closed {
 			return ErrQueueClosed
 		}
 	}
-	
+
 	// Check memory limit
 	estimatedMemory := int64(len(sentence.Text) * 2) // Rough estimate
 	if q.currentMemory+estimatedMemory > q.memoryLimit {
 		q.stats.TotalDropped++
 		return ErrQueueFull
 	}
-	
+
 	// Add to appropriate queue
 	if priority {
 		heap.Push(q.priorityQueue, &queueItem{
 			sentence: sentence,
-			priority: int(tts.PriorityHigh),
+			priority: int(ttypes.PriorityHigh),
 			index:    0,
 		})
 		q.stats.HighPriorityCount++
 	} else {
 		q.regularQueue = append(q.regularQueue, sentence)
 	}
-	
+
 	q.currentMemory += estimatedMemory
 	q.stats.TotalEnqueued++
 	q.stats.LastEnqueue = time.Now()
-	
+
 	// Update peak size
 	currentSize := q.priorityQueue.Len() + len(q.regularQueue)
 	if currentSize > q.stats.PeakSize {
 		q.stats.PeakSize = currentSize
 	}
 	q.stats.CurrentSize = currentSize
-	
+
 	// Signal that queue is not empty
 	q.notEmpty.Signal()
-	
+
 	// Trigger lookahead processing for non-priority items
 	if !priority && q.lookahead > 0 {
 		select {
@@ -155,32 +158,32 @@ func (q *AudioQueue) Enqueue(sentence tts.Sentence, priority bool) error {
 			// Lookahead processor is busy, skip
 		}
 	}
-	
+
 	return nil
 }
 
 // Dequeue removes and returns the next sentence to process.
 // Priority items are returned first, followed by regular items in FIFO order.
-func (q *AudioQueue) Dequeue() (tts.Sentence, error) {
+func (q *AudioQueue) Dequeue() (ttypes.Sentence, error) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
-		return tts.Sentence{}, ErrQueueClosed
+		return ttypes.Sentence{}, ErrQueueClosed
 	}
-	
+
 	// Wait while queue is empty
 	for q.priorityQueue.Len() == 0 && len(q.regularQueue) == 0 && !q.closed {
 		q.notEmpty.Wait()
 	}
-	
+
 	if q.closed {
-		return tts.Sentence{}, ErrQueueClosed
+		return ttypes.Sentence{}, ErrQueueClosed
 	}
-	
-	var sentence tts.Sentence
+
+	var sentence ttypes.Sentence
 	var memoryFreed int64
-	
+
 	// Check priority queue first
 	if q.priorityQueue.Len() > 0 {
 		item := heap.Pop(q.priorityQueue).(*queueItem)
@@ -192,51 +195,51 @@ func (q *AudioQueue) Dequeue() (tts.Sentence, error) {
 		q.regularQueue = q.regularQueue[1:]
 		memoryFreed = int64(len(sentence.Text) * 2)
 	} else {
-		return tts.Sentence{}, tts.ErrQueueEmpty
+		return ttypes.Sentence{}, ErrQueueEmpty
 	}
-	
+
 	q.currentMemory -= memoryFreed
 	if q.currentMemory < 0 {
 		q.currentMemory = 0
 	}
-	
+
 	q.stats.TotalDequeued++
 	q.stats.LastDequeue = time.Now()
 	q.stats.CurrentSize = q.priorityQueue.Len() + len(q.regularQueue)
-	
+
 	// Signal that queue has space
 	q.notFull.Signal()
-	
+
 	return sentence, nil
 }
 
 // Peek returns the next sentence without removing it from the queue.
-func (q *AudioQueue) Peek() (tts.Sentence, error) {
+func (q *AudioQueue) Peek() (ttypes.Sentence, error) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	if q.closed {
-		return tts.Sentence{}, ErrQueueClosed
+		return ttypes.Sentence{}, ErrQueueClosed
 	}
-	
+
 	// Check priority queue first
 	if q.priorityQueue.Len() > 0 {
 		return (*q.priorityQueue)[0].sentence, nil
 	}
-	
+
 	// Check regular queue
 	if len(q.regularQueue) > 0 {
 		return q.regularQueue[0], nil
 	}
-	
-	return tts.Sentence{}, tts.ErrQueueEmpty
+
+	return ttypes.Sentence{}, ErrQueueEmpty
 }
 
 // Size returns the current number of sentences in the queue.
 func (q *AudioQueue) Size() int {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	return q.priorityQueue.Len() + len(q.regularQueue)
 }
 
@@ -244,14 +247,14 @@ func (q *AudioQueue) Size() int {
 func (q *AudioQueue) Clear() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	// Clear both queues
 	q.priorityQueue = &priorityQueue{}
 	heap.Init(q.priorityQueue)
 	q.regularQueue = q.regularQueue[:0]
 	q.currentMemory = 0
 	q.stats.CurrentSize = 0
-	
+
 	// Signal that queue has space
 	q.notFull.Broadcast()
 }
@@ -260,7 +263,7 @@ func (q *AudioQueue) Clear() {
 func (q *AudioQueue) SetLookahead(count int) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	q.lookahead = count
 }
 
@@ -268,10 +271,10 @@ func (q *AudioQueue) SetLookahead(count int) {
 func (q *AudioQueue) GetStats() Stats {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
+
 	stats := q.stats
 	stats.CurrentSize = q.priorityQueue.Len() + len(q.regularQueue)
-	
+
 	// Calculate average wait time if we have data
 	if q.stats.TotalDequeued > 0 && !q.stats.LastEnqueue.IsZero() && !q.stats.LastDequeue.IsZero() {
 		if q.stats.LastDequeue.After(q.stats.LastEnqueue) {
@@ -279,23 +282,23 @@ func (q *AudioQueue) GetStats() Stats {
 			stats.AverageWaitTime = totalWait / time.Duration(q.stats.TotalDequeued)
 		}
 	}
-	
+
 	return stats
 }
 
 // GetLookahead returns upcoming sentences for preprocessing.
 // This doesn't remove them from the queue.
-func (q *AudioQueue) GetLookahead() []tts.Sentence {
+func (q *AudioQueue) GetLookahead() []ttypes.Sentence {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
-	
-	lookahead := make([]tts.Sentence, 0, q.lookahead)
-	
+
+	lookahead := make([]ttypes.Sentence, 0, q.lookahead)
+
 	// First add priority items
 	for i := 0; i < q.priorityQueue.Len() && len(lookahead) < q.lookahead; i++ {
 		lookahead = append(lookahead, (*q.priorityQueue)[i].sentence)
 	}
-	
+
 	// Then add regular items
 	remaining := q.lookahead - len(lookahead)
 	if remaining > 0 && len(q.regularQueue) > 0 {
@@ -305,7 +308,7 @@ func (q *AudioQueue) GetLookahead() []tts.Sentence {
 		}
 		lookahead = append(lookahead, q.regularQueue[:end]...)
 	}
-	
+
 	return lookahead
 }
 
@@ -313,18 +316,18 @@ func (q *AudioQueue) GetLookahead() []tts.Sentence {
 func (q *AudioQueue) Close() error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
 		return nil
 	}
-	
+
 	q.closed = true
 	close(q.done)
-	
+
 	// Wake up any waiting goroutines
 	q.notEmpty.Broadcast()
 	q.notFull.Broadcast()
-	
+
 	return nil
 }
 
@@ -346,7 +349,7 @@ func (q *AudioQueue) processLookahead() {
 
 // Priority queue implementation using a heap
 type queueItem struct {
-	sentence tts.Sentence
+	sentence ttypes.Sentence
 	priority int
 	index    int // Index in the heap
 }
@@ -384,22 +387,22 @@ func (pq *priorityQueue) Pop() interface{} {
 }
 
 // EnqueueBatch adds multiple sentences to the queue efficiently.
-func (q *AudioQueue) EnqueueBatch(sentences []tts.Sentence, priority bool) error {
+func (q *AudioQueue) EnqueueBatch(sentences []ttypes.Sentence, priority bool) error {
 	if len(sentences) == 0 {
 		return nil
 	}
-	
+
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
 		return ErrQueueClosed
 	}
-	
+
 	// Check if we have space for the batch
 	totalSize := q.priorityQueue.Len() + len(q.regularQueue)
 	spaceAvailable := q.maxSize - totalSize
-	
+
 	if spaceAvailable < len(sentences) {
 		// Can only add partial batch
 		sentences = sentences[:spaceAvailable]
@@ -407,7 +410,7 @@ func (q *AudioQueue) EnqueueBatch(sentences []tts.Sentence, priority bool) error
 			return ErrQueueFull
 		}
 	}
-	
+
 	// Add all sentences
 	for _, sentence := range sentences {
 		estimatedMemory := int64(len(sentence.Text) * 2)
@@ -415,46 +418,46 @@ func (q *AudioQueue) EnqueueBatch(sentences []tts.Sentence, priority bool) error
 			// Stop adding if we hit memory limit
 			break
 		}
-		
+
 		if priority {
 			heap.Push(q.priorityQueue, &queueItem{
 				sentence: sentence,
-				priority: int(tts.PriorityHigh),
+				priority: int(ttypes.PriorityHigh),
 				index:    0,
 			})
 			q.stats.HighPriorityCount++
 		} else {
 			q.regularQueue = append(q.regularQueue, sentence)
 		}
-		
+
 		q.currentMemory += estimatedMemory
 		q.stats.TotalEnqueued++
 	}
-	
+
 	q.stats.LastEnqueue = time.Now()
-	
+
 	// Update stats
 	currentSize := q.priorityQueue.Len() + len(q.regularQueue)
 	if currentSize > q.stats.PeakSize {
 		q.stats.PeakSize = currentSize
 	}
 	q.stats.CurrentSize = currentSize
-	
+
 	// Signal that queue is not empty
 	q.notEmpty.Broadcast()
-	
+
 	return nil
 }
 
 // DrainTo drains up to n sentences from the queue into the provided slice.
-func (q *AudioQueue) DrainTo(sentences []tts.Sentence, n int) int {
+func (q *AudioQueue) DrainTo(sentences []ttypes.Sentence, n int) int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	
+
 	if q.closed {
 		return 0
 	}
-	
+
 	count := 0
 	for count < n && count < len(sentences) {
 		// Try priority queue first
@@ -473,13 +476,13 @@ func (q *AudioQueue) DrainTo(sentences []tts.Sentence, n int) int {
 		}
 		q.stats.TotalDequeued++
 	}
-	
+
 	if count > 0 {
 		q.stats.LastDequeue = time.Now()
 		q.stats.CurrentSize = q.priorityQueue.Len() + len(q.regularQueue)
 		q.notFull.Broadcast()
 	}
-	
+
 	return count
 }
 
@@ -491,36 +494,36 @@ func (q *AudioQueue) WaitForSpace(ctx context.Context) error {
 		q.mu.Unlock()
 		return ErrQueueClosed
 	}
-	
+
 	totalSize := q.priorityQueue.Len() + len(q.regularQueue)
 	if totalSize < q.maxSize {
 		q.mu.Unlock()
 		return nil
 	}
 	q.mu.Unlock()
-	
+
 	// Use a channel to handle context cancellation properly
 	done := make(chan error, 1)
 	go func() {
 		q.mu.Lock()
 		defer q.mu.Unlock()
-		
+
 		for {
 			if q.closed {
 				done <- ErrQueueClosed
 				return
 			}
-			
+
 			totalSize := q.priorityQueue.Len() + len(q.regularQueue)
 			if totalSize < q.maxSize {
 				done <- nil
 				return
 			}
-			
+
 			q.notFull.Wait()
 		}
 	}()
-	
+
 	select {
 	case err := <-done:
 		return err

@@ -6,8 +6,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/charmbracelet/glow/v2/internal/tts"
 )
 
 // MockPlayer implements tts.AudioPlayer for testing purposes.
@@ -41,10 +39,10 @@ type MockPlayer struct {
 	delayFactor    float64 // Speed up/slow down simulated playback
 
 	// Metrics for testing
-	playCount    atomic.Int64
-	pauseCount   atomic.Int64
-	resumeCount  atomic.Int64
-	stopCount    atomic.Int64
+	playCount   atomic.Int64
+	pauseCount  atomic.Int64
+	resumeCount atomic.Int64
+	stopCount   atomic.Int64
 }
 
 // PlayerState represents the current state of the player.
@@ -465,5 +463,4 @@ func (mp *MockPlayer) getStateName(state PlayerState) string {
 	}
 }
 
-// Ensure MockPlayer implements AudioPlayer interface
-var _ tts.AudioPlayer = (*MockPlayer)(nil)
+// MockPlayer implements the AudioPlayer interface for testing purposes

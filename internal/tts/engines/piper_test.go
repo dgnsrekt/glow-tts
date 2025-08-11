@@ -202,14 +202,14 @@ func TestPiperEngine_SpeedConversion(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			// The formula in the code is: lengthScale = 1.0 / speed
 			lengthScale := 1.0 / tt.speed
-			
+
 			// Allow small floating point differences
 			diff := lengthScale - tt.wantScale
 			if diff < 0 {
 				diff = -diff
 			}
 			if diff > 0.01 {
-				t.Errorf("Speed %v: expected scale ~%v, got %v", 
+				t.Errorf("Speed %v: expected scale ~%v, got %v",
 					tt.speed, tt.wantScale, lengthScale)
 			}
 		})
@@ -319,17 +319,17 @@ func TestPiperEngine_Concurrency(t *testing.T) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			// Concurrent reads
 			_ = engine.GetInfo()
 			_ = engine.GetVoice()
-			
+
 			// Concurrent writes
 			voice := fmt.Sprintf("voice-%d", id)
 			engine.SetVoice(voice)
 		}(i)
 	}
-	
+
 	wg.Wait()
 }
 
@@ -343,17 +343,17 @@ func TestPiperEngine_TimeoutHandling(t *testing.T) {
 		}
 
 		sourceStr := string(source)
-		
+
 		// Check for timeout context
 		if !contains(sourceStr, "context.WithTimeout") {
 			t.Error("Source code doesn't implement timeout protection")
 		}
-		
+
 		// Check for graceful shutdown attempt
 		if !contains(sourceStr, "Process.Signal") {
 			t.Error("Source code doesn't attempt graceful shutdown")
 		}
-		
+
 		// Check for force kill as last resort
 		if !contains(sourceStr, "Process.Kill") {
 			t.Error("Source code doesn't have force kill fallback")
@@ -371,17 +371,17 @@ func TestPiperEngine_OutputValidation(t *testing.T) {
 		}
 
 		sourceStr := string(source)
-		
+
 		// Check for empty output validation
 		if !contains(sourceStr, "len(audio) == 0") {
 			t.Error("Source code doesn't check for empty output")
 		}
-		
+
 		// Check for size limit validation
 		if !contains(sourceStr, "maxAudioSize") {
 			t.Error("Source code doesn't check for oversized output")
 		}
-		
+
 		// Check for stderr capture
 		if !contains(sourceStr, "stderr") {
 			t.Error("Source code doesn't capture stderr for debugging")

@@ -52,7 +52,7 @@ func TestGTTSEngine_NewGTTSEngine(t *testing.T) {
 			config: GTTSConfig{
 				Language: "en",
 				CacheConfig: &cache.CacheConfig{
-					MemoryCapacity: 10 * 1024 * 1024, // 10MB
+					MemoryCapacity: 10 * 1024 * 1024,  // 10MB
 					DiskCapacity:   100 * 1024 * 1024, // 100MB
 					DiskPath:       "/tmp/test-cache",
 				},
@@ -72,35 +72,35 @@ func TestGTTSEngine_NewGTTSEngine(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			engine, err := NewGTTSEngine(tt.config)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
-			
+
 			if engine == nil {
 				t.Fatal("Engine should not be nil")
 			}
-			
+
 			// Check defaults
 			if engine.language == "" {
 				t.Error("Language should have default value")
 			}
-			
+
 			if engine.sampleRate == 0 {
 				t.Error("Sample rate should have default value")
 			}
-			
+
 			if engine.rateLimiter == nil {
 				t.Error("Rate limiter should not be nil")
 			}
-			
+
 			// Clean up
 			engine.Close()
 		})
@@ -155,7 +155,7 @@ func TestGTTSEngine_Validate(t *testing.T) {
 	defer engine.Close()
 
 	err = engine.Validate()
-	
+
 	// If gtts-cli or ffmpeg is not installed, the test should fail with a helpful message
 	if err != nil {
 		if strings.Contains(err.Error(), "not found in PATH") {
@@ -220,9 +220,9 @@ func TestGTTSEngine_SynthesizeIntegration(t *testing.T) {
 	audio, err := engine.Synthesize(ctx, "Hello, this is a test.", 1.0)
 	if err != nil {
 		// If this fails due to network issues, skip rather than fail
-		if strings.Contains(err.Error(), "timeout") || 
-		   strings.Contains(err.Error(), "network") ||
-		   strings.Contains(err.Error(), "connection") {
+		if strings.Contains(err.Error(), "timeout") ||
+			strings.Contains(err.Error(), "network") ||
+			strings.Contains(err.Error(), "connection") {
 			t.Skipf("Skipping synthesis test due to network issues: %v", err)
 		}
 		t.Fatalf("Synthesis failed: %v", err)
@@ -266,13 +266,13 @@ func TestGTTSEngine_SynthesizeWithSpeed(t *testing.T) {
 	defer cancel()
 
 	speeds := []float64{0.5, 1.0, 1.5, 2.0}
-	
+
 	for _, speed := range speeds {
 		t.Run(fmt.Sprintf("speed_%.1f", speed), func(t *testing.T) {
 			audio, err := engine.Synthesize(ctx, testText, speed)
 			if err != nil {
-				if strings.Contains(err.Error(), "timeout") || 
-				   strings.Contains(err.Error(), "network") {
+				if strings.Contains(err.Error(), "timeout") ||
+					strings.Contains(err.Error(), "network") {
 					t.Skipf("Skipping speed test due to network issues: %v", err)
 				}
 				t.Errorf("Synthesis at speed %.1f failed: %v", speed, err)
@@ -283,7 +283,7 @@ func TestGTTSEngine_SynthesizeWithSpeed(t *testing.T) {
 				t.Errorf("Synthesis at speed %.1f produced no audio", speed)
 			}
 		})
-		
+
 		// Add delay between requests to respect rate limiting
 		if speed != speeds[len(speeds)-1] {
 			time.Sleep(15 * time.Second)
@@ -317,7 +317,7 @@ func TestGTTSEngine_SynthesizeWithCaching(t *testing.T) {
 		RequestsPerMinute: 10,
 		CacheConfig: &cache.CacheConfig{
 			MemoryCapacity: 10 * 1024 * 1024, // 10MB
-			DiskCapacity:   50 * 1024 * 1024,  // 50MB
+			DiskCapacity:   50 * 1024 * 1024, // 50MB
 			DiskPath:       cacheDir,
 		},
 	})
@@ -334,10 +334,10 @@ func TestGTTSEngine_SynthesizeWithCaching(t *testing.T) {
 	start := time.Now()
 	audio1, err := engine.Synthesize(ctx, testText, 1.0)
 	firstDuration := time.Since(start)
-	
+
 	if err != nil {
-		if strings.Contains(err.Error(), "timeout") || 
-		   strings.Contains(err.Error(), "network") {
+		if strings.Contains(err.Error(), "timeout") ||
+			strings.Contains(err.Error(), "network") {
 			t.Skip("Skipping caching test due to network issues")
 		}
 		t.Fatalf("First synthesis failed: %v", err)
@@ -347,7 +347,7 @@ func TestGTTSEngine_SynthesizeWithCaching(t *testing.T) {
 	start = time.Now()
 	audio2, err := engine.Synthesize(ctx, testText, 1.0)
 	secondDuration := time.Since(start)
-	
+
 	if err != nil {
 		t.Fatalf("Second synthesis failed: %v", err)
 	}
@@ -421,12 +421,12 @@ func TestGTTSEngine_RaceConditions(t *testing.T) {
 	// This test is mainly to ensure no race conditions in the engine itself
 	// Multiple rapid calls should be rate-limited properly
 	results := make([]error, 3)
-	
+
 	for i := 0; i < 3; i++ {
 		go func(idx int) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			
+
 			_, err := engine.Synthesize(ctx, "test", 1.0)
 			results[idx] = err
 		}(i)
@@ -434,7 +434,7 @@ func TestGTTSEngine_RaceConditions(t *testing.T) {
 
 	// Wait for all goroutines to complete
 	time.Sleep(15 * time.Second)
-	
+
 	// At least one should succeed, others may fail due to rate limiting or timeout
 	successCount := 0
 	for i, err := range results {
@@ -469,8 +469,8 @@ func TestGTTSEngine_ContextCancellation(t *testing.T) {
 	}
 
 	if !strings.Contains(err.Error(), "rate limit wait cancelled") &&
-	   !strings.Contains(err.Error(), "timeout") &&
-	   !strings.Contains(err.Error(), "context canceled") {
+		!strings.Contains(err.Error(), "timeout") &&
+		!strings.Contains(err.Error(), "context canceled") {
 		t.Errorf("Expected cancellation error, got: %v", err)
 	}
 }
@@ -486,7 +486,7 @@ func TestGTTSEngine_CacheOperations(t *testing.T) {
 
 	engine, err := NewGTTSEngine(GTTSConfig{
 		CacheConfig: &cache.CacheConfig{
-			MemoryCapacity: 1024 * 1024, // 1MB
+			MemoryCapacity: 1024 * 1024,      // 1MB
 			DiskCapacity:   10 * 1024 * 1024, // 10MB
 			DiskPath:       cacheDir,
 		},
@@ -533,17 +533,17 @@ func BenchmarkGTTSEngine_Synthesize(b *testing.B) {
 	defer engine.Close()
 
 	b.ResetTimer()
-	
+
 	// Note: This benchmark may be rate-limited, so results may vary
 	for i := 0; i < b.N; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		_, err := engine.Synthesize(ctx, "Benchmark test.", 1.0)
 		cancel()
-		
+
 		if err != nil {
 			b.Logf("Synthesis %d failed (may be rate limited): %v", i, err)
 		}
-		
+
 		// Add delay to respect rate limits
 		time.Sleep(time.Minute / 10) // 6 seconds between requests
 	}

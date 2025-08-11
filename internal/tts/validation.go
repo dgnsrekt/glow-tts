@@ -6,22 +6,24 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/charmbracelet/glow/v2/internal/ttypes"
 )
 
 // ValidationResult contains the result of engine validation
 type ValidationResult struct {
 	// Engine is the validated engine type
-	Engine EngineType
-	
+	Engine ttypes.EngineType
+
 	// Available indicates if the engine is available and configured
 	Available bool
-	
+
 	// Error contains any validation error
 	Error error
-	
+
 	// Guidance provides setup instructions if validation failed
 	Guidance string
-	
+
 	// Details contains additional validation information
 	Details map[string]string
 }
@@ -29,59 +31,59 @@ type ValidationResult struct {
 // ValidateEngineSelection validates that a TTS engine has been explicitly chosen.
 // It checks the CLI argument first, then config, and requires explicit selection.
 // Returns ErrNoEngineConfigured if no engine is selected.
-func ValidateEngineSelection(cliArg string, config Config) (EngineType, error) {
+func ValidateEngineSelection(cliArg string, config Config) (ttypes.EngineType, error) {
 	// 1. CLI argument takes precedence
 	engineType := cliArg
-	
+
 	// 2. Use config if no CLI arg
 	if engineType == "" {
 		engineType = string(config.Engine)
 	}
-	
+
 	// 3. Require explicit selection - no defaults, no fallback
 	if engineType == "" {
-		return EngineNone, fmt.Errorf("%w\n\nPlease specify an engine:\n  glow --tts piper document.md    # Use Piper (offline)\n  glow --tts gtts document.md     # Use Google TTS (online)\n\nOr set a default in ~/.config/glow/config.yml:\n  tts:\n    engine: piper  # or \"gtts\"", ErrNoEngineConfigured)
+		return ttypes.EngineNone, fmt.Errorf("%w\n\nPlease specify an engine:\n  glow --tts piper document.md    # Use Piper (offline)\n  glow --tts gtts document.md     # Use Google TTS (online)\n\nOr set a default in ~/.config/glow/config.yml:\n  tts:\n    engine: piper  # or \"gtts\"", ErrNoEngineConfigured)
 	}
-	
+
 	// 4. Validate engine type (normalize aliases)
 	switch engineType {
 	case "piper":
-		return EnginePiper, nil
+		return ttypes.EnginePiper, nil
 	case "gtts", "google":
-		return EngineGoogle, nil
+		return ttypes.EngineGoogle, nil
 	default:
-		return EngineNone, fmt.Errorf("%w: %s\n\nSupported engines:\n  - piper (offline TTS)\n  - gtts (Google TTS)", ErrInvalidEngine, engineType)
+		return ttypes.EngineNone, fmt.Errorf("%w: %s\n\nSupported engines:\n  - piper (offline TTS)\n  - gtts (Google TTS)", ErrInvalidEngine, engineType)
 	}
 }
 
 // ValidateEngine performs comprehensive validation of the specified engine.
 // It checks availability, configuration, and performs a test synthesis.
-func ValidateEngine(engineType EngineType, config Config) *ValidationResult {
+func ValidateEngine(engineType ttypes.EngineType, config Config) *ValidationResult {
 	result := &ValidationResult{
 		Engine:  engineType,
 		Details: make(map[string]string),
 	}
-	
+
 	switch engineType {
-	case EnginePiper:
+	case ttypes.EnginePiper:
 		result = validatePiperEngine(config.Piper, result)
-	case EngineGoogle:
+	case ttypes.EngineGoogle:
 		result = validateGoogleEngine(config.GTTS, result)
-	case EngineNone:
+	case ttypes.EngineNone:
 		result.Error = ErrNoEngineConfigured
 		result.Guidance = "Please specify a TTS engine with --tts flag or in config file"
 	default:
 		result.Error = fmt.Errorf("%w: %s", ErrInvalidEngine, engineType)
 		result.Guidance = "Supported engines: piper, gtts"
 	}
-	
+
 	return result
 }
 
 // validatePiperEngine validates the Piper TTS engine configuration and availability
 func validatePiperEngine(config PiperConfig, result *ValidationResult) *ValidationResult {
 	result.Details["engine"] = "Piper (Offline TTS)"
-	
+
 	// Check if Piper binary is available
 	piperPath, err := exec.LookPath("piper")
 	if err != nil {
@@ -90,7 +92,7 @@ func validatePiperEngine(config PiperConfig, result *ValidationResult) *Validati
 		return result
 	}
 	result.Details["binary_path"] = piperPath
-	
+
 	// Check if we can execute Piper
 	cmd := exec.Command(piperPath, "--version")
 	if err := cmd.Run(); err != nil {
@@ -98,7 +100,7 @@ func validatePiperEngine(config PiperConfig, result *ValidationResult) *Validati
 		result.Guidance = "Piper binary found but cannot be executed. Check permissions and dependencies."
 		return result
 	}
-	
+
 	// Check model path configuration
 	if config.ModelPath == "" {
 		result.Error = fmt.Errorf("Piper model path not configured")
@@ -106,14 +108,14 @@ func validatePiperEngine(config PiperConfig, result *ValidationResult) *Validati
 		return result
 	}
 	result.Details["model_path"] = config.ModelPath
-	
+
 	// Check if model file exists and is readable
 	if _, err := os.Stat(config.ModelPath); err != nil {
 		result.Error = fmt.Errorf("model file not accessible: %w", err)
 		result.Guidance = buildPiperValidationGuidance(err)
 		return result
 	}
-	
+
 	// Check config file if specified
 	if config.ConfigPath != "" {
 		if _, err := os.Stat(config.ConfigPath); err != nil {
@@ -129,7 +131,7 @@ func validatePiperEngine(config PiperConfig, result *ValidationResult) *Validati
 			result.Details["config_path"] = configPath + " (auto-detected)"
 		}
 	}
-	
+
 	result.Available = true
 	result.Details["status"] = "Ready (full validation requires test synthesis)"
 	return result
@@ -138,7 +140,7 @@ func validatePiperEngine(config PiperConfig, result *ValidationResult) *Validati
 // validateGoogleEngine validates the Google TTS engine configuration and availability
 func validateGoogleEngine(config GTTSConfigSection, result *ValidationResult) *ValidationResult {
 	result.Details["engine"] = "Google TTS (gTTS - Free)"
-	
+
 	// Check if gtts-cli is available
 	gttsPath, err := exec.LookPath("gtts-cli")
 	if err != nil {
@@ -147,7 +149,7 @@ func validateGoogleEngine(config GTTSConfigSection, result *ValidationResult) *V
 		return result
 	}
 	result.Details["gtts_path"] = gttsPath
-	
+
 	// Check if we can execute gtts-cli
 	cmd := exec.Command(gttsPath, "--help")
 	if err := cmd.Run(); err != nil {
@@ -155,7 +157,7 @@ func validateGoogleEngine(config GTTSConfigSection, result *ValidationResult) *V
 		result.Guidance = "gTTS binary found but cannot be executed. Check Python installation and dependencies."
 		return result
 	}
-	
+
 	// Check if ffmpeg is available
 	ffmpegPath, err := exec.LookPath("ffmpeg")
 	if err != nil {
@@ -164,7 +166,7 @@ func validateGoogleEngine(config GTTSConfigSection, result *ValidationResult) *V
 		return result
 	}
 	result.Details["ffmpeg_path"] = ffmpegPath
-	
+
 	// Check if we can execute ffmpeg
 	cmd = exec.Command(ffmpegPath, "-version")
 	if err := cmd.Run(); err != nil {
@@ -172,20 +174,20 @@ func validateGoogleEngine(config GTTSConfigSection, result *ValidationResult) *V
 		result.Guidance = "ffmpeg binary found but cannot be executed. Check installation and dependencies."
 		return result
 	}
-	
+
 	// Validate configuration
 	language := config.Language
 	if language == "" {
 		language = "en" // Default
 	}
 	result.Details["language"] = language
-	
+
 	if config.Slow {
 		result.Details["speed"] = "slow"
 	} else {
 		result.Details["speed"] = "normal"
 	}
-	
+
 	// Check temp directory if specified
 	if config.TempDir != "" {
 		if _, err := os.Stat(config.TempDir); err != nil {
@@ -195,7 +197,7 @@ func validateGoogleEngine(config GTTSConfigSection, result *ValidationResult) *V
 		}
 		result.Details["temp_dir"] = config.TempDir
 	}
-	
+
 	result.Available = true
 	result.Details["status"] = "Ready (full validation requires network test)"
 	return result
@@ -248,7 +250,7 @@ func buildPiperModelGuidance() string {
 // buildPiperValidationGuidance provides specific guidance based on validation errors
 func buildPiperValidationGuidance(err error) string {
 	errStr := err.Error()
-	
+
 	if strings.Contains(errStr, "model file not accessible") {
 		return `Model file is not accessible. Please check:
 
@@ -260,7 +262,7 @@ func buildPiperValidationGuidance(err error) string {
    wget https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx
    wget https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/en_US-amy-medium.onnx.json`
 	}
-	
+
 	if strings.Contains(errStr, "test synthesis failed") {
 		return `Test synthesis failed. This could indicate:
 
@@ -272,7 +274,7 @@ func buildPiperValidationGuidance(err error) string {
 Try running piper manually to diagnose:
   echo "Hello world" | piper --model /path/to/model.onnx --output-raw`
 	}
-	
+
 	return "Check Piper installation and model configuration"
 }
 
@@ -319,7 +321,7 @@ choco install ffmpeg
 // buildGTTSValidationGuidance provides specific guidance based on gTTS validation errors
 func buildGTTSValidationGuidance(err error) string {
 	errStr := err.Error()
-	
+
 	if strings.Contains(errStr, "test synthesis failed") {
 		return `gTTS test synthesis failed. This could indicate:
 
@@ -334,7 +336,7 @@ Try testing manually:
 If this works, the issue may be with audio conversion.
 If not, check your internet connection and try again later.`
 	}
-	
+
 	if strings.Contains(errStr, "cannot execute") {
 		return `Cannot execute gTTS or ffmpeg. Please check:
 
@@ -346,21 +348,21 @@ Test manually:
   gtts-cli --help
   ffmpeg -version`
 	}
-	
+
 	return "Check gTTS installation and internet connectivity"
 }
 
 // QuickValidation performs a fast validation check without test synthesis.
 // Useful for UI startup to show immediate feedback.
-func QuickValidation(engineType EngineType) error {
+func QuickValidation(engineType ttypes.EngineType) error {
 	switch engineType {
-	case EnginePiper:
+	case ttypes.EnginePiper:
 		if _, err := exec.LookPath("piper"); err != nil {
 			return fmt.Errorf("Piper not found: %w", err)
 		}
 		return nil
-		
-	case EngineGoogle:
+
+	case ttypes.EngineGoogle:
 		if _, err := exec.LookPath("gtts-cli"); err != nil {
 			return fmt.Errorf("gTTS not found: %w", err)
 		}
@@ -368,7 +370,7 @@ func QuickValidation(engineType EngineType) error {
 			return fmt.Errorf("ffmpeg not found: %w", err)
 		}
 		return nil
-		
+
 	default:
 		return ErrInvalidEngine
 	}

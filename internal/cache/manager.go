@@ -17,26 +17,26 @@ type CacheManager struct {
 	l1Memory *MemoryCache
 	l2Disk   *DiskCache
 	session  *SessionCache
-	
+
 	// Configuration
 	config *CacheConfig
-	
+
 	// Cleanup goroutine control
 	cleanupStop   chan struct{}
 	cleanupTicker *time.Ticker
 	cleanupWg     sync.WaitGroup
-	
+
 	// Metrics
 	mu    sync.RWMutex
 	stats struct {
-		TotalHits      int64
-		TotalMisses    int64
-		L1Hits         int64
-		L2Hits         int64
-		SessionHits    int64
-		Promotions     int64
-		CleanupRuns    int64
-		LastCleanup    time.Time
+		TotalHits   int64
+		TotalMisses int64
+		L1Hits      int64
+		L2Hits      int64
+		SessionHits int64
+		Promotions  int64
+		CleanupRuns int64
+		LastCleanup time.Time
 	}
 }
 
@@ -45,7 +45,7 @@ func NewCacheManager(config *CacheConfig) (*CacheManager, error) {
 	if config == nil {
 		config = DefaultCacheConfig()
 	}
-	
+
 	// Set default cache directory if not specified
 	if config.DiskPath == "" {
 		homeDir, err := os.UserHomeDir()
@@ -54,20 +54,20 @@ func NewCacheManager(config *CacheConfig) (*CacheManager, error) {
 		}
 		config.DiskPath = filepath.Join(homeDir, ".cache", "glow-tts", "audio")
 	}
-	
+
 	// Create L1 memory cache
 	l1Memory := NewMemoryCache(config.MemoryCapacity)
-	
+
 	// Create L2 disk cache
 	l2Disk, err := NewDiskCache(config.DiskPath, config.DiskCapacity, config.CompressionLevel)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create disk cache: %w", err)
 	}
-	
+
 	// Create session cache with unique ID
 	sessionID := generateSessionID()
 	session := NewSessionCache(sessionID, config.SessionCapacity)
-	
+
 	cm := &CacheManager{
 		l1Memory:    l1Memory,
 		l2Disk:      l2Disk,
@@ -75,12 +75,12 @@ func NewCacheManager(config *CacheConfig) (*CacheManager, error) {
 		config:      config,
 		cleanupStop: make(chan struct{}),
 	}
-	
+
 	// Start cleanup routine if configured
 	if config.CleanupInterval > 0 {
 		cm.startCleanupRoutine()
 	}
-	
+
 	return cm, nil
 }
 
@@ -89,36 +89,36 @@ func NewCacheManager(config *CacheConfig) (*CacheManager, error) {
 func (cm *CacheManager) Get(key string) ([]byte, bool) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	// Check L1 memory cache first
 	if data, ok := cm.l1Memory.Get(key); ok {
 		cm.stats.L1Hits++
 		cm.stats.TotalHits++
 		return data, true
 	}
-	
+
 	// Check L2 disk cache
 	if data, ok := cm.l2Disk.Get(key); ok {
 		cm.stats.L2Hits++
 		cm.stats.TotalHits++
-		
+
 		// Promote to L1 for faster future access
 		cm.promoteToL1(key, data)
-		
+
 		return data, true
 	}
-	
+
 	// Check session cache
 	if data, ok := cm.session.Get(key); ok {
 		cm.stats.SessionHits++
 		cm.stats.TotalHits++
-		
+
 		// Promote to L1 for faster future access
 		cm.promoteToL1(key, data)
-		
+
 		return data, true
 	}
-	
+
 	cm.stats.TotalMisses++
 	return nil, false
 }
@@ -130,12 +130,12 @@ func (cm *CacheManager) Put(key string, value []byte) error {
 	if err := cm.l1Memory.Put(key, value); err != nil && err != ErrItemTooLarge {
 		return fmt.Errorf("L1 cache error: %w", err)
 	}
-	
+
 	// Store in session cache
 	if err := cm.session.Put(key, value); err != nil && err != ErrItemTooLarge {
 		// Non-fatal, continue
 	}
-	
+
 	// Store in L2 disk cache asynchronously
 	go func() {
 		if err := cm.l2Disk.Put(key, value); err != nil && err != ErrItemTooLarge {
@@ -143,53 +143,53 @@ func (cm *CacheManager) Put(key string, value []byte) error {
 			// In production, use proper logging
 		}
 	}()
-	
+
 	return nil
 }
 
 // Delete removes an entry from all cache levels.
 func (cm *CacheManager) Delete(key string) error {
 	var errs []error
-	
+
 	if err := cm.l1Memory.Delete(key); err != nil {
 		errs = append(errs, fmt.Errorf("L1 delete: %w", err))
 	}
-	
+
 	if err := cm.l2Disk.Delete(key); err != nil {
 		errs = append(errs, fmt.Errorf("L2 delete: %w", err))
 	}
-	
+
 	if err := cm.session.Delete(key); err != nil {
 		errs = append(errs, fmt.Errorf("session delete: %w", err))
 	}
-	
+
 	if len(errs) > 0 {
 		return fmt.Errorf("cache delete errors: %v", errs)
 	}
-	
+
 	return nil
 }
 
 // Clear removes all entries from all cache levels.
 func (cm *CacheManager) Clear() error {
 	var errs []error
-	
+
 	if err := cm.l1Memory.Clear(); err != nil {
 		errs = append(errs, fmt.Errorf("L1 clear: %w", err))
 	}
-	
+
 	if err := cm.l2Disk.Clear(); err != nil {
 		errs = append(errs, fmt.Errorf("L2 clear: %w", err))
 	}
-	
+
 	if err := cm.session.Clear(); err != nil {
 		errs = append(errs, fmt.Errorf("session clear: %w", err))
 	}
-	
+
 	if len(errs) > 0 {
 		return fmt.Errorf("cache clear errors: %v", errs)
 	}
-	
+
 	return nil
 }
 
@@ -203,7 +203,7 @@ func (cm *CacheManager) GetWithMetadata(key string) ([]byte, CacheMetadata, bool
 		cm.mu.Unlock()
 		return data, meta, true
 	}
-	
+
 	// Check L2 disk cache
 	if data, meta, ok := cm.l2Disk.GetWithMetadata(key); ok {
 		cm.mu.Lock()
@@ -211,30 +211,30 @@ func (cm *CacheManager) GetWithMetadata(key string) ([]byte, CacheMetadata, bool
 		cm.stats.TotalHits++
 		cm.stats.Promotions++
 		cm.mu.Unlock()
-		
+
 		// Promote to L1
 		cm.promoteToL1(key, data)
-		
+
 		return data, meta, true
 	}
-	
+
 	// Check session cache
 	if data, meta, ok := cm.session.GetWithMetadata(key); ok {
 		cm.mu.Lock()
 		cm.stats.SessionHits++
 		cm.stats.TotalHits++
 		cm.mu.Unlock()
-		
+
 		// Promote to L1
 		cm.promoteToL1(key, data)
-		
+
 		return data, meta, true
 	}
-	
+
 	cm.mu.Lock()
 	cm.stats.TotalMisses++
 	cm.mu.Unlock()
-	
+
 	return nil, CacheMetadata{}, false
 }
 
@@ -242,20 +242,20 @@ func (cm *CacheManager) GetWithMetadata(key string) ([]byte, CacheMetadata, bool
 func (cm *CacheManager) Stats() map[string]interface{} {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	
+
 	l1Stats := cm.l1Memory.Stats()
 	l2Stats := cm.l2Disk.Stats()
 	sessionStats := cm.session.Stats()
-	
+
 	totalHits := cm.stats.TotalHits
 	totalMisses := cm.stats.TotalMisses
 	totalRequests := totalHits + totalMisses
-	
+
 	var hitRate float64
 	if totalRequests > 0 {
 		hitRate = float64(totalHits) / float64(totalRequests)
 	}
-	
+
 	return map[string]interface{}{
 		"total_hits":    totalHits,
 		"total_misses":  totalMisses,
@@ -291,15 +291,15 @@ func (cm *CacheManager) Close() error {
 		cm.cleanupWg.Wait()
 		cm.cleanupTicker.Stop()
 	}
-	
+
 	// Clear session cache
 	cm.session.Clear()
-	
+
 	// Save disk cache index
 	if err := cm.l2Disk.Close(); err != nil {
 		return fmt.Errorf("failed to close disk cache: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -316,10 +316,10 @@ func (cm *CacheManager) promoteToL1(key string, data []byte) {
 func (cm *CacheManager) startCleanupRoutine() {
 	cm.cleanupTicker = time.NewTicker(cm.config.CleanupInterval)
 	cm.cleanupWg.Add(1)
-	
+
 	go func() {
 		defer cm.cleanupWg.Done()
-		
+
 		for {
 			select {
 			case <-cm.cleanupTicker.C:
@@ -337,7 +337,7 @@ func (cm *CacheManager) performCleanup() {
 	cm.stats.CleanupRuns++
 	cm.stats.LastCleanup = time.Now()
 	cm.mu.Unlock()
-	
+
 	// Remove expired entries from L2 disk cache (TTL cleanup)
 	if cm.config.TTLDays > 0 {
 		cutoff := time.Now().Add(-time.Duration(cm.config.TTLDays) * 24 * time.Hour)
@@ -347,13 +347,13 @@ func (cm *CacheManager) performCleanup() {
 			// In production, use proper logging
 		}
 	}
-	
+
 	// Enforce size limits with smart eviction
 	cm.enforceSizeLimits()
-	
+
 	// Clear stale session data
 	cm.session.ClearIfStale(24 * time.Hour)
-	
+
 	// Prune old entries from memory cache
 	if cm.config.TTLDays > 0 {
 		maxAge := time.Duration(cm.config.TTLDays) * 24 * time.Hour
@@ -367,16 +367,16 @@ func (cm *CacheManager) enforceSizeLimits() {
 	if cm.l2Disk.Size() > cm.config.DiskCapacity {
 		// Use smart eviction scoring to decide what to evict
 		candidates := cm.l2Disk.GetLRUEntries(10)
-		
+
 		// Sort by eviction score (lower score = more likely to evict)
 		for i := range candidates {
 			candidates[i].CalculateEvictionScore()
 		}
-		
+
 		// Evict items with lowest scores
 		cm.l2Disk.EvictLRU()
 	}
-	
+
 	// L1 memory cache handles its own eviction via LRU
 	// Session cache also handles its own eviction
 }
@@ -415,7 +415,7 @@ func (cm *CacheManager) SetCleanupInterval(interval time.Duration) {
 	if cm.cleanupTicker != nil {
 		cm.cleanupTicker.Stop()
 	}
-	
+
 	if interval > 0 {
 		cm.config.CleanupInterval = interval
 		cm.startCleanupRoutine()

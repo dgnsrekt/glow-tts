@@ -16,24 +16,24 @@ import (
 // DiskCache implements an L2 disk-based cache with optional compression.
 // It provides persistent storage for audio data across sessions.
 type DiskCache struct {
-	basePath    string
-	capacity    int64 // Maximum size in bytes
-	size        int64 // Current size in bytes
-	
+	basePath string
+	capacity int64 // Maximum size in bytes
+	size     int64 // Current size in bytes
+
 	// Compression
 	compressionLevel int
-	encoder         *zstd.Encoder
-	decoder         *zstd.Decoder
-	
+	encoder          *zstd.Encoder
+	decoder          *zstd.Decoder
+
 	// Index for fast lookups
 	index map[string]*diskCacheEntry
-	
+
 	// Synchronization
 	mu sync.RWMutex
-	
+
 	// Metrics
 	stats CacheStats
-	
+
 	// Configuration
 	enableCompression bool
 }
@@ -42,8 +42,8 @@ type DiskCache struct {
 type diskCacheEntry struct {
 	Key          string
 	FilePath     string
-	Size         int64      // Size on disk (compressed)
-	OriginalSize int64      // Original size (uncompressed)
+	Size         int64 // Size on disk (compressed)
+	OriginalSize int64 // Original size (uncompressed)
 	Timestamp    time.Time
 	LastAccess   time.Time
 	Hits         int64
@@ -56,42 +56,42 @@ func NewDiskCache(basePath string, capacity int64, compressionLevel int) (*DiskC
 	if err := os.MkdirAll(basePath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
-	
+
 	dc := &DiskCache{
-		basePath:         basePath,
-		capacity:         capacity,
-		compressionLevel: compressionLevel,
-		index:           make(map[string]*diskCacheEntry),
+		basePath:          basePath,
+		capacity:          capacity,
+		compressionLevel:  compressionLevel,
+		index:             make(map[string]*diskCacheEntry),
 		enableCompression: compressionLevel > 0,
 		stats: CacheStats{
 			Capacity: capacity,
 		},
 	}
-	
+
 	// Initialize compression if enabled
 	if dc.enableCompression {
 		var err error
-		dc.encoder, err = zstd.NewWriter(nil, 
+		dc.encoder, err = zstd.NewWriter(nil,
 			zstd.WithEncoderLevel(zstd.EncoderLevelFromZstd(compressionLevel)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create zstd encoder: %w", err)
 		}
-		
+
 		dc.decoder, err = zstd.NewReader(nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create zstd decoder: %w", err)
 		}
 	}
-	
+
 	// Load existing cache index
 	if err := dc.loadIndex(); err != nil {
 		// Non-fatal: just start with empty index
 		dc.index = make(map[string]*diskCacheEntry)
 	}
-	
+
 	// Calculate current size
 	dc.calculateSize()
-	
+
 	return dc, nil
 }
 
@@ -99,13 +99,13 @@ func NewDiskCache(basePath string, capacity int64, compressionLevel int) (*DiskC
 func (dc *DiskCache) Get(key string) ([]byte, bool) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	
+
 	entry, ok := dc.index[key]
 	if !ok {
 		dc.stats.Misses++
 		return nil, false
 	}
-	
+
 	// Read from disk
 	data, err := os.ReadFile(entry.FilePath)
 	if err != nil {
@@ -115,7 +115,7 @@ func (dc *DiskCache) Get(key string) ([]byte, bool) {
 		dc.stats.Misses++
 		return nil, false
 	}
-	
+
 	// Decompress if needed
 	if entry.Compressed && dc.enableCompression {
 		decompressed, err := dc.decoder.DecodeAll(data, nil)
@@ -129,14 +129,14 @@ func (dc *DiskCache) Get(key string) ([]byte, bool) {
 		}
 		data = decompressed
 	}
-	
+
 	// Update access time and hits
 	entry.LastAccess = time.Now()
 	entry.Hits++
-	
+
 	dc.stats.Hits++
 	dc.stats.LastAccess = time.Now()
-	
+
 	return data, true
 }
 
@@ -144,9 +144,9 @@ func (dc *DiskCache) Get(key string) ([]byte, bool) {
 func (dc *DiskCache) Put(key string, value []byte) error {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	
+
 	originalSize := int64(len(value))
-	
+
 	// Compress if enabled
 	var dataToWrite []byte
 	var compressed bool
@@ -162,34 +162,34 @@ func (dc *DiskCache) Put(key string, value []byte) error {
 	} else {
 		dataToWrite = value
 	}
-	
+
 	diskSize := int64(len(dataToWrite))
-	
+
 	// Check if key already exists
 	if existing, ok := dc.index[key]; ok {
 		// Update existing entry
 		dc.size -= existing.Size
 		os.Remove(existing.FilePath)
 	}
-	
+
 	// Check capacity
 	if diskSize > dc.capacity {
 		return ErrItemTooLarge
 	}
-	
+
 	// Evict items if necessary
 	for dc.size+diskSize > dc.capacity && len(dc.index) > 0 {
 		dc.evictOldest()
 	}
-	
+
 	// Generate file path
 	filePath := dc.generateFilePath(key)
-	
+
 	// Write to disk
 	if err := dc.writeFile(filePath, dataToWrite); err != nil {
 		return fmt.Errorf("failed to write cache file: %w", err)
 	}
-	
+
 	// Update index
 	entry := &diskCacheEntry{
 		Key:          key,
@@ -201,13 +201,13 @@ func (dc *DiskCache) Put(key string, value []byte) error {
 		Hits:         0,
 		Compressed:   compressed,
 	}
-	
+
 	dc.index[key] = entry
 	dc.size += diskSize
-	
+
 	dc.stats.Size = dc.size
 	dc.stats.ItemCount = int64(len(dc.index))
-	
+
 	return nil
 }
 
@@ -215,22 +215,22 @@ func (dc *DiskCache) Put(key string, value []byte) error {
 func (dc *DiskCache) Delete(key string) error {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	
+
 	entry, ok := dc.index[key]
 	if !ok {
 		return nil
 	}
-	
+
 	// Remove file
 	os.Remove(entry.FilePath)
-	
+
 	// Update index and size
 	delete(dc.index, key)
 	dc.size -= entry.Size
-	
+
 	dc.stats.Size = dc.size
 	dc.stats.ItemCount = int64(len(dc.index))
-	
+
 	return nil
 }
 
@@ -238,19 +238,19 @@ func (dc *DiskCache) Delete(key string) error {
 func (dc *DiskCache) Clear() error {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	
+
 	// Remove all cache files
 	for _, entry := range dc.index {
 		os.Remove(entry.FilePath)
 	}
-	
+
 	// Clear index
 	dc.index = make(map[string]*diskCacheEntry)
 	dc.size = 0
-	
+
 	dc.stats.Size = 0
 	dc.stats.ItemCount = 0
-	
+
 	// Save empty index
 	return dc.saveIndex()
 }
@@ -259,7 +259,7 @@ func (dc *DiskCache) Clear() error {
 func (dc *DiskCache) Size() int64 {
 	dc.mu.RLock()
 	defer dc.mu.RUnlock()
-	
+
 	return dc.size
 }
 
@@ -267,15 +267,15 @@ func (dc *DiskCache) Size() int64 {
 func (dc *DiskCache) Stats() CacheStats {
 	dc.mu.RLock()
 	defer dc.mu.RUnlock()
-	
+
 	stats := dc.stats
 	stats.Size = dc.size
 	stats.ItemCount = int64(len(dc.index))
-	
+
 	if stats.Hits+stats.Misses > 0 {
 		stats.HitRate = float64(stats.Hits) / float64(stats.Hits+stats.Misses)
 	}
-	
+
 	return stats
 }
 
@@ -283,7 +283,7 @@ func (dc *DiskCache) Stats() CacheStats {
 func (dc *DiskCache) Contains(key string) bool {
 	dc.mu.RLock()
 	defer dc.mu.RUnlock()
-	
+
 	_, ok := dc.index[key]
 	return ok
 }
@@ -292,13 +292,13 @@ func (dc *DiskCache) Contains(key string) bool {
 func (dc *DiskCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	
+
 	entry, ok := dc.index[key]
 	if !ok {
 		dc.stats.Misses++
 		return nil, CacheMetadata{}, false
 	}
-	
+
 	// Read from disk
 	data, err := os.ReadFile(entry.FilePath)
 	if err != nil {
@@ -307,7 +307,7 @@ func (dc *DiskCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) {
 		dc.stats.Misses++
 		return nil, CacheMetadata{}, false
 	}
-	
+
 	// Decompress if needed
 	if entry.Compressed && dc.enableCompression {
 		decompressed, err := dc.decoder.DecodeAll(data, nil)
@@ -320,13 +320,13 @@ func (dc *DiskCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) {
 		}
 		data = decompressed
 	}
-	
+
 	// Update access time and hits
 	entry.LastAccess = time.Now()
 	entry.Hits++
-	
+
 	dc.stats.Hits++
-	
+
 	metadata := CacheMetadata{
 		Key:        entry.Key,
 		Size:       entry.OriginalSize,
@@ -336,7 +336,7 @@ func (dc *DiskCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) {
 		Level:      CacheLevelL2,
 	}
 	metadata.CalculateEvictionScore()
-	
+
 	return data, metadata, true
 }
 
@@ -344,7 +344,7 @@ func (dc *DiskCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) {
 func (dc *DiskCache) RemoveOlderThan(cutoff time.Time) int {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	
+
 	removed := 0
 	for key, entry := range dc.index {
 		if entry.Timestamp.Before(cutoff) {
@@ -354,10 +354,10 @@ func (dc *DiskCache) RemoveOlderThan(cutoff time.Time) int {
 			removed++
 		}
 	}
-	
+
 	dc.stats.Size = dc.size
 	dc.stats.ItemCount = int64(len(dc.index))
-	
+
 	return removed
 }
 
@@ -365,15 +365,15 @@ func (dc *DiskCache) RemoveOlderThan(cutoff time.Time) int {
 func (dc *DiskCache) EvictLRU() int {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	
+
 	targetSize := dc.capacity * 90 / 100 // Free to 90% capacity
 	evicted := 0
-	
+
 	for dc.size > targetSize && len(dc.index) > 0 {
 		dc.evictOldest()
 		evicted++
 	}
-	
+
 	return evicted
 }
 
@@ -381,13 +381,13 @@ func (dc *DiskCache) EvictLRU() int {
 func (dc *DiskCache) GetLRUEntries(n int) []CacheMetadata {
 	dc.mu.RLock()
 	defer dc.mu.RUnlock()
-	
+
 	// Convert index to slice for sorting
 	entries := make([]*diskCacheEntry, 0, len(dc.index))
 	for _, entry := range dc.index {
 		entries = append(entries, entry)
 	}
-	
+
 	// Sort by last access time (oldest first)
 	// Note: In production, use sort.Slice for efficiency
 	for i := 0; i < len(entries)-1; i++ {
@@ -397,7 +397,7 @@ func (dc *DiskCache) GetLRUEntries(n int) []CacheMetadata {
 			}
 		}
 	}
-	
+
 	// Return up to n entries
 	result := make([]CacheMetadata, 0, n)
 	for i := 0; i < n && i < len(entries); i++ {
@@ -413,7 +413,7 @@ func (dc *DiskCache) GetLRUEntries(n int) []CacheMetadata {
 		meta.CalculateEvictionScore()
 		result = append(result, meta)
 	}
-	
+
 	return result
 }
 
@@ -429,15 +429,15 @@ func (dc *DiskCache) generateFilePath(key string) string {
 func (dc *DiskCache) writeFile(path string, data []byte) error {
 	// Write to temp file first, then rename (atomic on most systems)
 	tempPath := path + ".tmp"
-	
+
 	file, err := os.Create(tempPath)
 	if err != nil {
 		return err
 	}
-	
+
 	_, err = file.Write(data)
 	closeErr := file.Close()
-	
+
 	if err != nil {
 		os.Remove(tempPath)
 		return err
@@ -446,7 +446,7 @@ func (dc *DiskCache) writeFile(path string, data []byte) error {
 		os.Remove(tempPath)
 		return closeErr
 	}
-	
+
 	// Atomic rename
 	return os.Rename(tempPath, path)
 }
@@ -455,14 +455,14 @@ func (dc *DiskCache) evictOldest() {
 	// Find oldest entry by last access time
 	var oldestKey string
 	var oldestTime time.Time
-	
+
 	for key, entry := range dc.index {
 		if oldestKey == "" || entry.LastAccess.Before(oldestTime) {
 			oldestKey = key
 			oldestTime = entry.LastAccess
 		}
 	}
-	
+
 	if oldestKey != "" {
 		entry := dc.index[oldestKey]
 		os.Remove(entry.FilePath)
@@ -475,7 +475,7 @@ func (dc *DiskCache) evictOldest() {
 
 func (dc *DiskCache) loadIndex() error {
 	indexPath := filepath.Join(dc.basePath, "cache.index")
-	
+
 	file, err := os.Open(indexPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -484,7 +484,7 @@ func (dc *DiskCache) loadIndex() error {
 		return err
 	}
 	defer file.Close()
-	
+
 	decoder := gob.NewDecoder(file)
 	return decoder.Decode(&dc.index)
 }
@@ -492,16 +492,16 @@ func (dc *DiskCache) loadIndex() error {
 func (dc *DiskCache) saveIndex() error {
 	indexPath := filepath.Join(dc.basePath, "cache.index")
 	tempPath := indexPath + ".tmp"
-	
+
 	file, err := os.Create(tempPath)
 	if err != nil {
 		return err
 	}
-	
+
 	encoder := gob.NewEncoder(file)
 	err = encoder.Encode(dc.index)
 	closeErr := file.Close()
-	
+
 	if err != nil {
 		os.Remove(tempPath)
 		return err
@@ -510,7 +510,7 @@ func (dc *DiskCache) saveIndex() error {
 		os.Remove(tempPath)
 		return closeErr
 	}
-	
+
 	return os.Rename(tempPath, indexPath)
 }
 
@@ -527,6 +527,6 @@ func (dc *DiskCache) calculateSize() {
 func (dc *DiskCache) Close() error {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	
+
 	return dc.saveIndex()
 }
