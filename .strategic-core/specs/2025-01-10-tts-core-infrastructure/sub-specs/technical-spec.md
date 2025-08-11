@@ -144,23 +144,26 @@ type PiperEngine struct {
 - **Critical**: Never uses StdinPipe()
 - **No fallback** - fails if Piper unavailable
 
-##### Google TTS Engine (`internal/tts/engines/google.go`)
+##### Google TTS Engine (`internal/tts/engines/gtts.go`)
 
 ```go
-type GoogleTTSEngine struct {
-    client     *texttospeech.Client
-    voice      *texttospeechpb.VoiceSelectionParams
-    audioConfig *texttospeechpb.AudioConfig
+type GTTSEngine struct {
+    language   string
+    slow       bool
+    tempDir    string
+    cache      *cache.CacheManager
     rateLimit  *rate.Limiter
 }
 ```
 
 **Implementation:**
-- Uses Google Cloud TTS API
-- Implements rate limiting
-- Handles authentication
-- Supports SSML markup
-- **No fallback** - fails if API unavailable
+- Uses gTTS CLI tool (Google Translate's TTS)
+- **No API key required** - free service
+- Generates MP3, converts to PCM using ffmpeg
+- Process flow: text → gtts-cli → MP3 → ffmpeg → PCM
+- Implements rate limiting to avoid blocking
+- Supports multiple languages and slow speed
+- **No fallback** - fails if network unavailable
 
 #### 5. Audio Player (`internal/audio/player.go`)
 
@@ -603,10 +606,10 @@ piper:
   model_path: ~/.local/share/piper/models
   voice: en_US-amy-medium
   
-google:
-  api_key: ${GOOGLE_TTS_API_KEY}
-  voice: en-US-Wavenet-F
-  language: en-US
+gtts:
+  language: en       # Language code (en, es, fr, etc.)
+  slow: false        # Use slower speech speed
+  # No API key needed!
 ```
 
 ### CLI Usage
@@ -648,14 +651,16 @@ piper --model model.onnx --length-scale 0.67
 piper --model model.onnx --length-scale 1.33
 ```
 
-#### Google TTS Speed Control
+#### gTTS Speed Control
 
-Google TTS uses the `speaking_rate` field in the audio config:
-```go
-audioConfig := &texttospeechpb.AudioConfig{
-    AudioEncoding: texttospeechpb.AudioEncoding_LINEAR16,
-    SpeakingRate:  1.5,  // 1.5x speed
-}
+gTTS only supports two speed settings via the `--slow` flag:
+- Normal speed (default)
+- Slow speed (--slow flag)
+
+For more granular control, we can adjust playback speed during audio processing with ffmpeg:
+```bash
+# Speed up 1.5x during conversion
+ffmpeg -i input.mp3 -filter:a "atempo=1.5" -f s16le -ar 22050 -ac 1 output.pcm
 ```
 
 #### Speed Implementation
@@ -700,8 +705,16 @@ func (s *SpeedController) ToPiperScale() string {
     return fmt.Sprintf("%.2f", scale)
 }
 
-func (s *SpeedController) ToGoogleRate() float64 {
-    return s.currentSpeed
+func (s *SpeedController) ToGTTSSlow() bool {
+    // gTTS only has normal and slow speeds
+    // Consider anything below 0.8x as "slow"
+    return s.currentSpeed < 0.8
+}
+
+func (s *SpeedController) ToFFmpegTempo() string {
+    // ffmpeg atempo filter for speed adjustment
+    // Range: 0.5 to 2.0
+    return fmt.Sprintf("%.2f", s.currentSpeed)
 }
 ```
 

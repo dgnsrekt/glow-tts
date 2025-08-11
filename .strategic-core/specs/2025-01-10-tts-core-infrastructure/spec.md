@@ -27,7 +27,7 @@ Add comprehensive Text-to-Speech (TTS) functionality to Glow, enabling users to 
 - [ ] TTS is ONLY available when `--tts [engine]` flag is used
 - [ ] Without `--tts` flag, all TTS code is completely inactive
 - [ ] Supports Piper engine for offline synthesis
-- [ ] Supports Google TTS for cloud-based synthesis  
+- [ ] Supports Google TTS via gTTS (no API key required)  
 - [ ] Requires explicit engine selection (no automatic fallback)
 - [ ] Manual start required (no auto-play on document open)
 - [ ] Sentence-level navigation (next/previous)
@@ -57,7 +57,8 @@ Add comprehensive Text-to-Speech (TTS) functionality to Glow, enabling users to 
 
 ### External Dependencies
 - **Piper**: ONNX runtime and voice models
-- **Google Cloud TTS**: API credentials (optional)
+- **gTTS (Google TTS)**: Python gtts package for free TTS (no API key required)
+- **ffmpeg**: For MP3 to PCM conversion (required for gTTS)
 - **Audio Library**: oto/v3 for cross-platform playback
 
 ### Internal Dependencies

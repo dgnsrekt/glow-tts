@@ -320,41 +320,51 @@ err := cmd.Run()  // Synchronous execution
 
 ---
 
-### Task 8: Implement Google TTS Engine
+### Task 8: Implement Google TTS Engine (using gTTS - no API key)
 
 **Type**: implementation  
 **Priority**: medium
 **Estimated Hours**: 4
 
 #### Pre-Implementation Checklist
-- [ ] Set up Google Cloud account
-- [ ] Understand API quotas/limits
-- [ ] Plan authentication
-- [ ] Design rate limiting
-- [ ] Consider error handling
+- [ ] Install gTTS: `pip install gtts`
+- [ ] Verify gtts-cli is available in PATH
+- [ ] Install ffmpeg for MP3 to PCM conversion
+- [ ] Understand gTTS CLI options
+- [ ] Plan MP3 to PCM conversion strategy
 
 #### Description
-Implement Google Text-to-Speech API integration with proper error handling.
+Implement Google Text-to-Speech using gTTS (Google Translate's TTS) which requires no API key. This provides free TTS functionality with some limitations.
 
 #### Acceptance Criteria
-- [ ] Authenticates with API correctly
-- [ ] Synthesizes text successfully
-- [ ] Implements rate limiting
-- [ ] Handles API errors gracefully
-- [ ] Supports voice selection
-- [ ] Manages quotas properly
+- [ ] Uses gtts-cli as subprocess (similar to Piper pattern)
+- [ ] Converts MP3 output to PCM format using ffmpeg
+- [ ] Implements caching for converted audio
+- [ ] Handles multiple languages
+- [ ] Supports speed adjustment (--slow flag)
+- [ ] Validates gtts-cli availability
+- [ ] Handles network errors gracefully
 
 #### Validation Steps
-- [ ] API calls succeed
-- [ ] Rate limiting works
-- [ ] Error handling is robust
-- [ ] Voice selection works
+- [ ] Synthesis produces valid audio
+- [ ] MP3 to PCM conversion works correctly
+- [ ] Cache integration works
+- [ ] Language selection works
+- [ ] Network timeouts handled properly
 - [ ] Integration tests pass
 
 #### Technical Notes
-- Use official Google Cloud Go SDK
-- Implement exponential backoff
-- Cache API responses
+```bash
+# gTTS usage pattern:
+gtts-cli "Hello world" -l en -o output.mp3
+# Then convert with ffmpeg:
+ffmpeg -i output.mp3 -f s16le -ar 22050 -ac 1 output.pcm
+```
+- Use same subprocess pattern as Piper (pre-configured stdin)
+- Implement timeout protection for network requests
+- Cache both MP3 and PCM to avoid re-conversion
+- Default to English ('en') language
+- Consider rate limiting to avoid Google blocking
 
 ---
 
