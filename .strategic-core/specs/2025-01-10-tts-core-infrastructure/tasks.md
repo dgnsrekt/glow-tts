@@ -483,15 +483,16 @@ Implement the main TTS controller that orchestrates all components.
 - [ ] Plan defaults
 
 #### Description
-Add `--tts [engine]` flag to CLI with proper validation and configuration.
+Add `--tts [engine]` flag to CLI with proper validation and configuration. When flag is not used, all TTS code remains inactive.
 
 #### Acceptance Criteria
 - [ ] Flag parses correctly
-- [ ] Validates engine choice
-- [ ] Forces TUI mode
-- [ ] Updates configuration
+- [ ] Validates engine choice (piper/gtts)
+- [ ] Forces TUI mode when used
+- [ ] Without flag, TTS code is completely inactive
+- [ ] Updates configuration only when flag present
 - [ ] Shows in help text
-- [ ] Has sensible defaults
+- [ ] Requires explicit engine selection
 
 #### Validation Steps
 - [ ] CLI accepts flag
@@ -517,12 +518,15 @@ Add `--tts [engine]` flag to CLI with proper validation and configuration.
 - [ ] Plan keyboard shortcuts
 
 #### Description
-Integrate TTS controls into the Bubble Tea TUI using Commands for ALL async operations.
+Integrate TTS controls into the Bubble Tea TUI using Commands for ALL async operations. TTS is ONLY active when --tts flag is used.
 
 #### Acceptance Criteria
 - [ ] **CRITICAL: All async ops use Commands (no goroutines)**
-- [ ] TTS status bar displays
-- [ ] Keyboard shortcuts work
+- [ ] TTS only exists when `--tts` flag is used
+- [ ] Without `--tts` flag, no TTS code runs
+- [ ] Space key controls TTS only when `--tts` used
+- [ ] Manual start required (no auto-play)
+- [ ] TTS status bar displays (only with flag)
 - [ ] Navigation commands function
 - [ ] Status updates in real-time
 - [ ] Error messages display

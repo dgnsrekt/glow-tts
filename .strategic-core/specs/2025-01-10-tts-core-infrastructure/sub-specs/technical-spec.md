@@ -448,6 +448,70 @@ func (c *CacheManager) cleanupExpired() {
 
 ### UI Integration
 
+#### TTS Activation Model
+
+```go
+type Model struct {
+    // Existing Glow fields...
+    
+    // TTS fields - only initialized if --tts flag is used
+    ttsEnabled  bool         // Set by --tts flag
+    ttsEngine   TTSEngine    // nil unless ttsEnabled
+    ttsState    TTSState     // Idle by default
+    ttsController *Controller // nil unless ttsEnabled
+}
+
+// Key handling changes based on ttsEnabled
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        // Only process TTS keys if --tts flag was used
+        if !m.ttsEnabled {
+            // All keys work normally - TTS doesn't exist
+            return m.handleNormalKeys(msg)
+        }
+        
+        // TTS is enabled, handle TTS-specific keys
+        switch msg.String() {
+        case " ": // Space key - TTS play/pause
+            if m.ttsState == StateReady {
+                // First time - start TTS
+                return m, startTTSCmd()
+            } else if m.ttsState == StatePlaying {
+                return m, pauseTTSCmd()
+            } else if m.ttsState == StatePaused {
+                return m, resumeTTSCmd()
+            }
+        
+        case "s": // Stop TTS
+            if m.ttsState != StateIdle {
+                return m, stopTTSCmd()
+            }
+        
+        case "→", "l": // Next sentence
+            if m.ttsState == StatePlaying || m.ttsState == StatePaused {
+                return m, nextSentenceCmd()
+            }
+        
+        case "←", "h": // Previous sentence
+            if m.ttsState == StatePlaying || m.ttsState == StatePaused {
+                return m, prevSentenceCmd()
+            }
+        
+        case "+", "=": // Increase speed
+            return m, increaseSpeedCmd()
+        
+        case "-", "_": // Decrease speed
+            return m, decreaseSpeedCmd()
+        
+        default:
+            // Other keys work normally
+            return m.handleNormalKeys(msg)
+        }
+    }
+}
+```
+
 #### CRITICAL: Bubble Tea Command Pattern
 
 **⚠️ NEVER use goroutines directly in Bubble Tea programs!**
@@ -567,6 +631,105 @@ Or set a default in ~/.config/glow/config.yml:
   tts:
     engine: piper  # or "gtts"
 ```
+
+### Speed Adjustment Implementation
+
+#### Piper Speed Control
+
+Piper uses the `--length-scale` parameter to control speed:
+```bash
+# Normal speed (1.0x)
+piper --model model.onnx --length-scale 1.0
+
+# Faster (1.5x speed = 0.67 length scale)
+piper --model model.onnx --length-scale 0.67
+
+# Slower (0.75x speed = 1.33 length scale)
+piper --model model.onnx --length-scale 1.33
+```
+
+#### Google TTS Speed Control
+
+Google TTS uses the `speaking_rate` field in the audio config:
+```go
+audioConfig := &texttospeechpb.AudioConfig{
+    AudioEncoding: texttospeechpb.AudioEncoding_LINEAR16,
+    SpeakingRate:  1.5,  // 1.5x speed
+}
+```
+
+#### Speed Implementation
+
+```go
+type SpeedController struct {
+    currentSpeed float64  // 0.5 to 2.0
+    steps        []float64
+}
+
+func NewSpeedController() *SpeedController {
+    return &SpeedController{
+        currentSpeed: 1.0,
+        steps: []float64{0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0},
+    }
+}
+
+func (s *SpeedController) Increase() float64 {
+    for _, speed := range s.steps {
+        if speed > s.currentSpeed {
+            s.currentSpeed = speed
+            return speed
+        }
+    }
+    return s.currentSpeed // Already at max
+}
+
+func (s *SpeedController) Decrease() float64 {
+    for i := len(s.steps) - 1; i >= 0; i-- {
+        if s.steps[i] < s.currentSpeed {
+            s.currentSpeed = s.steps[i]
+            return s.currentSpeed
+        }
+    }
+    return s.currentSpeed // Already at min
+}
+
+// Convert speed to engine-specific parameter
+func (s *SpeedController) ToPiperScale() string {
+    // Piper uses inverse scale (faster = smaller value)
+    scale := 1.0 / s.currentSpeed
+    return fmt.Sprintf("%.2f", scale)
+}
+
+func (s *SpeedController) ToGoogleRate() float64 {
+    return s.currentSpeed
+}
+```
+
+#### Cache Key Includes Speed
+
+```go
+func generateCacheKey(text, voice string, speed float64) string {
+    data := fmt.Sprintf("%s|%s|%.2f", text, voice, speed)
+    hash := sha256.Sum256([]byte(data))
+    return hex.EncodeToString(hash[:16])
+}
+```
+
+#### User Experience
+
+```
+# User presses + or =
+│ Speed: 1.25x │  (brief notification)
+
+# User presses - or _
+│ Speed: 0.75x │  (brief notification)
+
+# At limits
+│ Speed: 2.0x (maximum) │
+│ Speed: 0.5x (minimum) │
+```
+
+**Note**: Speed changes only affect NEW synthesis. Currently playing audio continues at its original speed. The next sentence will use the new speed setting.
 
 ## Critical Implementation Patterns
 

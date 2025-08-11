@@ -24,15 +24,18 @@ Add comprehensive Text-to-Speech (TTS) functionality to Glow, enabling users to 
 ## Acceptance Criteria
 
 ### Functional Requirements
-- [ ] TTS can be activated via `--tts [engine]` CLI flag
+- [ ] TTS is ONLY available when `--tts [engine]` flag is used
+- [ ] Without `--tts` flag, all TTS code is completely inactive
 - [ ] Supports Piper engine for offline synthesis
 - [ ] Supports Google TTS for cloud-based synthesis  
 - [ ] Requires explicit engine selection (no automatic fallback)
+- [ ] Manual start required (no auto-play on document open)
 - [ ] Sentence-level navigation (next/previous)
 - [ ] Playback controls (play/pause/stop)
 - [ ] Speed adjustment (0.5x to 2.0x)
-- [ ] TUI mode is enforced when TTS is active
+- [ ] TUI mode is enforced when TTS flag is used
 - [ ] Audio caching for repeated content
+- [ ] Space key only controls TTS when `--tts` flag is used
 
 ### Non-Functional Requirements
 - [ ] TTS initialization completes within 3 seconds
