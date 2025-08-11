@@ -75,14 +75,23 @@ cmd.Run()  // Synchronous execution
 - Efficient memory usage
 **Pattern**: Ring buffer with 2-3 sentence look-ahead
 
-### 8. Multi-Engine Support
-**Decision**: Support both offline (Piper) and cloud (Google TTS) engines
+### 8. Explicit Engine Selection (No Automatic Fallback)
+**Decision**: Require explicit engine choice - no automatic fallback between engines
 **Rationale**:
-- Flexibility for different use cases
-- Offline capability for privacy/security
-- Cloud option for better quality
-- Graceful fallback mechanisms
-**Trade-offs**: Increased complexity in engine abstraction
+- User control and predictability
+- Clear cost implications (Google TTS has API costs)
+- Privacy considerations (offline vs cloud)
+- Simpler error handling and debugging
+- Avoids unexpected behavior changes
+**Implementation**:
+- CLI flag: `--tts piper` or `--tts gtts`
+- Config file: `engine: piper` or `engine: gtts`
+- Error if no engine specified
+- Engine fails immediately if unavailable (no silent fallback)
+**Trade-offs**: 
+- User must explicitly configure TTS
+- No automatic recovery if engine fails
+- Simpler implementation and mental model
 
 ### 9. CLI Flag Integration
 **Decision**: Use `--tts [engine]` flag pattern

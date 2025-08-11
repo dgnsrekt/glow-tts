@@ -334,36 +334,50 @@ Implement Google Text-to-Speech API integration with proper error handling.
 
 ---
 
-### Task 9: Implement Fallback Engine
+### Task 9: Implement Engine Validation
 
 **Type**: implementation
 **Priority**: medium
-**Estimated Hours**: 3
+**Estimated Hours**: 2
 
 #### Pre-Implementation Checklist
-- [ ] Design fallback strategy
-- [ ] Plan health checking
-- [ ] Consider switching logic
-- [ ] Design configuration
+- [ ] Design validation strategy
+- [ ] Plan error messages
+- [ ] Consider configuration validation
+- [ ] Design user guidance
 - [ ] Plan logging strategy
 
 #### Description
-Create a fallback engine wrapper that automatically switches between engines on failure.
+Create engine validation that ensures user has explicitly chosen and configured their TTS engine.
 
 #### Acceptance Criteria
-- [ ] Detects engine failures
-- [ ] Switches to fallback seamlessly
-- [ ] Maintains playback continuity
-- [ ] Logs fallback events
-- [ ] Configurable fallback order
-- [ ] Health check mechanism
+- [ ] Validates engine selection at startup
+- [ ] Checks engine availability (Piper installed, Google API key)
+- [ ] Provides clear error messages
+- [ ] Guides user to correct configuration
+- [ ] Validates model files exist (Piper)
+- [ ] Validates API credentials (Google)
 
 #### Validation Steps
-- [ ] Fallback triggers correctly
-- [ ] No audio interruption
-- [ ] State maintained properly
+- [ ] Engine selection required
+- [ ] Clear error messages displayed
+- [ ] Configuration guidance works
 - [ ] Logs are informative
-- [ ] Tests cover failure scenarios
+- [ ] Tests cover all error cases
+
+#### Technical Notes
+```go
+func ValidateEngine(engine EngineType, config Config) error {
+    switch engine {
+    case EnginePiper:
+        return validatePiper(config.Piper)
+    case EngineGoogle:
+        return validateGoogle(config.Google)
+    case EngineNone:
+        return ErrNoEngineConfigured
+    }
+}
+```
 
 ---
 
@@ -775,7 +789,7 @@ Final integration, testing, and polish before release.
 ## Summary
 
 **Total Tasks**: 20
-**Total Estimated Hours**: 79-84 hours
+**Total Estimated Hours**: 78-83 hours
 **Estimated Duration**: 8-11 days (with parallel work)
 
 ### Critical Path

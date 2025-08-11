@@ -21,6 +21,40 @@ import (
     "strings"
 )
 
+// Engine selection - NO fallback, explicit choice required
+func InitializeTTS(cliArg string, config Config) (TTSEngine, error) {
+    // 1. CLI argument takes precedence
+    engineType := cliArg
+    
+    // 2. Use config if no CLI arg
+    if engineType == "" {
+        engineType = config.TTS.Engine
+    }
+    
+    // 3. Require explicit selection
+    if engineType == "" {
+        return nil, fmt.Errorf(`No TTS engine configured.
+
+Please specify an engine:
+  glow --tts piper document.md    # Use Piper (offline)
+  glow --tts gtts document.md     # Use Google TTS (online)
+
+Or set a default in ~/.config/glow/config.yml:
+  tts:
+    engine: piper  # or "gtts"`)
+    }
+    
+    // 4. Create selected engine (no fallback)
+    switch engineType {
+    case "piper":
+        return NewPiperEngine(config.Piper)
+    case "gtts", "google":
+        return NewGoogleEngine(config.Google)
+    default:
+        return nil, fmt.Errorf("unknown engine: %s", engineType)
+    }
+}
+
 type PiperEngine struct {
     modelPath string
     cache     map[string][]byte
@@ -32,7 +66,10 @@ func (e *PiperEngine) Synthesize(ctx context.Context, text string) ([]byte, erro
         return audio, nil
     }
     
-    // 2. Prepare command
+    // 2. Prepare command with timeout
+    ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+    defer cancel()
+    
     cmd := exec.CommandContext(ctx, "piper",
         "--model", e.modelPath,
         "--output-raw")  // Raw PCM output
@@ -45,10 +82,21 @@ func (e *PiperEngine) Synthesize(ctx context.Context, text string) ([]byte, erro
     cmd.Stdout = &stdout
     cmd.Stderr = &stderr
     
-    // 5. Run synchronously
-    if err := cmd.Run(); err != nil {
-        return nil, fmt.Errorf("piper failed: %w, stderr: %s", 
-            err, stderr.String())
+    // 5. Run with timeout protection
+    done := make(chan error, 1)
+    go func() {
+        done <- cmd.Run()
+    }()
+    
+    select {
+    case err := <-done:
+        if err != nil {
+            return nil, fmt.Errorf("piper failed: %w, stderr: %s", 
+                err, stderr.String())
+        }
+    case <-ctx.Done():
+        cmd.Process.Kill()
+        return nil, fmt.Errorf("synthesis timeout")
     }
     
     // 6. Cache and return
@@ -216,7 +264,7 @@ func (s *AudioStream) Play() {
 ```yaml
 # ~/.config/glow/config.yml
 tts:
-  engine: piper
+  engine: piper  # REQUIRED: "piper" or "gtts" (no default, no fallback)
   cache_dir: ~/.cache/glow-tts
   
   # Cache configuration
@@ -234,6 +282,29 @@ piper:
 google:
   api_key: ${GOOGLE_TTS_API_KEY}
   voice: en-US-Wavenet-F
+```
+
+### CLI Usage Examples
+
+```bash
+# Explicit engine selection (overrides config)
+glow --tts piper README.md
+glow --tts gtts README.md
+
+# Use configured engine (fails if not configured)
+glow --tts README.md
+
+# Error when no engine configured
+$ glow --tts README.md
+Error: No TTS engine configured.
+
+Please specify an engine:
+  glow --tts piper document.md    # Use Piper (offline)
+  glow --tts gtts document.md     # Use Google TTS (online)
+
+Or set a default in ~/.config/glow/config.yml:
+  tts:
+    engine: piper  # or "gtts"
 ```
 
 ## 📊 Performance Targets

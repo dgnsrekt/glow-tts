@@ -87,7 +87,41 @@ type AudioQueue struct {
 - `Preprocess(count int) error`
 - `Clear() error`
 
-#### 4. TTS Engines
+#### 4. TTS Engines (Explicit Selection - No Fallback)
+
+##### Engine Selection Logic
+
+```go
+type EngineType string
+
+const (
+    EnginePiper  EngineType = "piper"
+    EngineGoogle EngineType = "gtts"
+    EngineNone   EngineType = ""
+)
+
+func SelectEngine(cliArg string, config Config) (EngineType, error) {
+    // 1. CLI argument takes precedence
+    if cliArg != "" {
+        switch cliArg {
+        case "piper":
+            return EnginePiper, nil
+        case "gtts", "google":
+            return EngineGoogle, nil
+        default:
+            return EngineNone, fmt.Errorf("unknown engine: %s", cliArg)
+        }
+    }
+    
+    // 2. Check config file
+    if config.TTS.Engine != "" {
+        return config.TTS.Engine, nil
+    }
+    
+    // 3. No engine configured - require explicit choice
+    return EngineNone, ErrNoEngineConfigured
+}
+```
 
 ##### Piper Engine (`internal/tts/engines/piper.go`)
 
@@ -108,6 +142,7 @@ type PiperEngine struct {
 - Synchronous execution with cmd.Run()
 - Aggressive caching for performance
 - **Critical**: Never uses StdinPipe()
+- **No fallback** - fails if Piper unavailable
 
 ##### Google TTS Engine (`internal/tts/engines/google.go`)
 
@@ -125,6 +160,7 @@ type GoogleTTSEngine struct {
 - Implements rate limiting
 - Handles authentication
 - Supports SSML markup
+- **No fallback** - fails if API unavailable
 
 #### 5. Audio Player (`internal/audio/player.go`)
 
@@ -492,8 +528,9 @@ func CacheSaveCmd(key string, data []byte) tea.Cmd
 ### Configuration
 
 ```yaml
+# ~/.config/glow/config.yml
 tts:
-  engine: piper  # or "google"
+  engine: piper  # REQUIRED: "piper" or "gtts" (no default)
   cache_dir: ~/.cache/glow-tts
   max_cache_size: 100MB
   lookahead: 3
@@ -506,6 +543,29 @@ google:
   api_key: ${GOOGLE_TTS_API_KEY}
   voice: en-US-Wavenet-F
   language: en-US
+```
+
+### CLI Usage
+
+```bash
+# Explicit engine selection
+glow --tts piper document.md
+glow --tts gtts document.md
+
+# Use configured engine (must be set in config.yml)
+glow --tts document.md
+
+# Error if no engine configured
+$ glow --tts document.md
+Error: No TTS engine configured.
+
+Please specify an engine:
+  glow --tts piper document.md    # Use Piper (offline)
+  glow --tts gtts document.md     # Use Google TTS (online)
+
+Or set a default in ~/.config/glow/config.yml:
+  tts:
+    engine: piper  # or "gtts"
 ```
 
 ## Critical Implementation Patterns
