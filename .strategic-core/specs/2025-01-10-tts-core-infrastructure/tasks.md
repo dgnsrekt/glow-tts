@@ -369,11 +369,11 @@ Create a fallback engine wrapper that automatically switches between engines on 
 
 ## Phase 4: Audio Implementation
 
-### Task 10: Implement Real Audio Player
+### Task 10: Implement Real Audio Player with Memory Management
 
 **Type**: implementation
 **Priority**: high
-**Estimated Hours**: 5
+**Estimated Hours**: 6
 
 #### Pre-Implementation Checklist
 - [ ] Test oto library setup
@@ -381,29 +381,42 @@ Create a fallback engine wrapper that automatically switches between engines on 
 - [ ] Plan buffer management
 - [ ] Design streaming approach
 - [ ] Consider latency requirements
+- [ ] **CRITICAL: Understand OTO memory requirements**
 
 #### Description
-Implement cross-platform audio playback using the oto library.
+Implement cross-platform audio playback using the oto library with proper memory management to prevent GC issues.
 
 #### Acceptance Criteria
 - [ ] Plays audio on Linux/macOS/Windows
-- [ ] Streams audio without gaps
+- [ ] **CRITICAL: Keeps audio data alive during playback**
+- [ ] Streams audio without gaps or static
 - [ ] Controls volume correctly
 - [ ] Tracks position accurately
 - [ ] Handles device errors
 - [ ] Supports speed adjustment
+- [ ] No memory leaks or GC issues
 
 #### Validation Steps
-- [ ] Audio plays without distortion
+- [ ] Audio plays without distortion or static
 - [ ] No gaps between chunks
 - [ ] Position tracking accurate
 - [ ] Platform tests pass
+- [ ] **Memory profile shows no GC of playing audio**
 - [ ] Performance acceptable
 
 #### Technical Notes
+```go
+// CRITICAL: Keep audio data alive!
+type AudioStream struct {
+    data []byte  // Must stay alive during playback
+    reader *bytes.Reader
+    player oto.Player
+}
+```
 - Initialize oto context once
 - Use ring buffer for streaming
-- Handle sample rate conversion
+- Handle sample rate: 44100 or 48000 Hz ONLY
+- 100ms frame size for optimal latency
 
 ---
 
@@ -475,41 +488,57 @@ Add `--tts [engine]` flag to CLI with proper validation and configuration.
 
 ---
 
-### Task 13: Integrate TTS with Bubble Tea UI
+### Task 13: Integrate TTS with Bubble Tea UI Using Commands
 
 **Type**: implementation
 **Priority**: high
-**Estimated Hours**: 5
+**Estimated Hours**: 6
 
 #### Pre-Implementation Checklist
 - [ ] Review Bubble Tea patterns
+- [ ] **CRITICAL: Understand Command pattern (NO goroutines!)**
 - [ ] Plan message types
 - [ ] Design UI components
 - [ ] Consider state synchronization
 - [ ] Plan keyboard shortcuts
 
 #### Description
-Integrate TTS controls into the Bubble Tea TUI with status display.
+Integrate TTS controls into the Bubble Tea TUI using Commands for ALL async operations.
 
 #### Acceptance Criteria
+- [ ] **CRITICAL: All async ops use Commands (no goroutines)**
 - [ ] TTS status bar displays
 - [ ] Keyboard shortcuts work
 - [ ] Navigation commands function
 - [ ] Status updates in real-time
 - [ ] Error messages display
 - [ ] Progress indicator works
+- [ ] No UI freezes or race conditions
 
 #### Validation Steps
+- [ ] **Verify NO direct goroutines in code**
 - [ ] UI updates correctly
 - [ ] No UI blocking
 - [ ] Shortcuts are responsive
 - [ ] Status accurate
 - [ ] Error handling works
+- [ ] Race detector passes
 
 #### Technical Notes
+```go
+// CRITICAL: Use Commands for everything!
+func synthesizeCmd(text string) tea.Cmd {
+    return func() tea.Msg {
+        audio := engine.Synthesize(text)
+        return AudioReadyMsg{audio}
+    }
+}
+// NEVER use go func() directly!
+```
 - Create new Bubble Tea messages
-- Update pager model
+- Update pager model with Commands
 - Add TTS-specific key bindings
+- Batch multiple commands with tea.Batch()
 
 ---
 
@@ -746,7 +775,7 @@ Final integration, testing, and polish before release.
 ## Summary
 
 **Total Tasks**: 20
-**Total Estimated Hours**: 77-82 hours
+**Total Estimated Hours**: 79-84 hours
 **Estimated Duration**: 8-11 days (with parallel work)
 
 ### Critical Path

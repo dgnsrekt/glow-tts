@@ -84,7 +84,7 @@ internal/
 
 ## ⚠️ Critical Lessons Learned
 
-### The Stdin Race Condition
+### 1. The Stdin Race Condition
 
 **Problem**: Piper reads stdin immediately on startup
 ```go
@@ -94,11 +94,83 @@ stdin := cmd.StdinPipe() // Too late!
 stdin.Write(text)        // Writes to nothing
 ```
 
-**Solution**: Pre-configure stdin
+**Solution**: Pre-configure stdin with timeout protection
 ```go
-// ✅ CORRECT
+// ✅ CORRECT with full protection
+ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+defer cancel()
+
+cmd := exec.CommandContext(ctx, "piper", args...)
 cmd.Stdin = strings.NewReader(text)  // Ready before start
-cmd.Run()                            // Synchronous, no race
+
+done := make(chan error, 1)
+go func() {
+    done <- cmd.Run()
+}()
+
+select {
+case err := <-done:
+    return handleResult(err)
+case <-ctx.Done():
+    cmd.Process.Kill()
+    return ErrTimeout
+}
+```
+
+### 2. Bubble Tea Command Pattern (CRITICAL!)
+
+**Problem**: Using goroutines directly breaks Bubble Tea
+```go
+// ❌ CATASTROPHIC - Breaks everything
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    go func() {  // NEVER DO THIS!
+        result := doWork()
+        m.channel <- result
+    }()
+    return m, nil
+}
+```
+
+**Solution**: ALWAYS use Commands for async operations
+```go
+// ✅ MANDATORY PATTERN
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    return m, doWorkCmd()  // Return a command
+}
+
+func doWorkCmd() tea.Cmd {
+    return func() tea.Msg {
+        result := doWork()
+        return WorkDoneMsg{result}
+    }
+}
+```
+
+### 3. OTO Audio Memory Management
+
+**Problem**: Audio data gets GC'd during playback
+```go
+// ❌ BROKEN - Causes static/crashes
+func Play(audio []byte) {
+    reader := bytes.NewReader(audio)
+    player.Play(reader)
+    // audio gets GC'd, reader points to freed memory!
+}
+```
+
+**Solution**: Keep references alive during playback
+```go
+// ✅ CORRECT - Prevents GC
+type AudioStream struct {
+    data []byte  // Keep alive!
+    reader *bytes.Reader
+}
+
+func (s *AudioStream) Play() {
+    s.reader = bytes.NewReader(s.data)
+    player.Play(s.reader)
+    // data stays alive as long as AudioStream exists
+}
 ```
 
 ## 🎯 Implementation Checklist
@@ -209,12 +281,15 @@ func BenchmarkSynthesisWithCache(b *testing.B) {
 ## 🚫 Common Pitfalls to Avoid
 
 1. **Using StdinPipe()** - Causes race condition
-2. **Long-running processes** - Unstable, memory leaks
-3. **Process pools** - Over-complicated, still unreliable
-4. **No caching** - Terrible performance
-5. **Forgetting stderr** - Lost error messages
-6. **No timeout** - Hanging processes
-7. **Ignoring output validation** - Silent failures
+2. **Using goroutines in Bubble Tea** - Breaks UI completely
+3. **Not keeping audio data alive** - Static noise/crashes
+4. **No timeout protection** - Hanging processes forever
+5. **Long-running processes** - Unstable, memory leaks
+6. **Process pools** - Over-complicated, still unreliable
+7. **No caching** - Terrible performance
+8. **Forgetting stderr** - Lost error messages
+9. **Ignoring output validation** - Silent failures
+10. **Not handling graceful shutdown** - Orphaned processes
 
 ## 💾 Cache Implementation Details
 

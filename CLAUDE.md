@@ -61,6 +61,7 @@ Your project-specific standards are located in:
 
 ### Architecture & Design
 - **Bubble Tea TUI**: @.strategic-core/standards/active/2025-01-10-0004-bubble-tea-tui.md
+- **Bubble Tea Commands** ⚠️: @.strategic-core/standards/active/2025-01-10-0011-bubble-tea-commands.md
 - **API & Interface Design**: @.strategic-core/standards/active/2025-01-10-0006-api-interface-design.md
 
 ### Quality & Documentation

@@ -135,6 +135,18 @@ type AudioPlayer struct {
     buffer     *RingBuffer
     playing    atomic.Bool
     position   atomic.Int64
+    // CRITICAL: Keep audio data alive during playback
+    activeStream *AudioStream
+}
+
+// CRITICAL: OTO Memory Management Pattern
+type AudioStream struct {
+    data      []byte         // Must stay alive during playback!
+    reader    *bytes.Reader  // Recreated from data
+    player    oto.Player     // Active player
+    position  int64
+    closeOnce sync.Once
+    mu        sync.RWMutex
 }
 ```
 
@@ -143,6 +155,47 @@ type AudioPlayer struct {
 - Non-blocking audio streaming
 - Position tracking
 - Volume control
+- **CRITICAL: Maintain audio data references during playback**
+
+**⚠️ OTO Memory Management Requirements:**
+
+OTO streams audio data - it does NOT load everything into memory first. If the underlying data source is garbage collected or closed while playing, you'll get:
+- Static noise instead of audio
+- Complete silence
+- Segmentation faults/crashes
+
+```go
+// ❌ BROKEN - Data will be GC'd, causing static/crashes
+func (p *AudioPlayer) Play(audio []byte) error {
+    reader := bytes.NewReader(audio)
+    p.player = p.context.NewPlayer(reader)
+    p.player.Play()
+    return nil
+    // audio goes out of scope, gets GC'd
+    // reader now points to freed memory!
+}
+
+// ✅ CORRECT - Keep data alive during playback
+func (p *AudioPlayer) Play(audio []byte) error {
+    // Store reference to prevent GC
+    p.activeStream = &AudioStream{
+        data:   audio,  // Keep alive!
+        reader: bytes.NewReader(audio),
+    }
+    
+    p.player = p.context.NewPlayer(p.activeStream.reader)
+    p.player.Play()
+    return nil
+}
+
+func (p *AudioPlayer) Stop() {
+    if p.activeStream != nil {
+        p.player.Close()
+        // NOW safe to release memory
+        p.activeStream = nil
+    }
+}
+```
 
 ## Data Flow
 
@@ -359,6 +412,54 @@ func (c *CacheManager) cleanupExpired() {
 
 ### UI Integration
 
+#### CRITICAL: Bubble Tea Command Pattern
+
+**⚠️ NEVER use goroutines directly in Bubble Tea programs!**
+
+Bubble Tea has its own scheduler for managing concurrency. Using goroutines directly bypasses this scheduler and causes:
+- Race conditions with internal state
+- UI freezes and unresponsive behavior
+- Missed re-renders after state changes
+- Unpredictable crashes
+
+```go
+// ❌ NEVER DO THIS - Breaks Bubble Tea completely
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    case StartTTSMsg:
+        go func() {  // CATASTROPHIC ERROR!
+            audio := m.engine.Synthesize(text)
+            m.audioReady <- audio
+        }()
+        return m, nil
+}
+
+// ✅ ALWAYS DO THIS - Use Commands for ALL async operations
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    case StartTTSMsg:
+        return m, synthesizeCmd(msg.Text)  // Return a command
+    case AudioReadyMsg:
+        m.audio = msg.Audio
+        return m, playAudioCmd(m.audio)
+}
+
+// All async operations must be commands
+func synthesizeCmd(text string) tea.Cmd {
+    return func() tea.Msg {
+        audio := engine.Synthesize(text)
+        return AudioReadyMsg{Audio: audio}
+    }
+}
+
+func playAudioCmd(audio []byte) tea.Cmd {
+    return func() tea.Msg {
+        player.Play(audio)
+        return AudioPlayingMsg{}
+    }
+}
+```
+
+#### Messages and Commands
+
 ```go
 // Bubble Tea messages
 type TTSStatusMsg struct {
@@ -373,10 +474,19 @@ type TTSErrorMsg struct {
     Fatal bool
 }
 
-// Commands
+type AudioReadyMsg struct {
+    Audio    []byte
+    Sentence string
+}
+
+// Commands - ALL I/O operations must be commands
 func StartTTSCmd(content string) tea.Cmd
 func StopTTSCmd() tea.Cmd
 func NavigateTTSCmd(direction Direction) tea.Cmd
+func SynthesizeCmd(text string) tea.Cmd
+func PlayAudioCmd(audio []byte) tea.Cmd
+func CacheLoadCmd(key string) tea.Cmd
+func CacheSaveCmd(key string, data []byte) tea.Cmd
 ```
 
 ### Configuration
@@ -413,12 +523,16 @@ stdin.Write(text)  // Too late!
 
 **ALWAYS DO THIS:**
 ```go
-// ✅ CORRECT - No race possible
+// ✅ COMPLETE - Handles ALL race conditions with timeout protection
 func (e *PiperEngine) Synthesize(ctx context.Context, text string) ([]byte, error) {
     // Check cache first
     if audio := e.getFromCache(text); audio != nil {
         return audio, nil
     }
+    
+    // CRITICAL: Add timeout protection
+    ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+    defer cancel()
     
     cmd := exec.CommandContext(ctx, "piper",
         "--model", e.modelPath,
@@ -428,20 +542,73 @@ func (e *PiperEngine) Synthesize(ctx context.Context, text string) ([]byte, erro
     // Critical: Pre-set stdin before starting
     cmd.Stdin = strings.NewReader(text)
     
+    // Capture outputs before starting
     var stdout, stderr bytes.Buffer
     cmd.Stdout = &stdout
     cmd.Stderr = &stderr
     
-    // Run synchronously
-    if err := cmd.Run(); err != nil {
-        return nil, fmt.Errorf("piper failed: %w, stderr: %s", err, stderr.String())
-    }
+    // Use channel for completion notification
+    done := make(chan error, 1)
     
-    audio := stdout.Bytes()
-    e.saveToCache(text, audio)
-    return audio, nil
+    // Start process with proper synchronization
+    go func() {
+        done <- cmd.Run()
+        close(done)
+    }()
+    
+    // Wait with timeout protection
+    select {
+    case err := <-done:
+        // Process completed normally
+        if err != nil {
+            return nil, fmt.Errorf("piper failed: %w, stderr: %s", 
+                err, stderr.String())
+        }
+        
+        audio := stdout.Bytes()
+        
+        // Validate output
+        if len(audio) == 0 {
+            return nil, fmt.Errorf("piper produced no audio")
+        }
+        if len(audio) > 10*1024*1024 { // 10MB sanity check
+            return nil, fmt.Errorf("piper output too large: %d bytes", len(audio))
+        }
+        
+        e.saveToCache(text, audio)
+        return audio, nil
+        
+    case <-ctx.Done():
+        // Timeout or cancellation
+        // Try graceful shutdown first
+        if cmd.Process != nil {
+            cmd.Process.Signal(os.Interrupt)
+            
+            // Give it a moment to clean up
+            select {
+            case <-done:
+                // Exited gracefully
+            case <-time.After(100 * time.Millisecond):
+                // Force kill
+                cmd.Process.Kill()
+                <-done // Wait for goroutine to finish
+            }
+        }
+        
+        return nil, fmt.Errorf("synthesis timeout after 5s: %w", ctx.Err())
+    }
 }
 ```
+
+### Additional Race Condition Protections
+
+Beyond the stdin race, we must protect against:
+
+1. **Process Hang Protection**: Always use timeouts
+2. **Wait/Write Race**: Complete all I/O before Wait()
+3. **File Descriptor Reuse**: Never access cmd after Wait()
+4. **Graceful Shutdown**: Try SIGINT before SIGKILL
+5. **Output Validation**: Check for sane output sizes
 
 ## Security Considerations
 
