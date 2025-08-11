@@ -191,6 +191,12 @@ func (m *pagerModel) unload() {
 	if m.statusMessageTimer != nil {
 		m.statusMessageTimer.Stop()
 	}
+	// Clean up TTS controller if active
+	if m.ttsController != nil {
+		_ = m.ttsController.Stop()
+		m.ttsController = nil
+		m.ttsState = "inactive"
+	}
 	m.state = pagerStateBrowse
 	m.viewport.SetContent("")
 	m.viewport.YOffset = 0
