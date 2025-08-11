@@ -16,6 +16,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/styles"
+	"github.com/charmbracelet/glow/v2/internal/tts"
 	"github.com/charmbracelet/glow/v2/ui"
 	"github.com/charmbracelet/glow/v2/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -42,6 +43,7 @@ var (
 	showLineNumbers  bool
 	preserveNewLines bool
 	mouse            bool
+	ttsEngine        string
 
 	rootCmd = &cobra.Command{
 		Use:   "glow [SOURCE|DIR]",
@@ -171,6 +173,46 @@ func validateOptions(cmd *cobra.Command) error {
 	showAllFiles = viper.GetBool("all")
 	preserveNewLines = viper.GetBool("preserveNewLines")
 	showLineNumbers = viper.GetBool("showLineNumbers")
+	// TTS engine selection: CLI flag takes precedence over config file
+	ttsEngine = viper.GetString("tts")
+	if ttsEngine == "" {
+		ttsEngine = viper.GetString("tts.engine")
+	}
+
+	// TTS validation and mode enforcement
+	if ttsEngine != "" {
+		// Ensure TTS defaults are applied when using CLI flag
+		if viper.GetInt("tts.cache.max_size") == 0 {
+			viper.Set("tts.cache.max_size", 100)
+		}
+		if viper.GetString("tts.cache.dir") == "" {
+			// Keep empty to use default in TTS initialization
+		}
+		if viper.GetFloat64("tts.piper.speed") == 0 {
+			viper.Set("tts.piper.speed", 1.0)
+		}
+		if viper.GetString("tts.gtts.language") == "" {
+			viper.Set("tts.gtts.language", "en")
+		}
+		// TTS requires TUI mode
+		if pager {
+			return errors.New("cannot use pager mode with TTS (TTS requires TUI mode)")
+		}
+
+		// Force TUI mode when TTS is enabled
+		tui = true
+
+		// Validate TTS engine selection
+		_, err := tts.ValidateEngineSelection(ttsEngine, tts.Config{})
+		if err != nil {
+			return fmt.Errorf("TTS validation failed: %w", err)
+		}
+
+		// Validate TTS configuration values
+		if err := validateTTSConfig(); err != nil {
+			return fmt.Errorf("TTS config validation failed: %w", err)
+		}
+	}
 
 	if pager && tui {
 		return errors.New("cannot use both pager and tui")
@@ -205,6 +247,53 @@ func validateOptions(cmd *cobra.Command) error {
 			width = 80
 		}
 	}
+	return nil
+}
+
+// validateTTSConfig validates TTS configuration values
+func validateTTSConfig() error {
+	// Validate cache size
+	maxCacheSize := viper.GetInt("tts.cache.max_size")
+	if maxCacheSize < 1 || maxCacheSize > 10000 {
+		return fmt.Errorf("TTS cache max_size must be between 1 and 10000 MB, got %d", maxCacheSize)
+	}
+
+	// Validate Piper speed
+	piperSpeed := viper.GetFloat64("tts.piper.speed")
+	if piperSpeed < 0.1 || piperSpeed > 3.0 {
+		return fmt.Errorf("TTS piper speed must be between 0.1 and 3.0, got %.2f", piperSpeed)
+	}
+
+	// Validate gTTS language code (basic validation - not exhaustive)
+	gttsLang := viper.GetString("tts.gtts.language")
+	if len(gttsLang) < 2 || len(gttsLang) > 5 {
+		return fmt.Errorf("TTS gtts language code must be 2-5 characters, got %q", gttsLang)
+	}
+
+	// Validate cache directory if specified
+	cacheDir := viper.GetString("tts.cache.dir")
+	if cacheDir != "" {
+		// Expand path
+		cacheDir = utils.ExpandPath(cacheDir)
+		// Check if parent directory exists or can be created
+		parentDir := filepath.Dir(cacheDir)
+		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+			// Try to create parent directory
+			if err := os.MkdirAll(parentDir, 0o755); err != nil {
+				return fmt.Errorf("TTS cache directory parent %q cannot be created: %w", parentDir, err)
+			}
+		}
+	}
+
+	// Validate Piper model path if specified
+	piperModel := viper.GetString("tts.piper.model")
+	if piperModel != "" {
+		piperModel = utils.ExpandPath(piperModel)
+		if _, err := os.Stat(piperModel); os.IsNotExist(err) {
+			return fmt.Errorf("TTS piper model file does not exist: %s", piperModel)
+		}
+	}
+
 	return nil
 }
 
@@ -360,6 +449,16 @@ func runTUI(path string, content string) error {
 	cfg.EnableMouse = mouse
 	cfg.PreserveNewLines = preserveNewLines
 
+	// TTS configuration
+	cfg.TTSEngine = ttsEngine
+	cfg.TTSEnabled = ttsEngine != ""
+	cfg.TTSCacheDir = viper.GetString("tts.cache.dir")
+	cfg.TTSMaxCacheSize = viper.GetInt("tts.cache.max_size")
+	cfg.TTSPiperModel = viper.GetString("tts.piper.model")
+	cfg.TTSPiperSpeed = viper.GetFloat64("tts.piper.speed")
+	cfg.TTSGTTSLang = viper.GetString("tts.gtts.language")
+	cfg.TTSGTTSSlow = viper.GetBool("tts.gtts.slow")
+
 	// Run Bubble Tea program
 	if _, err := ui.NewProgram(cfg, content).Run(); err != nil {
 		return fmt.Errorf("unable to run tui program: %w", err)
@@ -404,6 +503,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&preserveNewLines, "preserve-new-lines", "n", false, "preserve newlines in the output")
 	rootCmd.Flags().BoolVarP(&mouse, "mouse", "m", false, "enable mouse wheel (TUI-mode only)")
 	_ = rootCmd.Flags().MarkHidden("mouse")
+	rootCmd.Flags().StringVar(&ttsEngine, "tts", "", "enable TTS with specified engine (piper/gtts, forces TUI mode)")
 
 	// Config bindings
 	_ = viper.BindPFlag("pager", rootCmd.Flags().Lookup("pager"))
@@ -415,10 +515,20 @@ func init() {
 	_ = viper.BindPFlag("preserveNewLines", rootCmd.Flags().Lookup("preserve-new-lines"))
 	_ = viper.BindPFlag("showLineNumbers", rootCmd.Flags().Lookup("line-numbers"))
 	_ = viper.BindPFlag("all", rootCmd.Flags().Lookup("all"))
+	_ = viper.BindPFlag("tts", rootCmd.Flags().Lookup("tts"))
 
 	viper.SetDefault("style", styles.AutoStyle)
 	viper.SetDefault("width", 0)
 	viper.SetDefault("all", true)
+
+	// TTS defaults
+	viper.SetDefault("tts.engine", "")
+	viper.SetDefault("tts.cache.dir", "")
+	viper.SetDefault("tts.cache.max_size", 100)
+	viper.SetDefault("tts.piper.model", "")
+	viper.SetDefault("tts.piper.speed", 1.0)
+	viper.SetDefault("tts.gtts.language", "en")
+	viper.SetDefault("tts.gtts.slow", false)
 
 	rootCmd.AddCommand(configCmd, manCmd)
 }
