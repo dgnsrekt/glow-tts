@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/charmbracelet/glow/v2/internal/ttypes"
 )
 
 // Compile-time interface compliance checks
@@ -35,18 +37,18 @@ func (m *mockEngine) Close() error {
 
 type mockPlayer struct{}
 
-func (m *mockPlayer) Play(audio []byte) error              { return nil }
-func (m *mockPlayer) Pause() error                          { return nil }
-func (m *mockPlayer) Resume() error                         { return nil }
-func (m *mockPlayer) Stop() error                           { return nil }
-func (m *mockPlayer) IsPlaying() bool                       { return false }
-func (m *mockPlayer) GetPosition() time.Duration            { return 0 }
-func (m *mockPlayer) SetVolume(volume float64) error        { return nil }
-func (m *mockPlayer) Close() error                          { return nil }
+func (m *mockPlayer) Play(audio []byte) error        { return nil }
+func (m *mockPlayer) Pause() error                   { return nil }
+func (m *mockPlayer) Resume() error                  { return nil }
+func (m *mockPlayer) Stop() error                    { return nil }
+func (m *mockPlayer) IsPlaying() bool                { return false }
+func (m *mockPlayer) GetPosition() time.Duration     { return 0 }
+func (m *mockPlayer) SetVolume(volume float64) error { return nil }
+func (m *mockPlayer) Close() error                   { return nil }
 
 type mockCache struct{}
 
-func (m *mockCache) Get(key string) ([]byte, bool)     { return nil, false }
+func (m *mockCache) Get(key string) ([]byte, bool)      { return nil, false }
 func (m *mockCache) Put(key string, audio []byte) error { return nil }
 func (m *mockCache) Delete(key string) error            { return nil }
 func (m *mockCache) Clear() error                       { return nil }
@@ -55,49 +57,49 @@ func (m *mockCache) Stats() CacheStats                  { return CacheStats{} }
 
 type mockQueue struct{}
 
-func (m *mockQueue) Enqueue(sentence Sentence, priority bool) error { return nil }
-func (m *mockQueue) Dequeue() (Sentence, error)                     { return Sentence{}, nil }
-func (m *mockQueue) Peek() (Sentence, error)                        { return Sentence{}, nil }
-func (m *mockQueue) Size() int                                      { return 0 }
-func (m *mockQueue) Clear()                                         {}
-func (m *mockQueue) SetLookahead(count int)                         {}
+func (m *mockQueue) Enqueue(sentence ttypes.Sentence, priority bool) error { return nil }
+func (m *mockQueue) Dequeue() (ttypes.Sentence, error)                     { return ttypes.Sentence{}, nil }
+func (m *mockQueue) Peek() (ttypes.Sentence, error)                        { return ttypes.Sentence{}, nil }
+func (m *mockQueue) Size() int                                             { return 0 }
+func (m *mockQueue) Clear()                                                {}
+func (m *mockQueue) SetLookahead(count int)                                {}
 
 type mockParser struct{}
 
-func (m *mockParser) Parse(markdown string) ([]Sentence, error) { return nil, nil }
-func (m *mockParser) StripMarkdown(text string) string          { return text }
+func (m *mockParser) Parse(markdown string) ([]ttypes.Sentence, error) { return nil, nil }
+func (m *mockParser) StripMarkdown(text string) string                 { return text }
 
 type mockController struct{}
 
-func (m *mockController) Start(ctx context.Context, engineType EngineType) error { return nil }
-func (m *mockController) Stop() error                                            { return nil }
-func (m *mockController) ProcessDocument(content string) error                   { return nil }
-func (m *mockController) Play() error                                            { return nil }
-func (m *mockController) Pause() error                                           { return nil }
-func (m *mockController) NextSentence() error                                    { return nil }
-func (m *mockController) PreviousSentence() error                                { return nil }
-func (m *mockController) SetSpeed(speed float64) error                           { return nil }
-func (m *mockController) GetState() State                                        { return StateIdle }
-func (m *mockController) GetProgress() Progress                                  { return Progress{} }
+func (m *mockController) Start(ctx context.Context, engineType ttypes.EngineType) error { return nil }
+func (m *mockController) Stop() error                                                   { return nil }
+func (m *mockController) ProcessDocument(content string) error                          { return nil }
+func (m *mockController) Play() error                                                   { return nil }
+func (m *mockController) Pause() error                                                  { return nil }
+func (m *mockController) NextSentence() error                                           { return nil }
+func (m *mockController) PreviousSentence() error                                       { return nil }
+func (m *mockController) SetSpeed(speed float64) error                                  { return nil }
+func (m *mockController) GetState() ttypes.State                                        { return ttypes.StateIdle }
+func (m *mockController) GetProgress() ttypes.Progress                                  { return ttypes.Progress{} }
 
 type mockSpeedController struct{}
 
-func (m *mockSpeedController) GetSpeed() float64        { return 1.0 }
+func (m *mockSpeedController) GetSpeed() float64            { return 1.0 }
 func (m *mockSpeedController) SetSpeed(speed float64) error { return nil }
-func (m *mockSpeedController) Increase() float64        { return 1.25 }
-func (m *mockSpeedController) Decrease() float64        { return 0.75 }
-func (m *mockSpeedController) ToPiperScale() string     { return "1.0" }
-func (m *mockSpeedController) ToGoogleRate() float64    { return 1.0 }
+func (m *mockSpeedController) Increase() float64            { return 1.25 }
+func (m *mockSpeedController) Decrease() float64            { return 0.75 }
+func (m *mockSpeedController) ToPiperScale() string         { return "1.0" }
+func (m *mockSpeedController) ToGoogleRate() float64        { return 1.0 }
 
 // Ensure all mock implementations satisfy their interfaces
 var (
-	_ TTSEngine        = (*mockEngine)(nil)
-	_ AudioPlayer      = (*mockPlayer)(nil)
-	_ AudioCache       = (*mockCache)(nil)
-	_ SentenceQueue    = (*mockQueue)(nil)
-	_ Parser           = (*mockParser)(nil)
-	_ Controller       = (*mockController)(nil)
-	_ SpeedController  = (*mockSpeedController)(nil)
+	_ TTSEngine       = (*mockEngine)(nil)
+	_ AudioPlayer     = (*mockPlayer)(nil)
+	_ AudioCache      = (*mockCache)(nil)
+	_ SentenceQueue   = (*mockQueue)(nil)
+	_ Parser          = (*mockParser)(nil)
+	_ Controller      = (*mockController)(nil)
+	_ SpeedController = (*mockSpeedController)(nil)
 )
 
 // TestInterfaceCompilation verifies that all interfaces compile
@@ -113,19 +115,19 @@ func TestErrorTypes(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected error to be created")
 	}
-	
+
 	// Test error with context
 	err = err.WithContext("engine", "piper")
 	if err.Context["engine"] != "piper" {
 		t.Errorf("Expected context to contain engine=piper")
 	}
-	
+
 	// Test fatal error detection
 	fatalErr := NewTTSError(ErrorCodeAudioDevice, "device error", nil)
 	if !fatalErr.IsFatal() {
 		t.Errorf("Expected audio device error to be fatal")
 	}
-	
+
 	// Test retryable error detection
 	retryErr := NewTTSError(ErrorCodeTimeout, "timeout", nil)
 	if !retryErr.IsRetryable() {
@@ -136,42 +138,42 @@ func TestErrorTypes(t *testing.T) {
 // TestStateString verifies state string conversion
 func TestStateString(t *testing.T) {
 	tests := []struct {
-		state    State
+		state    ttypes.State
 		expected string
 	}{
-		{StateIdle, "idle"},
-		{StateInitializing, "initializing"},
-		{StateReady, "ready"},
-		{StateProcessing, "processing"},
-		{StatePlaying, "playing"},
-		{StatePaused, "paused"},
-		{StateStopping, "stopping"},
-		{StateError, "error"},
+		{ttypes.StateIdle, "idle"},
+		{ttypes.StateInitializing, "initializing"},
+		{ttypes.StateReady, "ready"},
+		{ttypes.StateProcessing, "processing"},
+		{ttypes.StatePlaying, "playing"},
+		{ttypes.StatePaused, "paused"},
+		{ttypes.StateStopping, "stopping"},
+		{ttypes.StateError, "error"},
 	}
-	
+
 	for _, tt := range tests {
 		if got := tt.state.String(); got != tt.expected {
-			t.Errorf("State.String() = %v, want %v", got, tt.expected)
+			t.Errorf("ttypes.State.String() = %v, want %v", got, tt.expected)
 		}
 	}
 }
 
 // TestProgressCalculation verifies progress percentage calculation
 func TestProgressCalculation(t *testing.T) {
-	p := Progress{
+	p := ttypes.Progress{
 		CurrentSentence: 5,
 		TotalSentences:  10,
 		CurrentPosition: 0,
 		TotalDuration:   0,
 	}
-	
+
 	// Should be 50% complete (5 out of 10 sentences)
 	if percent := p.PercentComplete(); percent != 50.0 {
 		t.Errorf("Expected 50%% complete, got %.2f%%", percent)
 	}
-	
+
 	// Test with no sentences
-	p2 := Progress{TotalSentences: 0}
+	p2 := ttypes.Progress{TotalSentences: 0}
 	if percent := p2.PercentComplete(); percent != 0 {
 		t.Errorf("Expected 0%% for no sentences, got %.2f%%", percent)
 	}

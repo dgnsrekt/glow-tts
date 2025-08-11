@@ -11,14 +11,14 @@ import (
 type MemoryCache struct {
 	capacity int64 // Maximum size in bytes
 	size     int64 // Current size in bytes
-	
+
 	// LRU implementation
 	items    map[string]*list.Element
 	eviction *list.List
-	
+
 	// Synchronization
 	mu sync.RWMutex
-	
+
 	// Metrics
 	stats CacheStats
 }
@@ -48,18 +48,18 @@ func NewMemoryCache(capacity int64) *MemoryCache {
 func (c *MemoryCache) Get(key string) ([]byte, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	elem, ok := c.items[key]
 	if !ok {
 		c.stats.Misses++
 		return nil, false
 	}
-	
+
 	// Move to front (most recently used)
 	c.eviction.MoveToFront(elem)
 	entry := elem.Value.(*memoryCacheEntry)
 	entry.hits++
-	
+
 	c.stats.Hits++
 	return entry.value, true
 }
@@ -68,37 +68,37 @@ func (c *MemoryCache) Get(key string) ([]byte, bool) {
 func (c *MemoryCache) Put(key string, value []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	valueSize := int64(len(value))
-	
+
 	// Check if key already exists
 	if elem, ok := c.items[key]; ok {
 		// Update existing entry
 		c.eviction.MoveToFront(elem)
 		entry := elem.Value.(*memoryCacheEntry)
-		
+
 		// Update size
 		c.size += valueSize - entry.size
-		
+
 		// Update entry
 		entry.value = value
 		entry.size = valueSize
 		entry.timestamp = time.Now()
-		
+
 		c.stats.Size = c.size
 		return nil
 	}
-	
+
 	// Check if value is too large for cache
 	if valueSize > c.capacity {
 		return ErrItemTooLarge
 	}
-	
+
 	// Evict items if necessary
 	for c.size+valueSize > c.capacity && c.eviction.Len() > 0 {
 		c.evictOldest()
 	}
-	
+
 	// Add new entry
 	entry := &memoryCacheEntry{
 		key:       key,
@@ -107,11 +107,11 @@ func (c *MemoryCache) Put(key string, value []byte) error {
 		timestamp: time.Now(),
 		hits:      0,
 	}
-	
+
 	elem := c.eviction.PushFront(entry)
 	c.items[key] = elem
 	c.size += valueSize
-	
+
 	c.stats.Size = c.size
 	return nil
 }
@@ -120,12 +120,12 @@ func (c *MemoryCache) Put(key string, value []byte) error {
 func (c *MemoryCache) Delete(key string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	elem, ok := c.items[key]
 	if !ok {
 		return nil
 	}
-	
+
 	c.removeElement(elem)
 	return nil
 }
@@ -134,12 +134,12 @@ func (c *MemoryCache) Delete(key string) error {
 func (c *MemoryCache) Clear() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.items = make(map[string]*list.Element)
 	c.eviction.Init()
 	c.size = 0
 	c.stats.Size = 0
-	
+
 	return nil
 }
 
@@ -147,7 +147,7 @@ func (c *MemoryCache) Clear() error {
 func (c *MemoryCache) Size() int64 {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	return c.size
 }
 
@@ -155,15 +155,15 @@ func (c *MemoryCache) Size() int64 {
 func (c *MemoryCache) Stats() CacheStats {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	stats := c.stats
 	stats.Size = c.size
 	stats.ItemCount = int64(len(c.items))
-	
+
 	if stats.Hits+stats.Misses > 0 {
 		stats.HitRate = float64(stats.Hits) / float64(stats.Hits+stats.Misses)
 	}
-	
+
 	return stats
 }
 
@@ -171,20 +171,20 @@ func (c *MemoryCache) Stats() CacheStats {
 func (c *MemoryCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	elem, ok := c.items[key]
 	if !ok {
 		c.stats.Misses++
 		return nil, CacheMetadata{}, false
 	}
-	
+
 	// Move to front (most recently used)
 	c.eviction.MoveToFront(elem)
 	entry := elem.Value.(*memoryCacheEntry)
 	entry.hits++
-	
+
 	c.stats.Hits++
-	
+
 	metadata := CacheMetadata{
 		Key:       entry.key,
 		Size:      entry.size,
@@ -192,7 +192,7 @@ func (c *MemoryCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) 
 		Hits:      entry.hits,
 		Level:     CacheLevelL1,
 	}
-	
+
 	return entry.value, metadata, true
 }
 
@@ -200,9 +200,9 @@ func (c *MemoryCache) GetWithMetadata(key string) ([]byte, CacheMetadata, bool) 
 func (c *MemoryCache) GetLRUEntries(n int) []CacheMetadata {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	entries := make([]CacheMetadata, 0, n)
-	
+
 	// Start from the back (least recently used)
 	elem := c.eviction.Back()
 	for i := 0; i < n && elem != nil; i++ {
@@ -216,7 +216,7 @@ func (c *MemoryCache) GetLRUEntries(n int) []CacheMetadata {
 		})
 		elem = elem.Prev()
 	}
-	
+
 	return entries
 }
 
@@ -224,10 +224,10 @@ func (c *MemoryCache) GetLRUEntries(n int) []CacheMetadata {
 func (c *MemoryCache) Resize(newCapacity int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.capacity = newCapacity
 	c.stats.Capacity = newCapacity
-	
+
 	// Evict if necessary
 	for c.size > c.capacity && c.eviction.Len() > 0 {
 		c.evictOldest()
@@ -255,7 +255,7 @@ func (c *MemoryCache) removeElement(elem *list.Element) {
 func (c *MemoryCache) Contains(key string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	_, ok := c.items[key]
 	return ok
 }
@@ -264,7 +264,7 @@ func (c *MemoryCache) Contains(key string) bool {
 func (c *MemoryCache) Keys() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	keys := make([]string, 0, len(c.items))
 	for key := range c.items {
 		keys = append(keys, key)
@@ -276,23 +276,23 @@ func (c *MemoryCache) Keys() []string {
 func (c *MemoryCache) Prune(maxAge time.Duration) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	cutoff := time.Now().Add(-maxAge)
 	pruned := 0
-	
+
 	// Start from the back (oldest entries)
 	elem := c.eviction.Back()
 	for elem != nil {
 		prev := elem.Prev()
 		entry := elem.Value.(*memoryCacheEntry)
-		
+
 		if entry.timestamp.Before(cutoff) {
 			c.removeElement(elem)
 			pruned++
 		}
-		
+
 		elem = prev
 	}
-	
+
 	return pruned
 }

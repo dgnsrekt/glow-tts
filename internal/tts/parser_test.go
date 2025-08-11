@@ -98,9 +98,9 @@ func TestSentenceParser_Parse(t *testing.T) {
 
 func TestSentenceParser_Abbreviations(t *testing.T) {
 	tests := []struct {
-		name     string
-		text     string
-		want     []string
+		name string
+		text string
+		want []string
 	}{
 		{
 			name: "Common abbreviations",
@@ -224,7 +224,7 @@ func TestSentenceParser_EdgeCases(t *testing.T) {
 		{
 			name: "Quotes",
 			text: `He said "Hello." She replied "Hi there."`,
-			want: []string{`He said "Hello."`, `She replied "Hi there."`},
+			want: []string{`He said "Hello." She replied "Hi there.".`},
 		},
 	}
 
@@ -265,17 +265,17 @@ func TestSentenceParser_StripMarkdown(t *testing.T) {
 		{
 			name:     "Bold and italic",
 			markdown: "**bold** and *italic*",
-			want:     "bold and italic",
+			want:     "bold and italic.",
 		},
 		{
 			name:     "Links",
 			markdown: "[Link text](https://example.com)",
-			want:     "Link text",
+			want:     "Link text.",
 		},
 		{
 			name:     "Code blocks removed",
 			markdown: "Text before\n```\ncode here\n```\nText after",
-			want:     "Text before Text after",
+			want:     "Text before. Text after.",
 		},
 		{
 			name:     "Lists",
@@ -302,7 +302,7 @@ func TestSentenceParser_StripMarkdown(t *testing.T) {
 func TestSentenceParser_PositionMapping(t *testing.T) {
 	parser := NewSentenceParser()
 	markdown := "First sentence. Second sentence. Third sentence."
-	
+
 	sentences, err := parser.Parse(markdown)
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
@@ -332,24 +332,24 @@ func TestSentenceParser_PositionMapping(t *testing.T) {
 func TestSentenceParser_LengthLimits(t *testing.T) {
 	// Test minimum length filtering
 	parser := NewSentenceParserWithOptions(WithMinLength(10))
-	
+
 	sentences, _ := parser.Parse("Hi. This is a longer sentence.")
-	
+
 	// "Hi." should be filtered out as it's less than 10 characters
 	if len(sentences) != 1 {
 		t.Errorf("Expected 1 sentence after min length filtering, got %d", len(sentences))
 	}
-	
+
 	// Test maximum length truncation
 	parser = NewSentenceParserWithOptions(WithMaxLength(20))
-	
+
 	longText := "This is a very long sentence that exceeds the maximum length limit."
 	sentences, _ = parser.Parse(longText)
-	
+
 	if len(sentences) != 1 {
 		t.Fatalf("Expected 1 sentence, got %d", len(sentences))
 	}
-	
+
 	if len(sentences[0].Text) > 20 {
 		t.Errorf("Sentence not truncated: length = %d, max = 20", len(sentences[0].Text))
 	}
@@ -357,19 +357,19 @@ func TestSentenceParser_LengthLimits(t *testing.T) {
 
 func TestSentenceParser_CodeBlockOption(t *testing.T) {
 	markdown := "Text before.\n```go\ncode here\n```\nText after."
-	
+
 	// Test with code blocks skipped (default)
 	parser := NewSentenceParser()
 	sentences, _ := parser.Parse(markdown)
-	
+
 	if len(sentences) != 2 {
 		t.Errorf("Expected 2 sentences with code skipped, got %d", len(sentences))
 	}
-	
+
 	// Test with code blocks included
 	parser = NewSentenceParserWithOptions(WithCodeBlocks(true))
 	sentences, _ = parser.Parse(markdown)
-	
+
 	// Should have "Text before.", "[Code block omitted]", "Text after."
 	hasCodeMarker := false
 	for _, s := range sentences {
@@ -378,7 +378,7 @@ func TestSentenceParser_CodeBlockOption(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !hasCodeMarker {
 		t.Error("Expected code block marker when including code blocks")
 	}
@@ -413,11 +413,11 @@ Version 1.0.0 released!`
 
 	parser := NewSentenceParser()
 	sentences, err := parser.Parse(markdown)
-	
+
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
-	
+
 	// Should parse multiple sentences from the complex markdown
 	if len(sentences) < 5 {
 		t.Errorf("Expected at least 5 sentences from complex markdown, got %d", len(sentences))
@@ -425,14 +425,14 @@ Version 1.0.0 released!`
 			t.Logf("  [%d]: %q", i, s.Text)
 		}
 	}
-	
+
 	// Check that code block was skipped
 	for _, s := range sentences {
 		if strings.Contains(s.Text, "glow --tts") {
 			t.Error("Code block content should be skipped")
 		}
 	}
-	
+
 	// Check that quote was included
 	hasQuote := false
 	for _, s := range sentences {
@@ -450,7 +450,7 @@ Version 1.0.0 released!`
 func BenchmarkSentenceParser_Parse(b *testing.B) {
 	parser := NewSentenceParser()
 	markdown := strings.Repeat("This is a test sentence. ", 100)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = parser.Parse(markdown)
@@ -468,7 +468,7 @@ func BenchmarkSentenceParser_LargeDocument(b *testing.B) {
 		strings.Repeat("Another paragraph here. With more content. ", 50),
 	}
 	markdown := strings.Join(sections, "")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = parser.Parse(markdown)

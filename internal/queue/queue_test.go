@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/glow/v2/internal/tts"
+	"github.com/charmbracelet/glow/v2/internal/ttypes"
 )
 
 func TestAudioQueue_BasicOperations(t *testing.T) {
@@ -21,12 +21,12 @@ func TestAudioQueue_BasicOperations(t *testing.T) {
 
 	// Test peek on empty queue
 	_, err := q.Peek()
-	if err != tts.ErrQueueEmpty {
+	if err != ErrQueueEmpty {
 		t.Errorf("Expected ErrQueueEmpty, got %v", err)
 	}
 
 	// Test enqueue
-	sentence := tts.Sentence{
+	sentence := ttypes.Sentence{
 		ID:   "s1",
 		Text: "Test sentence",
 	}
@@ -69,7 +69,7 @@ func TestAudioQueue_PriorityHandling(t *testing.T) {
 
 	// Add regular sentences
 	for i := 0; i < 5; i++ {
-		sentence := tts.Sentence{
+		sentence := ttypes.Sentence{
 			ID:   fmt.Sprintf("regular-%d", i),
 			Text: fmt.Sprintf("Regular sentence %d", i),
 		}
@@ -80,7 +80,7 @@ func TestAudioQueue_PriorityHandling(t *testing.T) {
 
 	// Add priority sentences
 	for i := 0; i < 3; i++ {
-		sentence := tts.Sentence{
+		sentence := ttypes.Sentence{
 			ID:   fmt.Sprintf("priority-%d", i),
 			Text: fmt.Sprintf("Priority sentence %d", i),
 		}
@@ -118,7 +118,7 @@ func TestAudioQueue_Backpressure(t *testing.T) {
 
 	// Fill the queue
 	for i := 0; i < 3; i++ {
-		sentence := tts.Sentence{
+		sentence := ttypes.Sentence{
 			ID:   fmt.Sprintf("s%d", i),
 			Text: fmt.Sprintf("Sentence %d", i),
 		}
@@ -130,7 +130,7 @@ func TestAudioQueue_Backpressure(t *testing.T) {
 	// Try to enqueue when full - should block
 	done := make(chan bool)
 	go func() {
-		sentence := tts.Sentence{
+		sentence := ttypes.Sentence{
 			ID:   "s4",
 			Text: "Sentence 4",
 		}
@@ -170,7 +170,7 @@ func TestAudioQueue_MemoryLimit(t *testing.T) {
 	defer q.Close()
 
 	// Try to add a sentence that exceeds memory limit
-	largeSentence := tts.Sentence{
+	largeSentence := ttypes.Sentence{
 		ID:   "large",
 		Text: string(make([]byte, 100)), // 200 bytes estimated (x2)
 	}
@@ -181,7 +181,7 @@ func TestAudioQueue_MemoryLimit(t *testing.T) {
 	}
 
 	// Add smaller sentence that fits
-	smallSentence := tts.Sentence{
+	smallSentence := ttypes.Sentence{
 		ID:   "small",
 		Text: "Hi", // 4 bytes estimated
 	}
@@ -198,7 +198,7 @@ func TestAudioQueue_Lookahead(t *testing.T) {
 
 	// Add sentences
 	for i := 0; i < 5; i++ {
-		sentence := tts.Sentence{
+		sentence := ttypes.Sentence{
 			ID:   fmt.Sprintf("s%d", i),
 			Text: fmt.Sprintf("Sentence %d", i),
 		}
@@ -240,7 +240,7 @@ func TestAudioQueue_ConcurrentAccess(t *testing.T) {
 		go func(producerID int) {
 			defer wg.Done()
 			for i := 0; i < 10; i++ {
-				sentence := tts.Sentence{
+				sentence := ttypes.Sentence{
 					ID:   fmt.Sprintf("p%d-s%d", producerID, i),
 					Text: fmt.Sprintf("Producer %d, Sentence %d", producerID, i),
 				}
@@ -258,7 +258,7 @@ func TestAudioQueue_ConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < 16; i++ { // ~50 items total / 3 consumers
 				_, err := q.Dequeue()
-				if err != nil && err != tts.ErrQueueEmpty {
+				if err != nil && err != ErrQueueEmpty {
 					errors <- fmt.Errorf("consumer %d dequeue failed: %v", consumerID, err)
 				}
 				time.Sleep(time.Millisecond) // Simulate processing
@@ -296,7 +296,7 @@ func TestAudioQueue_Clear(t *testing.T) {
 
 	// Add items
 	for i := 0; i < 5; i++ {
-		sentence := tts.Sentence{
+		sentence := ttypes.Sentence{
 			ID:   fmt.Sprintf("s%d", i),
 			Text: fmt.Sprintf("Sentence %d", i),
 		}
@@ -318,7 +318,7 @@ func TestAudioQueue_Clear(t *testing.T) {
 
 	// Queue should be empty after clear
 	_, err := q.Peek()
-	if err != tts.ErrQueueEmpty {
+	if err != ErrQueueEmpty {
 		t.Errorf("Expected ErrQueueEmpty after clear, got %v", err)
 	}
 }
@@ -329,7 +329,7 @@ func TestAudioQueue_Stats(t *testing.T) {
 
 	// Enqueue items
 	for i := 0; i < 5; i++ {
-		sentence := tts.Sentence{
+		sentence := ttypes.Sentence{
 			ID:   fmt.Sprintf("s%d", i),
 			Text: fmt.Sprintf("Sentence %d", i),
 		}
@@ -373,9 +373,9 @@ func TestAudioQueue_BatchOperations(t *testing.T) {
 	defer q.Close()
 
 	// Create batch
-	batch := make([]tts.Sentence, 10)
+	batch := make([]ttypes.Sentence, 10)
 	for i := 0; i < 10; i++ {
-		batch[i] = tts.Sentence{
+		batch[i] = ttypes.Sentence{
 			ID:   fmt.Sprintf("batch-%d", i),
 			Text: fmt.Sprintf("Batch sentence %d", i),
 		}
@@ -391,7 +391,7 @@ func TestAudioQueue_BatchOperations(t *testing.T) {
 	}
 
 	// Drain to slice
-	drained := make([]tts.Sentence, 5)
+	drained := make([]ttypes.Sentence, 5)
 	count := q.DrainTo(drained, 5)
 
 	if count != 5 {
@@ -417,7 +417,7 @@ func TestAudioQueue_WaitForSpace(t *testing.T) {
 
 	// Fill queue
 	for i := 0; i < 2; i++ {
-		sentence := tts.Sentence{
+		sentence := ttypes.Sentence{
 			ID:   fmt.Sprintf("s%d", i),
 			Text: fmt.Sprintf("Sentence %d", i),
 		}
@@ -456,7 +456,7 @@ func TestAudioQueue_CloseHandling(t *testing.T) {
 	}
 
 	// Operations should fail after close
-	sentence := tts.Sentence{
+	sentence := ttypes.Sentence{
 		ID:   "test",
 		Text: "Test",
 	}
@@ -484,7 +484,7 @@ func BenchmarkAudioQueue_Enqueue(b *testing.B) {
 	q := NewAudioQueue(1000, 10, 10*1024*1024)
 	defer q.Close()
 
-	sentence := tts.Sentence{
+	sentence := ttypes.Sentence{
 		ID:   "bench",
 		Text: "Benchmark sentence for testing performance",
 	}
@@ -502,7 +502,7 @@ func BenchmarkAudioQueue_EnqueueDequeue(b *testing.B) {
 	q := NewAudioQueue(100, 10, 10*1024*1024)
 	defer q.Close()
 
-	sentence := tts.Sentence{
+	sentence := ttypes.Sentence{
 		ID:   "bench",
 		Text: "Benchmark sentence",
 	}
@@ -526,11 +526,11 @@ func BenchmarkAudioQueue_Priority(b *testing.B) {
 	q := NewAudioQueue(1000, 10, 10*1024*1024)
 	defer q.Close()
 
-	regular := tts.Sentence{
+	regular := ttypes.Sentence{
 		ID:   "regular",
 		Text: "Regular sentence",
 	}
-	priority := tts.Sentence{
+	priority := ttypes.Sentence{
 		ID:   "priority",
 		Text: "Priority sentence",
 	}
@@ -542,7 +542,7 @@ func BenchmarkAudioQueue_Priority(b *testing.B) {
 		} else {
 			_ = q.Enqueue(regular, false)
 		}
-		
+
 		if q.Size() > 900 {
 			for j := 0; j < 100; j++ {
 				_, _ = q.Dequeue()
@@ -555,7 +555,7 @@ func BenchmarkAudioQueue_Concurrent(b *testing.B) {
 	q := NewAudioQueue(1000, 10, 10*1024*1024)
 	defer q.Close()
 
-	sentence := tts.Sentence{
+	sentence := ttypes.Sentence{
 		ID:   "bench",
 		Text: "Benchmark sentence",
 	}
