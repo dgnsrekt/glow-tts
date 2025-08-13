@@ -166,7 +166,7 @@ func initTTSCmd(engine string, cfg Config) tea.Cmd {
 		audioCache := &audioCacheWrapper{cache: memoryCache}
 
 		player, err := audio.NewPlayer(audio.PlayerConfig{
-			SampleRate: 22050,
+			SampleRate: 44100, // OTO requires 44100 or 48000 Hz
 			Channels:   1,
 			BitDepth:   16,
 			BufferSize: 4096,
