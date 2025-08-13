@@ -855,6 +855,134 @@ Add TTS configuration to Glow's config file with validation.
 
 ---
 
+### Task 14.1: Fix Sample Rate Mismatch (Resampling in TTS Engines) 
+
+**Type**: implementation
+**Priority**: high
+**Estimated Hours**: 2
+**Status**: PENDING
+
+#### Pre-Implementation Checklist
+- [ ] Review OTO audio player sample rate validation (lines 126-129 in player.go)
+- [ ] Confirm Piper model outputs 22050 Hz (verified in piper-voices config)
+- [ ] Understand ffmpeg resampling parameters in existing gTTS implementation
+- [ ] Review existing ffmpeg integration patterns in gtts.go
+- [ ] Plan testing strategy for audio quality validation
+
+#### Description
+Fix the sample rate mismatch between TTS engines (22050 Hz) and OTO audio player requirements (44100/48000 Hz) by implementing resampling in the TTS engines rather than modifying the audio player.
+
+#### Problem Analysis
+- **Root Cause**: Piper models output 22050 Hz (fixed by training), OTO requires 44100/48000 Hz for platform reliability
+- **Error**: `invalid config: sample rate must be 44100 or 48000 Hz, got 22050`
+- **Impact**: TTS functionality completely broken due to audio player initialization failure
+- **Current State**: gTTS has existing ffmpeg integration that can be leveraged
+
+#### Acceptance Criteria
+- [ ] **gTTS Engine**: Change line 270 in `gtts.go` to output 44100 Hz instead of 22050 Hz
+- [ ] **Piper Engine**: Add resampling method using ffmpeg to convert 22050 Hz → 44100 Hz
+- [ ] **Audio Quality**: Resampled audio maintains acceptable quality for TTS playback
+- [ ] **Performance**: Resampling overhead is acceptable (<200ms additional latency)
+- [ ] **Cache Integration**: Cache keys include sample rate to avoid conflicts
+- [ ] **Error Handling**: Clear error messages if ffmpeg unavailable
+- [ ] **Backward Compatibility**: No breaking changes to existing interfaces
+
+#### Implementation Plan
+
+##### Step 1: Fix gTTS Engine (Simple - 1 line change)
+```go
+// In internal/tts/engines/gtts.go line 270:
+// OLD: "-ar", fmt.Sprintf("%d", e.sampleRate), // Currently 22050
+// NEW: "-ar", "44100", // Force 44100 Hz output
+```
+
+##### Step 2: Add Resampling to Piper Engine
+```go
+// Add new method to internal/tts/engines/piper.go:
+func (e *PiperEngine) resamplePCM(ctx context.Context, pcmData []byte, fromRate, toRate int) ([]byte, error) {
+    if fromRate == toRate {
+        return pcmData, nil // No resampling needed
+    }
+    
+    // Create temp files for ffmpeg processing
+    inputFile, err := os.CreateTemp(e.tempDir, "piper-pcm-*.raw")
+    // ... similar to gTTS convertMP3ToPCM pattern
+    
+    // ffmpeg command for PCM resampling:
+    // ffmpeg -f s16le -ar 22050 -ac 1 -i input.raw -f s16le -ar 44100 -ac 1 output.raw
+    args := []string{
+        "-f", "s16le", "-ar", fmt.Sprintf("%d", fromRate), "-ac", "1", "-i", inputFile.Name(),
+        "-f", "s16le", "-ar", fmt.Sprintf("%d", toRate), "-ac", "1", "-"
+    }
+    // ... implement with same timeout/error handling patterns as gTTS
+}
+
+// Modify Synthesize method to use resampling:
+func (e *PiperEngine) Synthesize(ctx context.Context, text string, speed float64) ([]byte, error) {
+    // ... existing piper synthesis logic (outputs 22050 Hz)
+    
+    // NEW: Resample to 44100 Hz
+    if rawAudio != nil {
+        audio, err = e.resamplePCM(ctx, rawAudio, 22050, 44100)
+        if err != nil {
+            return nil, fmt.Errorf("resampling failed: %w", err)
+        }
+    }
+    
+    // ... rest of method unchanged
+}
+```
+
+##### Step 3: Update Engine Info
+```go
+// Update GetInfo() methods to report 44100 Hz:
+// - piper.go: Change SampleRate from 22050 to 44100
+// - gtts.go: Change SampleRate from 22050 to 44100
+```
+
+##### Step 4: Update Cache Keys
+```go
+// Ensure cache keys account for output sample rate:
+// cache.GenerateCacheKey(text, engine, speed, outputSampleRate)
+// This prevents cache conflicts during transition
+```
+
+#### Validation Steps
+- [ ] gTTS synthesis produces 44100 Hz PCM audio (verify with ffprobe)
+- [ ] Piper synthesis produces 44100 Hz PCM audio (verify with ffprobe)
+- [ ] Audio player accepts synthesized audio without errors
+- [ ] TTS playback works end-to-end without sample rate errors
+- [ ] Audio quality remains acceptable (no obvious artifacts)
+- [ ] Performance impact is minimal (<200ms additional processing time)
+- [ ] Cache system works correctly with new sample rates
+- [ ] Error handling works when ffmpeg unavailable
+
+#### Technical Notes
+
+**Why This Approach:**
+1. **Maintains Architecture**: Keeps audio player requirements intact (OTO reliability)
+2. **Leverages Existing Code**: gTTS already has ffmpeg integration to copy from
+3. **Minimal Scope**: Only touches TTS engines, not core audio infrastructure
+4. **Performance**: Resampling overhead acceptable for TTS use case
+5. **Quality**: 22050→44100 Hz upsampling preserves speech intelligibility
+
+**Alternative Approaches Considered:**
+- **Modify OTO Player**: Rejected - could introduce platform instability
+- **Custom Resampling Library**: Rejected - ffmpeg is more reliable and already integrated
+- **Force Piper 44100 Hz Models**: Not feasible - models are pre-trained at specific rates
+
+**Performance Expectations:**
+- gTTS: ~50ms additional overhead for resampling during MP3→PCM conversion
+- Piper: ~100ms additional overhead for separate PCM resampling step
+- Cache will eliminate resampling on repeated content (expected >80% hit rate)
+
+**Dependencies:**
+- ffmpeg binary must be available in PATH (same requirement as gTTS)
+- Existing cache system will need minor updates for new sample rates
+- No new external dependencies required
+
+---
+
 ## Phase 6: Testing and Polish
 
 ### Task 15: Write Comprehensive Unit Tests
