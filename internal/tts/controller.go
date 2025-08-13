@@ -440,7 +440,7 @@ func (c *TTSController) initializeComponents() error {
 			ModelPath:  c.config.Piper.ModelPath,
 			ConfigPath: c.config.Piper.ConfigPath,
 			Voice:      c.config.Piper.Voice,
-			SampleRate: 22050, // Standard sample rate
+			SampleRate: 44100, // OTO requires 44100 or 48000 Hz
 		}
 		c.engine, err = engines.NewPiperEngine(piperConfig)
 
