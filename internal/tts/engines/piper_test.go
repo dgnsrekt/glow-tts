@@ -164,8 +164,8 @@ func TestPiperEngine_GetInfo(t *testing.T) {
 		t.Errorf("Expected name 'piper', got %s", info.Name)
 	}
 
-	if info.SampleRate != 22050 {
-		t.Errorf("Expected sample rate 22050, got %d", info.SampleRate)
+	if info.SampleRate != 44100 {
+		t.Errorf("Expected sample rate 44100, got %d", info.SampleRate)
 	}
 
 	if info.Channels != 1 {

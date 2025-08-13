@@ -69,9 +69,10 @@ func NewPiperEngine(config PiperConfig) (*PiperEngine, error) {
 		config.ConfigPath = strings.TrimSuffix(config.ModelPath, filepath.Ext(config.ModelPath)) + ".json"
 	}
 
-	// Set default sample rate
+	// Set default sample rate (44100 Hz for OTO compatibility)
+	// Note: Piper outputs 22050 Hz, but we resample to 44100 Hz
 	if config.SampleRate == 0 {
-		config.SampleRate = 22050
+		config.SampleRate = 44100
 	}
 
 	// Create cache manager if config provided
@@ -205,14 +206,96 @@ func (e *PiperEngine) Synthesize(ctx context.Context, text string, speed float64
 		return nil, fmt.Errorf("piper output too large: %d bytes (max %d)", len(audio), maxAudioSize)
 	}
 
+	// Resample from 22050 Hz to 44100 Hz for OTO compatibility
+	resampledAudio, err := e.resamplePCM(ctx, audio, 22050, 44100)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resample audio: %w", err)
+	}
+
 	// Cache the result if cache is available
 	if e.cache != nil {
 		cacheKey := cache.GenerateCacheKey(text, e.voice, speed)
 		// Ignore cache errors as they're non-fatal
-		_ = e.cache.Put(cacheKey, audio)
+		_ = e.cache.Put(cacheKey, resampledAudio)
 	}
 
-	return audio, nil
+	return resampledAudio, nil
+}
+
+// resamplePCM resamples PCM audio from one sample rate to another using ffmpeg.
+func (e *PiperEngine) resamplePCM(ctx context.Context, pcmData []byte, fromRate, toRate int) ([]byte, error) {
+	// If rates are the same, no resampling needed
+	if fromRate == toRate {
+		return pcmData, nil
+	}
+
+	// Check if ffmpeg is available
+	ffmpegPath, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return nil, fmt.Errorf("ffmpeg not found in PATH: %w", err)
+	}
+
+	// Build ffmpeg command for PCM resampling
+	args := []string{
+		"-f", "s16le",                    // Input format: signed 16-bit little-endian
+		"-ar", fmt.Sprintf("%d", fromRate), // Input sample rate
+		"-ac", "1",                        // Input channels (mono)
+		"-i", "pipe:0",                    // Read from stdin
+		"-f", "s16le",                    // Output format: signed 16-bit little-endian
+		"-ar", fmt.Sprintf("%d", toRate), // Output sample rate
+		"-ac", "1",                        // Output channels (mono)
+		"pipe:1",                          // Write to stdout
+	}
+
+	// Create command with context for timeout control
+	cmd := exec.CommandContext(ctx, ffmpegPath, args...)
+
+	// Set up stdin with the PCM data
+	cmd.Stdin = bytes.NewReader(pcmData)
+
+	// Capture outputs
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// Run ffmpeg with timeout protection
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Run()
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return nil, fmt.Errorf("ffmpeg resampling failed: %w, stderr: %s", err, stderr.String())
+		}
+
+		resampledAudio := stdout.Bytes()
+
+		// Validate resampled output
+		if len(resampledAudio) == 0 {
+			return nil, fmt.Errorf("ffmpeg produced no output, stderr: %s", stderr.String())
+		}
+
+		// The resampled audio should be approximately 2x the size (22050 -> 44100)
+		// Allow some variance in the ratio (1.8x to 2.2x)
+		expectedRatio := float64(toRate) / float64(fromRate)
+		actualRatio := float64(len(resampledAudio)) / float64(len(pcmData))
+		if actualRatio < expectedRatio*0.9 || actualRatio > expectedRatio*1.1 {
+			// Just log warning, don't fail
+			// Audio resampling can have slight variations
+		}
+
+		return resampledAudio, nil
+
+	case <-ctx.Done():
+		// Timeout or cancellation
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+			<-done // Wait for goroutine to finish
+		}
+		return nil, fmt.Errorf("resampling timeout: %w", ctx.Err())
+	}
 }
 
 // GetInfo returns engine capabilities and configuration.

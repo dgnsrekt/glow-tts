@@ -75,9 +75,9 @@ func NewGTTSEngine(config GTTSConfig) (*GTTSEngine, error) {
 		return nil, fmt.Errorf("failed to create temp directory: %w", err)
 	}
 
-	// Set default sample rate
+	// Set default sample rate (44100 Hz for OTO compatibility)
 	if config.SampleRate == 0 {
-		config.SampleRate = 22050
+		config.SampleRate = 44100
 	}
 
 	// Set default rate limit
@@ -267,7 +267,7 @@ func (e *GTTSEngine) convertMP3ToPCM(ctx context.Context, mp3Data []byte, speed 
 	args := []string{
 		"-i", mp3File.Name(), // Input MP3 file
 		"-f", "s16le", // Output format: signed 16-bit little-endian
-		"-ar", fmt.Sprintf("%d", e.sampleRate), // Sample rate
+		"-ar", "44100", // Force 44100 Hz output for OTO compatibility
 		"-ac", "1", // Mono (1 channel)
 	}
 
