@@ -309,6 +309,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				
 				skipChildUpdate = true  // Don't pass space to pager
 				
+				// Clear any previous errors when starting a new action
+				m.tts.lastError = nil
+				
 				if m.tts.isPlaying {
 					return m, pauseTTSCmd(m.tts.controller)
 				} else {
@@ -338,6 +341,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "left":
 			// TTS: Previous sentence (when in document view with TTS)
 			if m.tts != nil && m.tts.IsEnabled() && m.state == stateShowDocument {
+				m.tts.lastError = nil  // Clear previous errors
 				return m, prevSentenceCmd(m.tts.controller, m.tts.currentSentenceIndex)
 			}
 			// Otherwise, handle normally (go back)
@@ -349,6 +353,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "right":
 			// TTS: Next sentence (when in document view with TTS)
 			if m.tts != nil && m.tts.IsEnabled() && m.state == stateShowDocument {
+				m.tts.lastError = nil  // Clear previous errors
 				return m, nextSentenceCmd(m.tts.controller, m.tts.currentSentenceIndex, m.tts.totalSentences)
 			}
 
@@ -497,6 +502,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			
 			if msg.err != nil {
 				m.tts.lastError = msg.err
+				// Clear the error after 3 seconds (longer for play errors)
+				cmds = append(cmds, clearTTSErrorCmd(3*time.Second))
 			} else {
 				m.tts.lastError = nil  // Clear any previous errors
 				m.tts.isPlaying = true
@@ -542,6 +549,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tts != nil {
 			if msg.err != nil {
 				m.tts.lastError = msg.err
+				// Clear the error after 2 seconds
+				cmds = append(cmds, clearTTSErrorCmd(2*time.Second))
 			} else {
 				m.tts.currentSentenceIndex = msg.sentenceIndex
 			}
@@ -551,9 +560,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.tts != nil {
 			if msg.err != nil {
 				m.tts.lastError = msg.err
+				// Clear the error after 2 seconds
+				cmds = append(cmds, clearTTSErrorCmd(2*time.Second))
 			} else {
 				m.tts.currentSentenceIndex = msg.sentenceIndex
 			}
+		}
+	
+	case ttsClearErrorMsg:
+		if m.tts != nil {
+			m.tts.lastError = nil
 		}
 
 	case ttsSpeedChangeMsg:
@@ -581,6 +597,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tts.currentSentenceIndex = 0
 			// Stop the timer
 			cmds = append(cmds, m.tts.playbackTimer.Stop())
+		}
+	
+	case ttsMonitorMsg:
+		if m.tts != nil && m.tts.isPlaying {
+			if msg.continueMonitoring {
+				// Continue monitoring playback after a delay
+				cmds = append(cmds, tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg {
+					// After delay, check playback status again
+					return monitorPlaybackCmd(m.tts.controller)()
+				}))
+			}
 		}
 	}
 
