@@ -112,6 +112,9 @@ type ttsStatusUpdateMsg struct {
 	isPlaying     bool
 }
 
+// ttsPlaybackFinishedMsg is sent when playback completes
+type ttsPlaybackFinishedMsg struct{}
+
 // TTS Commands - These are the async commands that perform TTS operations
 
 // ttsTick sends periodic tick messages to refresh UI
@@ -269,6 +272,33 @@ func playTTSCmd(controller *tts.Controller, text string) tea.Cmd {
 		}
 		
 		return ttsPlayMsg{err: nil}
+	}
+}
+
+// monitorPlaybackCmd monitors playback and sends updates when it finishes
+func monitorPlaybackCmd(controller *tts.Controller) tea.Cmd {
+	return func() tea.Msg {
+		if controller == nil {
+			return nil
+		}
+		
+		// Check every 500ms if playback is still active
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		
+		for range ticker.C {
+			// Get the audio player state
+			player := tts.GetGlobalAudioPlayer()
+			if player != nil {
+				state := player.GetState()
+				if state == tts.PlaybackStopped {
+					// Playback has finished
+					return ttsPlaybackFinishedMsg{}
+				}
+			}
+		}
+		
+		return nil
 	}
 }
 

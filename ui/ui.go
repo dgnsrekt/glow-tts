@@ -466,6 +466,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tts.isPlaying = true
 				m.tts.isPaused = false
 				m.tts.isStopped = false
+				// Start monitoring playback for completion
+				cmds = append(cmds, monitorPlaybackCmd(m.tts.controller))
 			}
 		}
 
@@ -523,6 +525,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.tts.controller.SetSpeed(msg.newSpeed)
 				}
 			}
+		}
+	
+	case ttsPlaybackFinishedMsg:
+		if m.tts != nil {
+			log.Debug("TTS playback finished")
+			m.tts.isPlaying = false
+			m.tts.isPaused = false
+			m.tts.isStopped = true
+			m.tts.currentSentenceIndex = 0
 		}
 	}
 
