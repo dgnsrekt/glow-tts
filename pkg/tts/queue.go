@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
+	
+	"github.com/charmbracelet/log"
 )
 
 // QueueState represents the current state of the audio queue
@@ -211,6 +212,8 @@ func (aq *TTSAudioQueue) AddText(text string) error {
 		return fmt.Errorf("failed to parse text: %w", err)
 	}
 	
+	log.Debug("TTS Queue: Adding sentences", "count", len(sentences))
+	
 	// Add each sentence to the queue
 	for i, sentence := range sentences {
 		segment := TextSegment{
@@ -219,6 +222,11 @@ func (aq *TTSAudioQueue) AddText(text string) error {
 			Position: len(aq.order) + i,
 			Priority: 0,
 		}
+		
+		log.Debug("TTS Queue: Adding segment", 
+			"index", i, 
+			"position", segment.Position,
+			"text_preview", sentence.Text[:min(30, len(sentence.Text))])
 		
 		select {
 		case aq.textQueue <- segment:
@@ -252,13 +260,34 @@ func (aq *TTSAudioQueue) processTextQueue() {
 			aq.segments[segment.ID] = audioSeg
 			aq.order = append(aq.order, segment.ID)
 			
+			// Initialize currentIndex to 0 for the first segment
+			if aq.currentIndex < 0 && len(aq.order) == 1 {
+				aq.currentIndex = 0
+				log.Debug("TTS Queue: Initialized currentIndex to 0")
+			}
+			
 			// Queue for synthesis if within lookahead window
-			if segment.Position < aq.currentIndex+aq.config.LookaheadSize+1 {
+			// Use max(0, currentIndex) to handle initial state
+			effectiveIndex := aq.currentIndex
+			if effectiveIndex < 0 {
+				effectiveIndex = 0
+			}
+			if segment.Position <= effectiveIndex+aq.config.LookaheadSize {
+				log.Debug("TTS Queue: Queueing segment for synthesis",
+					"segmentID", segment.ID,
+					"position", segment.Position,
+					"effectiveIndex", effectiveIndex,
+					"lookaheadSize", aq.config.LookaheadSize)
 				select {
 				case aq.synthesisQueue <- segment.ID:
+					log.Debug("TTS Queue: Segment queued for synthesis", "segmentID", segment.ID)
 				default:
-					// Synthesis queue full, will be picked up later
+					log.Warn("TTS Queue: Synthesis queue full", "segmentID", segment.ID)
 				}
+			} else {
+				log.Debug("TTS Queue: Segment outside lookahead window",
+					"position", segment.Position,
+					"window", effectiveIndex+aq.config.LookaheadSize)
 			}
 			
 			aq.mu.Unlock()
@@ -306,12 +335,19 @@ func (w *queueWorker) run() {
 
 // synthesizeSegment synthesizes audio for a segment
 func (w *queueWorker) synthesizeSegment(segmentID string) {
+	log.Debug("TTS Worker: Starting synthesis", "workerID", w.id, "segmentID", segmentID)
+	
 	w.queue.mu.RLock()
 	segment, exists := w.queue.segments[segmentID]
 	w.queue.mu.RUnlock()
 	
-	if !exists || segment.Audio != nil {
-		return // Already synthesized or removed
+	if !exists {
+		log.Debug("TTS Worker: Segment not found", "segmentID", segmentID)
+		return
+	}
+	if segment.Audio != nil {
+		log.Debug("TTS Worker: Segment already synthesized", "segmentID", segmentID)
+		return
 	}
 	
 	start := time.Now()
@@ -333,13 +369,16 @@ func (w *queueWorker) synthesizeSegment(segmentID string) {
 	
 	// Synthesize if not cached
 	if audioData == nil {
+		log.Debug("TTS Worker: Synthesizing text", "segmentID", segmentID, "textLen", len(segment.Text))
 		audioData, err = w.queue.config.Engine.Synthesize(segment.Text, 1.0)
 		if err != nil {
+			log.Error("TTS Worker: Synthesis failed", "segmentID", segmentID, "error", err)
 			if w.queue.onError != nil {
 				w.queue.onError(fmt.Errorf("synthesis failed for segment %s: %w", segmentID, err))
 			}
 			return
 		}
+		log.Debug("TTS Worker: Synthesis complete", "segmentID", segmentID, "audioSize", len(audioData))
 		
 		// Cache the result
 		if w.queue.config.CacheManager != nil && len(audioData) > 0 {
@@ -391,15 +430,20 @@ func (w *queueWorker) synthesizeSegment(segmentID string) {
 
 // preprocessAudio preprocesses audio for seamless playback
 func (aq *TTSAudioQueue) preprocessAudio(audio []byte) []byte {
+	log.Debug("TTS Queue: preprocessAudio called", "inputSize", len(audio))
+	
 	if len(audio) == 0 {
+		log.Warn("TTS Queue: preprocessAudio received empty audio")
 		return audio
 	}
 	
 	// Trim silence from beginning and end
 	processed := aq.trimSilence(audio)
+	log.Debug("TTS Queue: After trimSilence", "processedSize", len(processed))
 	
 	// Normalize audio levels
 	processed = aq.normalizeAudio(processed)
+	log.Debug("TTS Queue: After normalizeAudio", "finalSize", len(processed))
 	
 	// Add crossfade markers (actual crossfading done during playback)
 	// For now, just return the processed audio
@@ -409,13 +453,14 @@ func (aq *TTSAudioQueue) preprocessAudio(audio []byte) []byte {
 // trimSilence removes silence from the beginning and end of audio
 func (aq *TTSAudioQueue) trimSilence(audio []byte) []byte {
 	if len(audio) < 4 {
+		log.Debug("TTS Queue: Audio too small to trim", "size", len(audio))
 		return audio
 	}
 	
 	samples := len(audio) / 2 // 16-bit samples
 	
 	// Find first non-silent sample
-	startIdx := 0
+	startIdx := -1
 	for i := 0; i < samples; i++ {
 		sample := int16(binary.LittleEndian.Uint16(audio[i*2 : i*2+2]))
 		amplitude := math.Abs(float64(sample) / 32768.0)
@@ -423,6 +468,13 @@ func (aq *TTSAudioQueue) trimSilence(audio []byte) []byte {
 			startIdx = i
 			break
 		}
+	}
+	
+	// If no non-silent samples found, return empty to indicate silence
+	if startIdx == -1 {
+		log.Warn("TTS Queue: Audio is completely silent")
+		// Return original audio instead of empty to avoid issues
+		return audio
 	}
 	
 	// Find last non-silent sample
@@ -436,9 +488,17 @@ func (aq *TTSAudioQueue) trimSilence(audio []byte) []byte {
 		}
 	}
 	
+	log.Debug("TTS Queue: Trimming silence", 
+		"startIdx", startIdx, 
+		"endIdx", endIdx, 
+		"samples", samples,
+		"removedStart", startIdx,
+		"removedEnd", samples-1-endIdx)
+	
 	// Return trimmed audio
-	if startIdx >= endIdx {
-		return audio // No trimming needed
+	if startIdx > endIdx {
+		log.Warn("TTS Queue: Invalid trim indices", "startIdx", startIdx, "endIdx", endIdx)
+		return audio // Return original if something went wrong
 	}
 	
 	return audio[startIdx*2 : (endIdx+1)*2]
@@ -533,7 +593,15 @@ func (aq *TTSAudioQueue) GetCurrent() (*AudioSegment, error) {
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
 	
+	log.Debug("TTS Queue: GetCurrent", 
+		"currentIndex", aq.currentIndex, 
+		"orderLen", len(aq.order),
+		"segmentsLen", len(aq.segments))
+	
 	if aq.currentIndex < 0 || aq.currentIndex >= len(aq.order) {
+		log.Error("TTS Queue: No current segment", 
+			"currentIndex", aq.currentIndex, 
+			"orderLen", len(aq.order))
 		return nil, fmt.Errorf("no current segment")
 	}
 	
@@ -541,8 +609,14 @@ func (aq *TTSAudioQueue) GetCurrent() (*AudioSegment, error) {
 	segment := aq.segments[segmentID]
 	
 	if segment == nil {
+		log.Error("TTS Queue: Segment not found", "segmentID", segmentID)
 		return nil, fmt.Errorf("segment not found")
 	}
+	
+	log.Debug("TTS Queue: Found current segment", 
+		"segmentID", segmentID,
+		"hasAudio", segment.Audio != nil,
+		"hasProcessedAudio", segment.ProcessedAudio != nil)
 	
 	// Update access time
 	segment.LastAccessed = time.Now()
@@ -921,30 +995,60 @@ func CrossfadeAudio(audio1, audio2 []byte, overlapMs int, sampleRate int) []byte
 	return result
 }
 
-// WaitForReady waits for at least one segment to be ready
+// WaitForReady waits for the current segment to be ready
 func (aq *TTSAudioQueue) WaitForReady(timeout time.Duration) error {
 	start := time.Now()
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
+	
+	log.Debug("TTS Queue: Waiting for ready", "timeout", timeout)
 	
 	for {
 		select {
 		case <-ticker.C:
 			aq.mu.RLock()
 			hasReady := false
-			for _, segment := range aq.segments {
-				if segment.Audio != nil {
+			segmentCount := len(aq.segments)
+			readyCount := 0
+			
+			// Check if the current segment specifically is ready
+			if aq.currentIndex >= 0 && aq.currentIndex < len(aq.order) {
+				segmentID := aq.order[aq.currentIndex]
+				if segment, exists := aq.segments[segmentID]; exists && segment.Audio != nil {
 					hasReady = true
-					break
+					readyCount = 1
+					log.Debug("TTS Queue: Current segment is ready", 
+						"id", segmentID, 
+						"currentIndex", aq.currentIndex,
+						"audioSize", len(segment.Audio))
+				}
+			} else {
+				// If no current index set, check for any ready segment
+				for id, segment := range aq.segments {
+					if segment.Audio != nil {
+						hasReady = true
+						readyCount++
+						log.Debug("TTS Queue: Found ready segment", "id", id, "audioSize", len(segment.Audio))
+						break
+					}
 				}
 			}
 			aq.mu.RUnlock()
 			
+			log.Debug("TTS Queue: Check ready status", 
+				"hasReady", hasReady, 
+				"readyCount", readyCount,
+				"totalSegments", segmentCount,
+				"currentIndex", aq.currentIndex,
+				"elapsed", time.Since(start))
+			
 			if hasReady {
+				log.Debug("TTS Queue: Ready!")
 				return nil
 			}
 			
 			if time.Since(start) > timeout {
+				log.Error("TTS Queue: Timeout waiting for ready", "timeout", timeout)
 				return fmt.Errorf("timeout waiting for audio to be ready")
 			}
 			
@@ -959,11 +1063,3 @@ func (aq *TTSAudioQueue) Preload() {
 	aq.checkLookahead()
 }
 
-// SetDebugLogging enables or disables debug logging
-func SetQueueDebugLogging(enabled bool) {
-	if enabled {
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
-	} else {
-		log.SetOutput(nil)
-	}
-}
