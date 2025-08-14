@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/glow/v2/pkg/tts"
 	"github.com/charmbracelet/log"
 )
 
@@ -153,23 +154,19 @@ func (e *GTTSEngine) Synthesize(text string, speed float64) ([]byte, error) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	
-	// Run with timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- cmd.Run()
-	}()
+	// Run with timeout protection using TimeoutExecutor
+	timeoutConfig := tts.DefaultTimeoutConfig()
+	timeoutConfig.Timeout = 10 * time.Second
+	executor := tts.NewTimeoutExecutor(timeoutConfig)
 	
-	select {
-	case err := <-done:
-		if err != nil {
-			log.Error("GTTS: Failed to generate MP3", 
-				"error", err,
-				"stderr", stderr.String())
-			return nil, fmt.Errorf("gtts-cli failed: %w\nstderr: %s", err, stderr.String())
+	if err := executor.RunWithTimeout(cmd); err != nil {
+		log.Error("GTTS: Failed to generate MP3", 
+			"error", err,
+			"stderr", stderr.String())
+		if strings.Contains(err.Error(), "timed out") {
+			return nil, fmt.Errorf("gtts-cli timed out (network issue?)")
 		}
-	case <-time.After(10 * time.Second):
-		cmd.Process.Kill()
-		return nil, fmt.Errorf("gtts-cli timed out (network issue?)")
+		return nil, fmt.Errorf("gtts-cli failed: %w\nstderr: %s", err, stderr.String())
 	}
 	
 	// Verify MP3 was created
@@ -215,23 +212,15 @@ func (e *GTTSEngine) Synthesize(text string, speed float64) ([]byte, error) {
 	ffmpegCmd.Stdout = &pcmBuffer
 	ffmpegCmd.Stderr = &ffmpegStderr
 	
-	// Run ffmpeg with timeout
-	done = make(chan error, 1)
-	go func() {
-		done <- ffmpegCmd.Run()
-	}()
-	
-	select {
-	case err := <-done:
-		if err != nil {
-			log.Error("GTTS: Failed to convert MP3 to PCM",
-				"error", err,
-				"stderr", ffmpegStderr.String())
-			return nil, fmt.Errorf("ffmpeg conversion failed: %w", err)
+	// Run ffmpeg with timeout protection
+	if err := executor.RunWithTimeout(ffmpegCmd); err != nil {
+		log.Error("GTTS: Failed to convert MP3 to PCM",
+			"error", err,
+			"stderr", ffmpegStderr.String())
+		if strings.Contains(err.Error(), "timed out") {
+			return nil, fmt.Errorf("ffmpeg conversion timed out")
 		}
-	case <-time.After(10 * time.Second):
-		ffmpegCmd.Process.Kill()
-		return nil, fmt.Errorf("ffmpeg conversion timed out")
+		return nil, fmt.Errorf("ffmpeg conversion failed: %w", err)
 	}
 	
 	pcmData := pcmBuffer.Bytes()
