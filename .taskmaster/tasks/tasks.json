@@ -700,7 +700,7 @@
           2,
           6
         ],
-        "status": "in-progress",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -730,7 +730,7 @@
               "7.2"
             ],
             "details": "Create Next() and Previous() methods for queue navigation with bounds checking. Implement Skip(n int) for jumping to specific positions. Add GetCurrent() and GetQueuedItems() for state inspection. Build position tracking with currentPosition and totalItems counters. Implement queue reordering logic for dynamic priority changes. Add Clear() and Reset() methods for queue management.",
-            "status": "in-progress",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -741,7 +741,7 @@
               "7.2"
             ],
             "details": "Build PreprocessAudio(raw []byte) method to normalize audio segments. Implement silence trimming at segment boundaries using audio amplitude detection. Add crossfade blending between consecutive segments (50-100ms overlap). Create audio level normalization to maintain consistent volume. Implement format conversion pipeline ensuring consistent PCM parameters. Add configurable transition duration settings.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -753,7 +753,7 @@
               "7.4"
             ],
             "details": "Implement buffer eviction policy using LRU cache for processed segments. Create ReleaseSegment(index int) for manual memory release. Add automatic cleanup of played segments after configurable retention period. Implement memory pooling for AudioSegment allocations to reduce GC pressure. Add MaxMemoryUsage limit with automatic buffer size adjustment. Create background cleanup goroutine monitoring memory usage and triggering collection when threshold exceeded.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -764,7 +764,7 @@
               "7.5"
             ],
             "details": "Create GetQueueStats() returning metrics: queue depth, buffer utilization, synthesis rate, memory usage. Implement state change notifications using callback pattern or channels. Add detailed logging with configurable levels (debug, info, warn, error). Create DumpQueueState() for debugging snapshots. Implement performance metrics tracking (synthesis time, buffer hits/misses). Add visual queue state representation for debugging output.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1012,7 +1012,7 @@
     ],
     "metadata": {
       "created": "2025-08-13T19:20:07.954Z",
-      "updated": "2025-08-14T20:20:20.230Z",
+      "updated": "2025-08-14T20:23:38.617Z",
       "description": "Tasks for master context"
     }
   }

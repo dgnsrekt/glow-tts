@@ -249,6 +249,15 @@ func initTTSWithTimeout(engine string, ttsState *TTSState) tea.Msg {
 			}
 			log.Debug("Piper engine created")
 			ttsEngine = piperEngine
+		case "gtts":
+			log.Debug("creating Google TTS engine")
+			gttsEngine, err := engines.NewGTTSEngine()
+			if err != nil {
+				log.Error("Google TTS engine creation failed", "error", err)
+				return ttsInitMsg{err: fmt.Errorf("failed to create Google TTS engine: %w", err)}
+			}
+			log.Debug("Google TTS engine created")
+			ttsEngine = gttsEngine
 		default:
 			return ttsInitMsg{err: fmt.Errorf("unsupported engine: %s", engine)}
 		}
