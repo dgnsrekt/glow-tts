@@ -214,13 +214,22 @@ func (c *Controller) Play(text string) error {
 		return fmt.Errorf("failed to parse text: %w", err)
 	}
 	
-	// Start playback of all sentences
-	if len(sentences) > 0 {
+	// Limit the number of sentences to process at once to reduce memory usage
+	const maxSentences = 50
+	sentencesToProcess := sentences
+	if len(sentences) > maxSentences {
+		sentencesToProcess = sentences[:maxSentences]
+		// Log that we're limiting the sentences
+		fmt.Printf("TTS: Processing first %d of %d sentences to reduce memory usage\n", maxSentences, len(sentences))
+	}
+	
+	// Start playback of selected sentences
+	if len(sentencesToProcess) > 0 {
 		// Concatenate all sentences with brief pauses
 		var fullText strings.Builder
-		for i, sentence := range sentences {
+		for i, sentence := range sentencesToProcess {
 			fullText.WriteString(sentence.Text)
-			if i < len(sentences)-1 {
+			if i < len(sentencesToProcess)-1 {
 				fullText.WriteString(". ") // Add pause between sentences
 			}
 		}

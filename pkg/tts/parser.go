@@ -121,11 +121,23 @@ func (p *SentenceParser) Parse(markdown string) ([]ParsedSentence, error) {
 func (p *SentenceParser) stripMarkdownSimple(markdown string) string {
 	text := markdown
 	
+	// Remove HTML tags and their content (like badges and embedded images)
+	text = regexp.MustCompile(`(?s)<[^>]+>`).ReplaceAllString(text, "")
+	
+	// Remove HTML comments
+	text = regexp.MustCompile(`(?s)<!--.*?-->`).ReplaceAllString(text, "")
+	
 	// Remove code blocks
 	text = regexp.MustCompile("```[^`]*```").ReplaceAllString(text, "")
 	text = regexp.MustCompile("`[^`]+`").ReplaceAllString(text, "")
 	
-	// Remove headers
+	// Remove images (including ones with URLs)
+	text = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`).ReplaceAllString(text, "")
+	
+	// Remove standalone URLs (http/https)
+	text = regexp.MustCompile(`https?://[^\s\)]+`).ReplaceAllString(text, "")
+	
+	// Remove headers but keep the text
 	text = regexp.MustCompile(`(?m)^#{1,6}\s+`).ReplaceAllString(text, "")
 	
 	// Remove bold and italic
@@ -135,9 +147,6 @@ func (p *SentenceParser) stripMarkdownSimple(markdown string) string {
 	// Remove links but keep text
 	text = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`).ReplaceAllString(text, "$1")
 	
-	// Remove images
-	text = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`).ReplaceAllString(text, "")
-	
 	// Remove list markers
 	text = regexp.MustCompile(`(?m)^[\s]*[-*+]\s+`).ReplaceAllString(text, "")
 	text = regexp.MustCompile(`(?m)^[\s]*\d+\.\s+`).ReplaceAllString(text, "")
@@ -145,9 +154,12 @@ func (p *SentenceParser) stripMarkdownSimple(markdown string) string {
 	// Remove blockquotes
 	text = regexp.MustCompile(`(?m)^>\s+`).ReplaceAllString(text, "")
 	
+	// Remove horizontal rules
+	text = regexp.MustCompile(`(?m)^[\s]*[-*_]{3,}[\s]*$`).ReplaceAllString(text, "")
+	
 	// Clean up whitespace
 	text = strings.TrimSpace(text)
-	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+	text = regexp.MustCompile(`[ \t]+`).ReplaceAllString(text, " ")
 	text = regexp.MustCompile(`\n{3,}`).ReplaceAllString(text, "\n\n")
 	
 	return text
