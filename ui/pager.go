@@ -280,7 +280,20 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 	// We've received terminal dimensions, either for the first time or
 	// after a resize
 	case tea.WindowSizeMsg:
-		return m, renderWithGlamour(m, m.currentDocument.Body)
+		// Don't re-render if we don't have content yet
+		// This can happen when opening a file directly
+		if m.currentDocument.Body == "" && m.rawMarkdownText == "" {
+			log.Debug("WindowSizeMsg in pager - skipping render, no content yet")
+			return m, nil
+		}
+		// Use rawMarkdownText if available (for direct file opening)
+		// Otherwise use currentDocument.Body (for browsing)
+		markdownToRender := m.currentDocument.Body
+		if m.rawMarkdownText != "" {
+			markdownToRender = m.rawMarkdownText
+		}
+		log.Debug("WindowSizeMsg in pager", "markdownLength", len(markdownToRender))
+		return m, renderWithGlamour(m, markdownToRender)
 
 	case statusMessageTimeoutMsg:
 		m.state = pagerStateBrowse
