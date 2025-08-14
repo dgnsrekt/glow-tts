@@ -14,6 +14,14 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // GTTSEngine implements the TTSEngine interface using Google Text-to-Speech via gtts-cli
 type GTTSEngine struct {
 	// Configuration
@@ -35,6 +43,8 @@ type GTTSEngine struct {
 
 // NewGTTSEngine creates a new Google TTS engine instance
 func NewGTTSEngine() (*GTTSEngine, error) {
+	log.Debug("GTTS: NewGTTSEngine called", "HOME", os.Getenv("HOME"))
+	
 	// Create temp directory for intermediate files
 	tempDir := filepath.Join(os.TempDir(), "glow-gtts")
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
@@ -49,6 +59,7 @@ func NewGTTSEngine() (*GTTSEngine, error) {
 	
 	// Detect dependencies
 	if err := engine.detectDependencies(); err != nil {
+		log.Error("GTTS: Dependency detection failed", "error", err)
 		return nil, err
 	}
 	
@@ -71,18 +82,55 @@ func (e *GTTSEngine) detectDependencies() error {
 		filepath.Join(os.Getenv("HOME"), ".local", "bin", "gtts-cli"),
 	}
 	
+	log.Debug("GTTS: Searching for gtts-cli", "paths", gttsPaths, "HOME", os.Getenv("HOME"))
+	
 	for _, path := range gttsPaths {
-		if _, err := exec.LookPath(path); err == nil {
+		log.Debug("GTTS: Checking path", "path", path)
+		
+		// First check if file exists (for absolute paths)
+		if _, err := os.Stat(path); err == nil {
+			log.Debug("GTTS: File exists", "path", path)
 			// Verify it's actually gtts-cli
 			cmd := exec.Command(path, "--help")
 			if output, err := cmd.CombinedOutput(); err == nil {
-				if strings.Contains(string(output), "Google Text-to-Speech") ||
-				   strings.Contains(string(output), "gTTS") {
+				outputStr := string(output)
+				log.Debug("GTTS: Help output", "path", path, "output", outputStr[:min(100, len(outputStr))])
+				if strings.Contains(outputStr, "Google Translate") ||
+				   strings.Contains(outputStr, "Text-to-Speech") ||
+				   strings.Contains(outputStr, "gtts-cli") ||
+				   strings.Contains(outputStr, "mp3 format") {
 					e.gttsBinary = path
-					log.Debug("Found gtts-cli", "path", path)
+					log.Info("GTTS: Found gtts-cli", "path", path)
 					break
+				} else {
+					log.Debug("GTTS: Help output doesn't match expected patterns", "path", path)
 				}
+			} else {
+				log.Debug("GTTS: Failed to run --help", "path", path, "error", err)
 			}
+		} else if _, err := exec.LookPath(path); err == nil {
+			log.Debug("GTTS: Found in PATH", "path", path)
+			// Try to find in PATH
+			// Verify it's actually gtts-cli
+			cmd := exec.Command(path, "--help")
+			if output, err := cmd.CombinedOutput(); err == nil {
+				outputStr := string(output)
+				log.Debug("GTTS: Help output", "path", path, "output", outputStr[:min(100, len(outputStr))])
+				if strings.Contains(outputStr, "Google Translate") ||
+				   strings.Contains(outputStr, "Text-to-Speech") ||
+				   strings.Contains(outputStr, "gtts-cli") ||
+				   strings.Contains(outputStr, "mp3 format") {
+					e.gttsBinary = path
+					log.Info("GTTS: Found gtts-cli", "path", path)
+					break
+				} else {
+					log.Debug("GTTS: Help output doesn't match expected patterns", "path", path)
+				}
+			} else {
+				log.Debug("GTTS: Failed to run --help", "path", path, "error", err)
+			}
+		} else {
+			log.Debug("GTTS: Path not found", "path", path, "error", err)
 		}
 	}
 	
