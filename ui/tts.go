@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/glow/v2/pkg/tts"
 	"github.com/charmbracelet/glow/v2/pkg/tts/engines"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 )
 
 // TTSState represents the TTS subsystem state in the UI
@@ -123,7 +124,7 @@ func ttsTick() tea.Cmd {
 // initTTSCmd initializes the TTS controller with timeout
 func initTTSCmd(engine string, ttsState *TTSState) tea.Cmd {
 	return func() tea.Msg {
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] initTTSCmd executing for engine: %s\n", engine)
+		log.Debug("initTTSCmd executing", "engine", engine)
 		
 		// Create a channel to receive the result
 		resultChan := make(chan tea.Msg, 1)
@@ -136,10 +137,10 @@ func initTTSCmd(engine string, ttsState *TTSState) tea.Cmd {
 		// Wait with timeout
 		select {
 		case result := <-resultChan:
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] initTTSCmd completed, returning result\n")
+			log.Debug("initTTSCmd completed")
 			return result
 		case <-time.After(10 * time.Second):
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Initialization timeout after 10 seconds\n")
+			log.Error("TTS initialization timeout", "timeout", "10 seconds")
 			return ttsInitMsg{err: fmt.Errorf("TTS initialization timed out after 10 seconds")}
 		}
 	}
@@ -149,7 +150,7 @@ func initTTSCmd(engine string, ttsState *TTSState) tea.Cmd {
 func initTTSWithTimeout(engine string, ttsState *TTSState) tea.Msg {
 		// Don't modify state here - it should be done in the Update function
 		
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Starting initialization for engine: %s\n", engine)
+		log.Debug("starting TTS initialization", "engine", engine)
 		
 		// Initialize TTS controller
 		cfg := tts.ControllerConfig{
@@ -159,78 +160,78 @@ func initTTSWithTimeout(engine string, ttsState *TTSState) tea.Msg {
 			DefaultSpeed:       1.0,
 		}
 
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Creating controller...\n")
+		log.Debug("creating TTS controller")
 		controller, err := tts.NewController(cfg)
 		if err != nil {
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Controller creation failed: %v\n", err)
+			log.Error("TTS controller creation failed", "error", err)
 			return ttsInitMsg{err: fmt.Errorf("controller creation failed: %w", err)}
 		}
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Controller created successfully\n")
+		log.Debug("TTS controller created successfully")
 
 		// Set up the engine based on the engine string
 		var ttsEngine tts.TTSEngine
 		switch engine {
 		case "piper":
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Creating Piper engine...\n")
+			log.Debug("creating Piper engine")
 			piperEngine, err := engines.NewPiperEngine()
 			if err != nil {
-				// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Piper engine creation failed: %v\n", err)
+				log.Error("Piper engine creation failed", "error", err)
 				return ttsInitMsg{err: fmt.Errorf("failed to create Piper engine: %w", err)}
 			}
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Piper engine created\n")
+			log.Debug("Piper engine created")
 			ttsEngine = piperEngine
 		default:
 			return ttsInitMsg{err: fmt.Errorf("unsupported engine: %s", engine)}
 		}
 
 		// Set the engine
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Setting engine on controller...\n")
+		log.Debug("setting engine on controller")
 		if err := controller.SetEngine(ttsEngine); err != nil {
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Failed to set engine: %v\n", err)
+			log.Error("failed to set engine", "error", err)
 			return ttsInitMsg{err: fmt.Errorf("failed to set engine: %w", err)}
 		}
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Engine set successfully\n")
+		log.Debug("engine set successfully")
 
 		// Set the parser
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Creating parser...\n")
+		log.Debug("creating parser")
 		parserConfig := &tts.ParserConfig{
 			MinSentenceLength: 3,
 			MaxSentenceLength: 500,
 		}
 		parser, err := tts.NewSentenceParser(parserConfig)
 		if err != nil {
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Parser creation failed: %v\n", err)
+			log.Error("parser creation failed", "error", err)
 			return ttsInitMsg{err: fmt.Errorf("failed to create parser: %w", err)}
 		}
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Setting parser on controller...\n")
+		log.Debug("setting parser on controller")
 		if err := controller.SetParser(parser); err != nil {
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Failed to set parser: %v\n", err)
+			log.Error("failed to set parser", "error", err)
 			return ttsInitMsg{err: fmt.Errorf("failed to set parser: %w", err)}
 		}
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Parser set successfully\n")
+		log.Debug("parser set successfully")
 
 		// Set the speed controller
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Setting speed controller...\n")
+		log.Debug("setting speed controller")
 		if err := controller.SetSpeedController(ttsState.speedController); err != nil {
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Failed to set speed controller: %v\n", err)
+			log.Error("failed to set speed controller", "error", err)
 			return ttsInitMsg{err: fmt.Errorf("failed to set speed controller: %w", err)}
 		}
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Speed controller set successfully\n")
+		log.Debug("speed controller set successfully")
 
 		// Initialize the controller
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Initializing controller...\n")
+		log.Debug("initializing controller")
 		if err := controller.Initialize(); err != nil {
-			// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Controller initialization failed: %v\n", err)
+			log.Error("controller initialization failed", "error", err)
 			return ttsInitMsg{err: fmt.Errorf("failed to initialize controller: %w", err)}
 		}
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Controller initialized successfully\n")
+		log.Debug("controller initialized successfully")
 
 		// Store the controller in the TTS state
 		ttsState.controller = controller
 		
 		// Don't modify state flags here - let the Update function handle it
 		
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] TTS initialization complete!\n")
+		log.Info("TTS initialization complete", "engine", engine)
 		return ttsInitMsg{err: nil}
 }
 
@@ -386,9 +387,10 @@ func (t *TTSState) RenderStatus() string {
 		return ""
 	}
 
-	// Debug log the render call (commented out for production)
-	// fmt.Fprintf(os.Stderr, "[TTS DEBUG] RenderStatus called - isInitializing: %v, isInitialized: %v\n", 
-	// 	t.isInitializing, t.isInitialized)
+	// Debug log the render call (verbose - normally disabled)
+	// log.Debug("RenderStatus called", 
+	// 	"isInitializing", t.isInitializing, 
+	// 	"isInitialized", t.isInitialized)
 
 	var parts []string
 

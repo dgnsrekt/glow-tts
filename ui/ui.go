@@ -157,11 +157,11 @@ func newModel(cfg Config, content string) tea.Model {
 
 	// Initialize TTS if enabled
 	if cfg.TTSEngine != "" {
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Creating TTS state with engine: %s\n", cfg.TTSEngine)
+		log.Debug("creating TTS state", "engine", cfg.TTSEngine)
 		m.tts = NewTTSState(cfg.TTSEngine)
 		// Pass TTS state to pager for status display
 		m.pager.tts = m.tts
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] TTS state created, isEnabled: %v\n", m.tts.IsEnabled())
+		log.Debug("TTS state created", "enabled", m.tts.IsEnabled())
 	}
 
 	path := cfg.Path
@@ -196,18 +196,18 @@ func newModel(cfg Config, content string) tea.Model {
 }
 
 func (m model) Init() tea.Cmd {
-	// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Init() called, state: %v\n", m.state)
+	log.Debug("Init() called", "state", m.state)
 	cmds := []tea.Cmd{m.stash.spinner.Tick}
 
 	// Initialize TTS if enabled
 	if m.tts != nil && m.tts.IsEnabled() {
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] TTS enabled, queuing initialization command\n")
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Initial state - isInitializing: %v, isInitialized: %v\n", 
-		// 	m.tts.isInitializing, m.tts.isInitialized)
+		log.Debug("TTS enabled, queuing initialization", 
+			"isInitializing", m.tts.isInitializing, 
+			"isInitialized", m.tts.isInitialized)
 		cmds = append(cmds, initTTSCmd(m.tts.engine, m.tts))
 		// Start ticker for UI updates during initialization
 		cmds = append(cmds, ttsTick())
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Queued %d commands including TTS init\n", len(cmds))
+		log.Debug("queued commands", "count", len(cmds))
 	}
 
 	switch m.state {
@@ -403,20 +403,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// TTS message handling
 	case ttsInitMsg:
-		// fmt.Fprintf(os.Stderr, "[TTS DEBUG] Received ttsInitMsg, err: %v\n", msg.err)
+		log.Debug("received ttsInitMsg", "error", msg.err)
 		if m.tts != nil {
 			if msg.err != nil {
-				// fmt.Fprintf(os.Stderr, "[TTS DEBUG] TTS init failed: %v\n", msg.err)
+				log.Error("TTS initialization failed", "error", msg.err)
 				m.tts.lastError = msg.err
 				m.tts.isInitializing = false
 				m.tts.isInitialized = false
 			} else {
-				// fmt.Fprintf(os.Stderr, "[TTS DEBUG] TTS init succeeded\n")
+				log.Info("TTS initialization succeeded")
 				m.tts.lastError = nil  // Clear any previous errors on successful init
 				m.tts.isInitializing = false
 				m.tts.isInitialized = true
-				// fmt.Fprintf(os.Stderr, "[TTS DEBUG] State after init - isInitialized: %v, isInitializing: %v\n", 
-				// 	m.tts.isInitialized, m.tts.isInitializing)
+				log.Debug("TTS state after init", 
+					"isInitialized", m.tts.isInitialized, 
+					"isInitializing", m.tts.isInitializing)
 			}
 			// Force a UI refresh by returning a no-op command
 			// This ensures the view is re-rendered with the updated TTS state

@@ -335,7 +335,12 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 	// TTS Status (if enabled)
 	var ttsStatus string
 	if m.tts != nil && m.tts.IsEnabled() {
-		ttsStatus = " " + m.tts.RenderStatus() + " "
+		renderedStatus := m.tts.RenderStatus()
+		if renderedStatus != "" {
+			ttsStatus = " " + renderedStatus + " "
+			// Log status changes for debugging
+			log.Debug("TTS status in pager", "status", renderedStatus)
+		}
 	}
 
 	// Note
