@@ -1,0 +1,49 @@
+# Task ID: 5
+# Title: Implement Basic Piper TTS Engine
+# Status: done
+# Dependencies: 1, 4
+# Priority: medium
+# Description: Create the offline Piper TTS engine implementation with dependency validation and basic synthesis capability
+# Details:
+Create pkg/tts/engines/piper.go implementing TTSEngine interface. Add dependency detection for piper binary in PATH and ONNX voice models. Implement synthesis using fresh process per call with proper subprocess management. Add --length-scale parameter for speed control (0.5x-2.0x). Include model validation and voice selection. Handle PCM audio output conversion and error handling with clear user guidance.
+
+# Test Strategy:
+Piper binary detection tests, synthesis quality validation, speed control verification, and comprehensive error handling tests
+
+# Subtasks:
+## 1. Create Piper engine structure and TTSEngine interface implementation [done]
+### Dependencies: None
+### Description: Set up the basic Piper engine struct in pkg/tts/engines/piper.go with all required fields and implement the TTSEngine interface methods (Synthesize, SetSpeed, Validate)
+### Details:
+Create piper.go file with PiperEngine struct containing fields for binary path, model path, speed setting, and process management. Implement TTSEngine interface with method stubs. Add constants for default speed range (0.5-2.0) and audio format parameters (16-bit mono 22050Hz PCM).
+
+## 2. Implement Piper binary and ONNX model detection [done]
+### Dependencies: 5.1
+### Description: Add dependency validation logic to detect piper binary in PATH and locate ONNX voice models in standard locations
+### Details:
+Implement Validate() method to check for piper binary using exec.LookPath. Search for ONNX models in common locations (~/.local/share/piper-voices/, /usr/share/piper-voices/). Validate model files exist and are accessible. Return clear error messages with installation instructions if dependencies are missing.
+
+## 3. Implement subprocess management for synthesis [done]
+### Dependencies: 5.1, 5.2
+### Description: Create the core synthesis logic using fresh process per call with proper stdin handling to prevent race conditions
+### Details:
+Implement Synthesize() method using exec.Command for piper binary. Apply the cmd.Stdin = strings.NewReader(text) pattern before process start. Add --output-raw flag for PCM output, --model flag for ONNX model path. Implement proper process lifecycle management with context support for cancellation. Handle process exit codes and stderr for error reporting.
+
+## 4. Add speed control with --length-scale parameter [done]
+### Dependencies: 5.3
+### Description: Implement SetSpeed method and integrate --length-scale parameter into synthesis command
+### Details:
+Implement SetSpeed() method to store speed setting (0.5-2.0 range). Add --length-scale parameter to piper command with inverse calculation (2.0 speed = 0.5 length-scale). Validate speed values and provide clear error messages for out-of-range values. Update synthesis command builder to include length-scale when speed != 1.0.
+
+## 5. Handle PCM audio output conversion and buffering [done]
+### Dependencies: 5.3, 5.4
+### Description: Implement PCM audio data collection from piper stdout with proper buffering and format validation
+### Details:
+Read PCM data from cmd.StdoutPipe() into byte buffer. Validate PCM format (16-bit mono 22050Hz). Handle partial reads and implement proper buffering strategy. Convert raw PCM bytes to []byte for return value. Add audio data size validation and handle edge cases like empty output.
+
+## 6. Create comprehensive error handling with user guidance [done]
+### Dependencies: 5.2, 5.3, 5.5
+### Description: Implement detailed error handling throughout the engine with actionable user messages
+### Details:
+Create custom error types for different failure scenarios (dependency missing, model not found, synthesis failed). Add helpful error messages with installation/fix instructions. Implement error wrapping for context preservation. Add logging for debugging subprocess issues. Handle timeout scenarios and provide recovery suggestions.
+

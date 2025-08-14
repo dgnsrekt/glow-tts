@@ -1,0 +1,55 @@
+# Task ID: 7
+# Title: Implement Audio Queue with Preprocessing Pipeline
+# Status: in-progress
+# Dependencies: 2, 6
+# Priority: medium
+# Description: Create background audio processing with 2-3 sentence lookahead buffer for seamless playback transitions
+# Details:
+Create pkg/tts/queue.go with AudioQueue struct managing preprocessing and playback order. Implement 2-3 sentence lookahead buffer with background synthesis. Add queue management for previous/next navigation. Implement preprocessing pipeline that eliminates gaps between sentences. Create buffer management with proper memory handling and garbage collection considerations. Add queue state tracking and debugging capabilities.
+
+# Test Strategy:
+Queue management tests, lookahead buffer validation, seamless transitions verification, and memory usage monitoring
+
+# Subtasks:
+## 1. Design AudioQueue Struct and Core Architecture [pending]
+### Dependencies: None
+### Description: Create AudioQueue struct with fields for buffer management, state tracking, and concurrent processing control
+### Details:
+Define AudioQueue struct in pkg/tts/queue.go with fields: buffer []AudioSegment, bufferSize int, currentIndex int, processingQueue chan TextSegment, synthesisWorkers int, mu sync.RWMutex, state QueueState, and ctx context.Context. Create AudioSegment type containing audio data, text reference, and metadata. Define QueueState enum (idle, processing, playing). Establish interfaces for queue operations and callback mechanisms.
+
+## 2. Implement Lookahead Buffer with Background Synthesis [pending]
+### Dependencies: 7.1
+### Description: Build 2-3 sentence lookahead buffer system with background synthesis workers for continuous audio preparation
+### Details:
+Implement NewAudioQueue(bufferSize int) constructor with default 3-sentence lookahead. Create background worker pool using goroutines for concurrent synthesis. Implement AddToQueue(text string) method that triggers background processing. Build buffer management logic to maintain 2-3 sentences ahead of current playback position. Add automatic buffer refill when dropping below threshold. Implement proper synchronization between synthesis workers and buffer updates.
+
+## 3. Build Queue Navigation and Control Methods [pending]
+### Dependencies: 7.2
+### Description: Implement previous/next navigation with proper buffer management and state transitions
+### Details:
+Create Next() and Previous() methods for queue navigation with bounds checking. Implement Skip(n int) for jumping to specific positions. Add GetCurrent() and GetQueuedItems() for state inspection. Build position tracking with currentPosition and totalItems counters. Implement queue reordering logic for dynamic priority changes. Add Clear() and Reset() methods for queue management.
+
+## 4. Create Preprocessing Pipeline for Seamless Transitions [pending]
+### Dependencies: 7.2
+### Description: Implement audio preprocessing pipeline that eliminates gaps between sentences for continuous playback
+### Details:
+Build PreprocessAudio(raw []byte) method to normalize audio segments. Implement silence trimming at segment boundaries using audio amplitude detection. Add crossfade blending between consecutive segments (50-100ms overlap). Create audio level normalization to maintain consistent volume. Implement format conversion pipeline ensuring consistent PCM parameters. Add configurable transition duration settings.
+
+## 5. Implement Memory Management and Garbage Collection [pending]
+### Dependencies: 7.3, 7.4
+### Description: Build efficient memory management system with proper cleanup and garbage collection optimization
+### Details:
+Implement buffer eviction policy using LRU cache for processed segments. Create ReleaseSegment(index int) for manual memory release. Add automatic cleanup of played segments after configurable retention period. Implement memory pooling for AudioSegment allocations to reduce GC pressure. Add MaxMemoryUsage limit with automatic buffer size adjustment. Create background cleanup goroutine monitoring memory usage and triggering collection when threshold exceeded.
+
+## 6. Add Queue State Tracking and Debugging Capabilities [pending]
+### Dependencies: 7.5
+### Description: Implement comprehensive state tracking, metrics collection, and debugging tools for queue operations
+### Details:
+Create GetQueueStats() returning metrics: queue depth, buffer utilization, synthesis rate, memory usage. Implement state change notifications using callback pattern or channels. Add detailed logging with configurable levels (debug, info, warn, error). Create DumpQueueState() for debugging snapshots. Implement performance metrics tracking (synthesis time, buffer hits/misses). Add visual queue state representation for debugging output.
+
+## 7. Implement loading states with Bubbles spinner [pending]
+### Dependencies: None
+### Description: Add visual loading indicators using the Bubbles spinner component for TTS initialization, audio synthesis, and buffering operations to provide better user feedback
+### Details:
+
+

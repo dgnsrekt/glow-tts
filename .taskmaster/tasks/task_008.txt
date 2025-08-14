@@ -1,0 +1,37 @@
+# Task ID: 8
+# Title: Create Speed Control System
+# Status: done
+# Dependencies: 5
+# Priority: medium
+# Description: Build comprehensive speed control with engine-specific parameter mapping and discrete speed steps
+# Details:
+Create pkg/tts/speed.go with SpeedController struct. Implement discrete speed steps from 0.5x to 2.0x (0.5, 0.75, 1.0, 1.25, 1.5, 2.0). Add engine-specific parameter mapping (Piper length-scale vs Google TTS ffmpeg atempo). Speed changes affect new synthesis only, maintaining current playback. Update cache keys to include speed parameter. Add keyboard controls (+/-) for speed adjustment with visual feedback in UI.
+
+# Test Strategy:
+Speed control accuracy tests, engine-specific parameter validation, cache key generation with speed, and UI feedback verification
+
+# Subtasks:
+## 1. Create SpeedController struct with discrete speed steps [done]
+### Dependencies: None
+### Description: Implement the core SpeedController struct in pkg/tts/speed.go with predefined discrete speed values and state management
+### Details:
+Create pkg/tts/speed.go with SpeedController struct containing currentSpeed float64, availableSpeeds []float64 (0.5, 0.75, 1.0, 1.25, 1.5, 2.0), and mutex for thread-safe operations. Implement NewSpeedController() constructor with default speed 1.0. Add GetSpeed(), SetSpeed(speed float64), NextSpeed(), and PreviousSpeed() methods. Validate speed values against available discrete steps. Include IsValidSpeed(speed float64) helper method.
+
+## 2. Implement engine-specific parameter mapping [done]
+### Dependencies: 8.1
+### Description: Create parameter mapping logic that translates generic speed values to engine-specific parameters for Piper and Google TTS
+### Details:
+Add GetEngineParameter(engineType string, speed float64) method to SpeedController. For Piper engine, map speed to --length-scale parameter (inverse relationship: speed 2.0 = length-scale 0.5). For Google TTS, prepare ffmpeg atempo parameter mapping (direct relationship: speed 2.0 = atempo 2.0). Create EngineParameterMap type for storing engine-specific configurations. Include validation for parameter ranges specific to each engine.
+
+## 3. Update cache key generation to include speed parameter [done]
+### Dependencies: 8.1
+### Description: Modify cache key generation logic to incorporate speed value, ensuring different speeds generate unique cache entries
+### Details:
+Update cache key generation to use SHA256(text|voice|speed) format. Modify GenerateCacheKey() function to accept speed parameter. Ensure speed value is normalized to string format with consistent precision (e.g., '1.50' not '1.5'). Update all cache lookups and stores to use new key format. Add migration logic to handle existing cache entries without speed parameter.
+
+## 4. Integrate keyboard controls with UI feedback [done]
+### Dependencies: 8.1, 8.2, 8.3
+### Description: Add keyboard handlers for speed adjustment and visual feedback display in the TUI
+### Details:
+Implement keyboard handlers for '+' (increase speed) and '-' (decrease speed) keys in the TUI event loop. Add visual speed indicator to UI showing current speed value (e.g., 'Speed: 1.25x'). Create UpdateSpeedDisplay() method for real-time UI updates. Ensure speed changes only affect new synthesis, not current playback. Add toast notification or status message when speed changes. Include bounds checking to prevent invalid speed selections.
+

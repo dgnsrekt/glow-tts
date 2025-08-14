@@ -1,0 +1,43 @@
+# Task ID: 4
+# Title: Create Sentence Parser for Markdown Text Extraction
+# Status: done
+# Dependencies: 1
+# Priority: medium
+# Description: Build intelligent markdown parser that extracts speakable sentences while preserving document structure
+# Details:
+Create pkg/tts/parser.go with SentenceParser struct. Implement markdown parsing that extracts clean text for synthesis while maintaining original formatting. Create Sentence struct with Text (clean), Position (document index), and Original (markdown) fields. Handle special markdown elements (code blocks, links, headers) appropriately for speech. Implement sentence boundary detection with proper punctuation handling.
+
+# Test Strategy:
+Parser tests with various markdown formats, sentence extraction accuracy validation, and edge case handling for complex markdown structures
+
+# Subtasks:
+## 1. Create SentenceParser struct and Sentence model [done]
+### Dependencies: None
+### Description: Define the core data structures for sentence parsing including SentenceParser struct in pkg/tts/parser.go and Sentence struct with Text, Position, and Original fields
+### Details:
+Create pkg/tts/parser.go file. Define Sentence struct with fields: Text (string for clean speakable text), Position (int for document index), Original (string for original markdown). Define SentenceParser struct with necessary fields for markdown processing state. Add constructor function NewSentenceParser() and basic initialization logic.
+
+## 2. Integrate glamour markdown parsing [done]
+### Dependencies: 4.1
+### Description: Implement markdown element extraction leveraging the existing glamour integration patterns from the codebase
+### Details:
+Study existing glamour usage in the codebase for markdown rendering. Create Parse(markdown string) method on SentenceParser that uses glamour to extract text content. Handle markdown AST traversal to extract plain text while preserving structure information. Map glamour elements to internal representation for further processing.
+
+## 3. Implement sentence boundary detection logic [done]
+### Dependencies: 4.2
+### Description: Add intelligent sentence boundary detection with proper punctuation rules and edge case handling
+### Details:
+Implement detectSentences(text string) []Sentence method with punctuation-based splitting (periods, exclamation marks, question marks). Handle abbreviations and decimal numbers that contain periods. Implement lookahead/lookbehind logic for proper sentence boundaries. Handle ellipsis and other special punctuation patterns. Preserve original markdown positions during sentence extraction.
+
+## 4. Handle special markdown elements for speech [done]
+### Dependencies: 4.3
+### Description: Process code blocks, links, headers, and other markdown elements appropriately for TTS synthesis
+### Details:
+Implement handleCodeBlock() to either skip or announce code blocks based on configuration. Convert links to speakable format (e.g., 'link to [text]' or just the link text). Transform headers into pausable boundaries with appropriate emphasis. Handle lists and blockquotes with proper speech formatting. Process inline code, bold, and italic elements for natural speech flow.
+
+## 5. Write comprehensive parser tests [done]
+### Dependencies: 4.4
+### Description: Create thorough test suite covering various markdown formats and edge cases for the sentence parser
+### Details:
+Create pkg/tts/parser_test.go with test cases for basic sentence extraction. Add tests for complex markdown with nested elements (links in lists, code in blockquotes). Test sentence boundary detection with abbreviations, numbers, and special punctuation. Verify correct handling of empty lines and whitespace. Test performance with large markdown documents. Include edge cases like malformed markdown and unicode content.
+

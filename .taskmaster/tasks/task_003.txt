@@ -1,0 +1,49 @@
+# Task ID: 3
+# Title: Integrate TTS Controls with Bubble Tea UI Framework
+# Status: done
+# Dependencies: 1, 2
+# Priority: high
+# Description: Add TTS command patterns to existing Bubble Tea UI and implement CLI flag detection for explicit TTS activation
+# Details:
+Add --tts flag to main.go CLI arguments with engine selection (piper|gtts). Modify ui/ui.go to include TTS state in model struct. Implement Bubble Tea command pattern for all TTS async operations - no direct goroutines. Add TTS status display showing engine, speed, sentence position. Create keyboard shortcuts: Space (play/pause), arrows (navigation), +/- (speed control). Ensure TUI mode is mandatory when --tts flag is used.
+
+# Test Strategy:
+UI integration tests for TTS controls, command pattern validation, keyboard shortcut functionality, and CLI flag parsing tests
+
+# Subtasks:
+## 1. Add --tts CLI flag parsing with engine selection [done]
+### Dependencies: None
+### Description: Implement command-line flag parsing in main.go to detect --tts flag with engine selection (piper|gtts)
+### Details:
+Modify main.go to add --tts flag using existing CLI parsing structure. Accept engine parameter as --tts=piper or --tts=gtts. Default to piper if no engine specified. Store selected engine in config struct. Ensure TUI mode is automatically enabled when --tts flag is present. Pass TTS configuration to ui.NewProgram() initialization.
+
+## 2. Extend Bubble Tea model struct with TTS state [done]
+### Dependencies: None
+### Description: Modify ui/ui.go model struct to include comprehensive TTS state management fields
+### Details:
+Add TTSController field to model struct in ui/ui.go. Include TTS state fields: isPlaying bool, isPaused bool, currentSentenceIndex int, currentSpeed float64, ttsEngine string. Add fields for audio queue management and sentence navigation tracking. Ensure proper initialization of TTS state in NewProgram() when --tts flag is detected.
+
+## 3. Implement Bubble Tea commands for async TTS operations [done]
+### Dependencies: 3.1, 3.2
+### Description: Create command pattern implementation for all TTS operations following Bubble Tea async patterns
+### Details:
+Create ttsPlayCmd, ttsPauseCmd, ttsNextCmd, ttsPrevCmd commands in ui/ui.go. Implement ttsSpeedChangeCmd for speed adjustments. Use tea.Cmd return type for all async operations - no direct goroutines. Create command factories that return tea.Cmd functions wrapping TTS controller calls. Ensure proper error handling and state updates through command results.
+
+## 4. Add keyboard shortcuts for TTS control [done]
+### Dependencies: 3.3
+### Description: Implement keyboard event handlers for Space, arrow keys, and +/- speed controls
+### Details:
+In Update() method, add case handlers for: Space key to toggle play/pause, Left/Right arrows for previous/next sentence navigation, Up/Down arrows for paragraph navigation, +/- keys for speed increment/decrement. Return appropriate TTS commands from key handlers. Ensure shortcuts only active when TTS is enabled. Add visual feedback for key actions in status display.
+
+## 5. Create TTS status display component [done]
+### Dependencies: 3.2, 3.4
+### Description: Build UI component showing TTS engine, playback status, speed, and sentence position
+### Details:
+Create renderTTSStatus() method in ui/ui.go View() function. Display current engine (Piper/Google TTS), playback state (Playing/Paused/Stopped), current speed (0.5x-2.0x), sentence position (e.g., '3/15 sentences'). Use lipgloss for styling consistent with existing UI. Position status bar at bottom or integrate with existing status display. Update display reactively based on model state changes.
+
+## 6. Enforce TUI mode and integrate TTS initialization [done]
+### Dependencies: 3.1, 3.2, 3.3
+### Description: Ensure TUI mode is mandatory with --tts flag and properly initialize TTS controller
+### Details:
+In main.go, force TUI mode when --tts flag is detected regardless of other flags. Initialize TTS controller in ui.NewProgram() when TTS is enabled. Connect TTS controller to model struct. Implement Init() command to start TTS preprocessing if auto-play is enabled. Add graceful shutdown handling for TTS resources in tea.Quit command. Validate TTS engine availability before UI initialization.
+

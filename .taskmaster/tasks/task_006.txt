@@ -1,0 +1,55 @@
+# Task ID: 6
+# Title: Build Two-Level Caching System
+# Status: done
+# Dependencies: 4, 5
+# Priority: medium
+# Description: Implement memory and disk caching architecture for optimal TTS performance with automatic cleanup
+# Details:
+Create pkg/tts/cache.go with CacheManager struct. Implement L1 memory cache (100MB limit, <1ms access) and L2 disk cache (1GB limit, 7-day TTL). Use SHA256(text|voice|speed) for cache keys. Add automatic cleanup based on size, age, and session lifecycle. Implement cache hit rate monitoring. Create AudioData struct with Audio []byte, Text string, Speed float64, and CacheKey string fields. Use platform-specific cache directories with restricted permissions.
+
+# Test Strategy:
+Cache performance benchmarks, hit rate validation (target >80%), cleanup mechanism tests, and cross-session persistence verification
+
+# Subtasks:
+## 1. Design CacheManager Architecture and Interfaces [done]
+### Dependencies: None
+### Description: Create the core CacheManager struct and define interfaces for L1 and L2 cache layers with common operations
+### Details:
+Create pkg/tts/cache.go with CacheManager struct containing L1Cache and L2Cache interfaces. Define Cache interface with Get(key string), Put(key string, data *AudioData), Delete(key string), Size() int64, and Clear() methods. Create AudioData struct with Audio []byte, Text string, Speed float64, and CacheKey string fields. Design configuration struct with L1SizeLimit (100MB), L2SizeLimit (1GB), and TTL (7 days) parameters.
+
+## 2. Implement L1 Memory Cache with LRU Eviction [done]
+### Dependencies: 6.1
+### Description: Build the in-memory cache layer with size-based LRU eviction and sub-millisecond access times
+### Details:
+Implement MemoryCache struct satisfying L1Cache interface. Use sync.Map or custom concurrent map for <1ms access. Implement LRU eviction using container/list for tracking access order. Add size tracking with atomic operations for thread safety. Implement automatic eviction when approaching 100MB limit. Include metrics for hit/miss rates and access times using sync/atomic counters.
+
+## 3. Build L2 Disk Cache with Platform-Specific Storage [done]
+### Dependencies: 6.1
+### Description: Create the persistent disk cache layer with platform-aware directory management and file permissions
+### Details:
+Implement DiskCache struct satisfying L2Cache interface. Use os.UserCacheDir() for platform-specific cache directories (XDG_CACHE_HOME on Linux, ~/Library/Caches on macOS, %LOCALAPPDATA% on Windows). Set restrictive permissions (0700) on cache directory. Implement file-based storage with metadata files containing timestamp, size, and access count. Add file locking for concurrent access safety. Include compression for audio data to optimize disk usage.
+
+## 4. Implement SHA256-Based Cache Key Generation [done]
+### Dependencies: 6.1
+### Description: Create deterministic cache key generation using SHA256 hashing of text, voice, and speed parameters
+### Details:
+Create GenerateCacheKey(text, voice, speed string) function using crypto/sha256. Normalize input parameters before hashing (trim whitespace, lowercase voice names, format speed to 2 decimal places). Generate hex-encoded 64-character keys. Add key validation and collision detection. Implement key prefix for versioning (v1_<hash>). Include unit tests for key determinism and parameter sensitivity.
+
+## 5. Build Automatic Cleanup and Lifecycle Management [done]
+### Dependencies: 6.2, 6.3
+### Description: Implement multi-criteria cleanup system based on size limits, age, and session lifecycle
+### Details:
+Create CleanupManager with goroutine-based background cleanup. Implement size-based cleanup triggering at 90% capacity for both L1 and L2. Add age-based cleanup removing entries older than 7 days for L2, 1 hour for L1. Implement session lifecycle hooks for cleanup on application exit. Use heap data structure for efficient LRU/LFU tracking. Add configurable cleanup intervals and thresholds. Include graceful shutdown with cleanup completion.
+
+## 6. Add Cache Metrics and Hit Rate Monitoring [done]
+### Dependencies: 6.2, 6.3, 6.4
+### Description: Implement comprehensive metrics collection for cache performance monitoring and optimization
+### Details:
+Create CacheMetrics struct with hit/miss counters, access times, and size tracking. Implement rolling window statistics for hit rates (1min, 5min, 15min averages). Add per-cache-level metrics (L1 vs L2 hit rates). Include cache promotion/demotion tracking between levels. Export metrics in Prometheus-compatible format. Add debug logging for cache operations with configurable verbosity. Target >80% combined hit rate.
+
+## 7. Write Performance Benchmarks and Persistence Tests [done]
+### Dependencies: 6.2, 6.3, 6.4, 6.5, 6.6
+### Description: Create comprehensive test suite validating performance requirements and cross-session persistence
+### Details:
+Write benchmark tests validating <1ms L1 access using testing.B. Create load tests simulating concurrent access patterns. Test LRU eviction correctness under memory pressure. Validate disk persistence across process restarts. Test cleanup mechanisms with time manipulation. Benchmark cache key generation performance. Validate platform-specific directory creation and permissions. Test cache coherency between L1 and L2 layers.
+

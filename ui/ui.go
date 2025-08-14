@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour/styles"
 	"github.com/charmbracelet/glow/v2/utils"
@@ -207,6 +209,8 @@ func (m model) Init() tea.Cmd {
 		cmds = append(cmds, initTTSCmd(m.tts.engine, m.tts))
 		// Start ticker for UI updates during initialization
 		cmds = append(cmds, ttsTick())
+		// Start spinner for loading animation
+		cmds = append(cmds, m.tts.loadingSpinner.Tick)
 		log.Debug("queued commands", "count", len(cmds))
 	}
 
@@ -319,7 +323,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						log.Debug("using rawMarkdownText", "length", len(documentText))
 					}
 					log.Debug("TTS play command", "textLength", len(documentText))
-					return m, playTTSCmd(m.tts.controller, documentText)
+					
+					// Set synthesizing state before playing
+					m.tts.SetLoadingState(true, false, "Synthesizing audio...")
+					
+					// Start the spinner tick and play command
+					return m, tea.Batch(
+						m.tts.loadingSpinner.Tick,
+						playTTSCmd(m.tts.controller, documentText),
+					)
 				}
 			}
 
@@ -438,12 +450,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 
-	case ttsTickMsg:
-		// During initialization, continue ticking to refresh UI
-		if m.tts != nil && m.tts.isInitializing {
-			return m, ttsTick()
+	case spinner.TickMsg:
+		// Forward spinner tick to TTS state if it's loading
+		if m.tts != nil && (m.tts.isInitializing || m.tts.isSynthesizing || m.tts.isBuffering) {
+			_, cmd := m.tts.Update(msg)
+			return m, cmd
 		}
-		// Stop ticking once initialized
+		return m, nil
+		
+	case timer.TickMsg:
+		// Forward timer tick to TTS state if playing
+		if m.tts != nil && m.tts.isPlaying && !m.tts.isPaused {
+			_, cmd := m.tts.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+		
+	case ttsTickMsg:
+		// Update spinner and continue ticking during loading states
+		if m.tts != nil {
+			var spinnerCmd tea.Cmd
+			if m.tts.isInitializing || m.tts.isSynthesizing || m.tts.isBuffering {
+				_, spinnerCmd = m.tts.Update(msg)
+				// Continue ticking for animation
+				return m, tea.Batch(spinnerCmd, ttsTick())
+			}
+		}
+		// Stop ticking when not loading
 		return m, nil
 
 	case ttsSentencesParsedMsg:
@@ -459,6 +492,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ttsPlayMsg:
 		if m.tts != nil {
+			// Clear synthesizing state once play starts
+			m.tts.SetLoadingState(false, false, "")
+			
 			if msg.err != nil {
 				m.tts.lastError = msg.err
 			} else {
@@ -466,7 +502,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tts.isPlaying = true
 				m.tts.isPaused = false
 				m.tts.isStopped = false
-				// Start monitoring playback for completion
+				// Record playback start time and start timer
+				m.tts.playbackStart = time.Now()
+				// Initialize and start timer
+				cmds = append(cmds, m.tts.playbackTimer.Init())
+				cmds = append(cmds, m.tts.playbackTimer.Start())
 				cmds = append(cmds, monitorPlaybackCmd(m.tts.controller))
 			}
 		}
@@ -478,6 +518,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.tts.isPlaying = false
 				m.tts.isPaused = true
+				// Stop the timer to pause it
+				cmds = append(cmds, m.tts.playbackTimer.Stop())
 			}
 		}
 
@@ -490,6 +532,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tts.isPaused = false
 				m.tts.isStopped = true
 				m.tts.currentSentenceIndex = 0
+				// Stop and reset the timer
+				cmds = append(cmds, m.tts.playbackTimer.Stop())
+				m.tts.playbackStart = time.Time{}
 			}
 		}
 
@@ -534,6 +579,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tts.isPaused = false
 			m.tts.isStopped = true
 			m.tts.currentSentenceIndex = 0
+			// Stop the timer
+			cmds = append(cmds, m.tts.playbackTimer.Stop())
 		}
 	}
 

@@ -1,0 +1,49 @@
+# Task ID: 9
+# Title: Implement Google TTS Engine with Pipeline
+# Status: pending
+# Dependencies: 1, 8
+# Priority: medium
+# Description: Create online Google TTS engine using gTTS CLI with ffmpeg audio processing pipeline
+# Details:
+Create pkg/tts/engines/gtts.go implementing TTSEngine interface. Add dependency detection for gtts-cli (pip install gTTS) and ffmpeg. Implement synthesis pipeline: gTTS CLI → MP3 → ffmpeg atempo → PCM conversion. Use ffmpeg atempo filter for speed control instead of Piper's length-scale. Add internet connectivity validation. Implement proper error handling with actionable user guidance. No API key required - uses free gTTS service.
+
+# Test Strategy:
+Dependency detection tests, synthesis pipeline validation, speed control via ffmpeg, connectivity handling, and error recovery tests
+
+# Subtasks:
+## 1. Create GTTSEngine struct implementing TTSEngine interface [pending]
+### Dependencies: None
+### Description: Implement the core Google TTS engine structure with TTSEngine interface methods in pkg/tts/engines/gtts.go
+### Details:
+Create pkg/tts/engines/gtts.go file. Define GTTSEngine struct with fields for configuration (language, slow mode flag). Implement TTSEngine interface methods: Synthesize(text string) ([]byte, error), SetSpeed(speed float32) error, and Validate() error. Add internal fields for tracking ffmpeg speed setting and temporary file management. Follow the same patterns established in piper.go for consistency.
+
+## 2. Implement dependency detection for gtts-cli and ffmpeg [pending]
+### Dependencies: 9.1
+### Description: Add robust dependency checking for both gtts-cli Python package and ffmpeg binary with actionable error messages
+### Details:
+Implement checkGTTSCLI() function to verify gtts-cli is installed via pip. Use exec.LookPath() to check for gtts-cli in PATH. Implement checkFFmpeg() function to verify ffmpeg binary availability. Add version checking for compatibility. Return detailed error messages with installation instructions: 'gtts-cli not found. Install with: pip install gTTS' and 'ffmpeg not found. Install via your package manager'. Call both checks in Validate() method.
+
+## 3. Build gTTS to MP3 synthesis pipeline [pending]
+### Dependencies: 9.1, 9.2
+### Description: Implement the first stage of the pipeline using gTTS CLI to generate MP3 output with internet connectivity validation
+### Details:
+Create synthesizeToMP3() method that constructs gtts-cli command with proper arguments: gtts-cli --text 'text' --output temp.mp3 --lang en. Add internet connectivity check before synthesis attempt using net.Dial to google.com:443. Handle temporary file creation with ioutil.TempFile for MP3 output. Implement proper error handling for network failures, returning user-friendly messages like 'Internet connection required for Google TTS'. Use cmd.Stdin = strings.NewReader(text) pattern to avoid stdin race conditions.
+
+## 4. Implement ffmpeg audio processing pipeline with atempo filter [pending]
+### Dependencies: 9.3
+### Description: Create the MP3 to PCM conversion pipeline with ffmpeg atempo filter for speed control
+### Details:
+Implement convertMP3ToPCM() method that takes MP3 file path and speed factor. Construct ffmpeg command: ffmpeg -i input.mp3 -af atempo=speed -f s16le -ar 22050 -ac 1 pipe:1. Map speed values (0.5-2.0) to atempo filter values. Handle ffmpeg stdout to capture PCM data into byte slice. Implement proper subprocess management with context cancellation. Add error handling for invalid speed values and ffmpeg failures. Clean up temporary MP3 file after conversion.
+
+## 5. Integrate complete synthesis pipeline with error recovery [pending]
+### Dependencies: 9.3, 9.4
+### Description: Wire together the complete gTTS → MP3 → ffmpeg → PCM pipeline in the Synthesize method
+### Details:
+Implement Synthesize() method orchestrating the full pipeline: call synthesizeToMP3(), then convertMP3ToPCM() with current speed setting. Add retry logic for transient network failures (max 2 retries with exponential backoff). Implement proper cleanup of all temporary files in defer blocks. Add detailed logging at each pipeline stage for debugging. Return PCM audio data in correct format (16-bit mono 22050Hz). Ensure all error messages guide users to solutions.
+
+## 6. Add comprehensive error handling and user guidance [pending]
+### Dependencies: 9.5
+### Description: Implement detailed error handling with actionable messages for all failure scenarios
+### Details:
+Create custom error types for different failure modes: NetworkError, DependencyError, ProcessError. Implement fallback behavior for network failures (suggest offline engines). Add detailed error messages with resolution steps for each error type. Create validateConnectivity() helper for pre-flight checks. Implement GetLastError() method for debugging. Add timeout handling for long-running synthesis operations (30s max). Include example usage documentation in comments.
+

@@ -1,0 +1,55 @@
+# Task ID: 10
+# Title: Add Comprehensive Error Handling and Production Polish
+# Status: pending
+# Dependencies: 7, 9
+# Priority: medium
+# Description: Implement robust error handling, dependency validation, timeout protection, and user documentation
+# Details:
+Add 5-second timeout protection with graceful SIGINT/SIGKILL sequence for all subprocess calls. Implement comprehensive dependency checking with clear setup guidance. Add engine availability detection with helpful error messages. Create configuration file support (.glow/config.yml) with TTS settings. Implement logging and debugging capabilities. Add user documentation for setup and troubleshooting. Create installation guides for Piper and Google TTS dependencies. Add graceful shutdown handling and resource cleanup.
+
+# Test Strategy:
+Timeout protection validation, dependency error message clarity, configuration loading tests, and comprehensive integration testing across platforms
+
+# Subtasks:
+## 1. Implement subprocess timeout protection system [pending]
+### Dependencies: None
+### Description: Add 5-second timeout mechanism with graceful SIGINT/SIGKILL sequence for all TTS engine subprocess calls
+### Details:
+Create pkg/tts/timeout.go with TimeoutExecutor struct. Implement RunWithTimeout(cmd *exec.Cmd, timeout time.Duration) that sends SIGINT after timeout, waits 500ms for graceful shutdown, then sends SIGKILL if needed. Integrate with both Piper and Google TTS engine subprocess calls. Add context cancellation support for proper cleanup. Include timeout configuration in engine structs with sensible defaults.
+
+## 2. Build dependency validation and setup guidance system [pending]
+### Dependencies: None
+### Description: Create comprehensive dependency checking with clear error messages and installation instructions
+### Details:
+Create pkg/tts/dependencies.go with DependencyChecker interface. Implement CheckPiper() for piper binary and ONNX models, CheckGTTS() for gtts-cli and ffmpeg. Add CheckSystemDependencies() that validates all required tools on startup. Create helpful error messages with platform-specific installation commands (brew/apt/pip). Include version checking where applicable. Add --check-deps flag to validate without running.
+
+## 3. Create configuration file system with .glow/config.yml [pending]
+### Dependencies: None
+### Description: Implement YAML configuration support for TTS settings using viper
+### Details:
+Create pkg/config/config.go extending existing viper setup. Define config structure for TTS settings: default engine, cache limits, timeout values, voice preferences, speed defaults. Support ~/.config/glow/config.yml and ./.glow/config.yml with proper precedence. Add config validation and migration from old settings. Include example config generation with --generate-config flag. Integrate with existing glamour style configuration.
+
+## 4. Implement logging and debugging capabilities [pending]
+### Dependencies: 10.3
+### Description: Add structured logging using charmbracelet/log with debug levels and TTS-specific logging
+### Details:
+Extend existing charmbracelet/log usage for TTS operations. Add debug levels: ERROR, WARN, INFO, DEBUG, TRACE. Create TTS-specific loggers for cache hits/misses, engine selection, synthesis timing, subprocess execution. Add --debug and --trace flags for verbose output. Include performance metrics logging (synthesis time, cache efficiency). Write logs to ~/.glow/debug.log when debug enabled.
+
+## 5. Write comprehensive user documentation [pending]
+### Dependencies: 10.2
+### Description: Create setup guides, troubleshooting docs, and installation instructions for all TTS dependencies
+### Details:
+Create docs/TTS_SETUP.md with platform-specific Piper installation (models, voices). Add docs/TTS_TROUBLESHOOTING.md for common issues and solutions. Write Google TTS setup guide with pip installation steps. Document configuration file options and examples. Add keyboard shortcuts reference for TTS controls. Include performance tuning guide for cache settings. Create quick-start section in main README.md.
+
+## 6. Add graceful shutdown and resource cleanup [pending]
+### Dependencies: 10.1, 10.4
+### Description: Implement proper signal handling and resource cleanup for TTS subsystems
+### Details:
+Create pkg/tts/lifecycle.go with cleanup coordination. Implement signal handlers for SIGINT/SIGTERM with graceful TTS shutdown. Add defer cleanup in all engine implementations. Ensure subprocess termination on exit. Implement cache flush on shutdown if configured. Add audio playback interruption handling. Create resource leak detection in debug mode. Ensure all goroutines terminate properly.
+
+## 7. Perform cross-platform integration testing [pending]
+### Dependencies: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6
+### Description: Validate all production features work correctly across Linux, macOS, and Windows
+### Details:
+Create integration test suite in tts_integration_test.go. Test timeout protection with slow/hanging processes. Validate dependency detection messages on each platform. Test configuration loading and precedence. Verify graceful shutdown sequences. Test cache behavior across sessions. Validate error messages and recovery paths. Add CI matrix testing for all platforms. Document platform-specific quirks discovered.
+

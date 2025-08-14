@@ -766,6 +766,15 @@
             "details": "Create GetQueueStats() returning metrics: queue depth, buffer utilization, synthesis rate, memory usage. Implement state change notifications using callback pattern or channels. Add detailed logging with configurable levels (debug, info, warn, error). Create DumpQueueState() for debugging snapshots. Implement performance metrics tracking (synthesis time, buffer hits/misses). Add visual queue state representation for debugging output.",
             "status": "pending",
             "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Implement loading states with Bubbles spinner",
+            "description": "Add visual loading indicators using the Bubbles spinner component for TTS initialization, audio synthesis, and buffering operations to provide better user feedback",
+            "details": "",
+            "status": "pending",
+            "dependencies": [],
+            "parentTaskId": 7
           }
         ]
       },

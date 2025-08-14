@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glow/v2/pkg/tts"
 	"github.com/charmbracelet/glow/v2/pkg/tts/engines"
@@ -28,6 +30,16 @@ type TTSState struct {
 	isPlaying  bool
 	isPaused   bool
 	isStopped  bool
+	
+	// Loading states
+	isSynthesizing bool
+	isBuffering    bool
+	loadingSpinner spinner.Model
+	loadingMessage string
+	
+	// Playback timer
+	playbackTimer  timer.Model
+	playbackStart  time.Time
 
 	// Navigation state
 	sentences            []tts.Sentence
@@ -43,18 +55,62 @@ type TTSState struct {
 
 // NewTTSState creates a new TTS state instance
 func NewTTSState(engine string) *TTSState {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	
+	// Create a timer that counts up (using a large timeout)
+	t := timer.NewWithInterval(24 * time.Hour, time.Second)
+	
 	return &TTSState{
 		engine:          engine,
 		isInitializing:  true,  // Start as initializing since we'll init immediately
 		isInitialized:   false,
 		isStopped:       true,
 		speedController: tts.NewSpeedController(),
+		loadingSpinner:  s,
+		loadingMessage:  "Initializing TTS engine",
+		playbackTimer:   t,
 	}
 }
 
 // IsEnabled returns true if TTS is enabled
 func (t *TTSState) IsEnabled() bool {
 	return t != nil && t.engine != ""
+}
+
+// Update handles spinner and timer updates and returns any commands
+func (t *TTSState) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	
+	// Update spinner if we're in a loading state
+	if t.isInitializing || t.isSynthesizing || t.isBuffering {
+		var cmd tea.Cmd
+		t.loadingSpinner, cmd = t.loadingSpinner.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	
+	// Update timer if playing
+	if t.isPlaying && !t.isPaused {
+		var cmd tea.Cmd
+		t.playbackTimer, cmd = t.playbackTimer.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	
+	return nil, tea.Batch(cmds...)
+}
+
+// SetLoadingState updates the loading state and message
+func (t *TTSState) SetLoadingState(synthesizing, buffering bool, message string) {
+	t.isSynthesizing = synthesizing
+	t.isBuffering = buffering
+	if message != "" {
+		t.loadingMessage = message
+	}
 }
 
 // TTS Commands - These follow the Bubble Tea command pattern
@@ -424,39 +480,44 @@ func (t *TTSState) RenderStatus() string {
 
 	var parts []string
 
-	// Engine indicator with initialization state
+	// Engine indicator (styled like Glow logo)
 	engineStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("39")).
+		Background(lipgloss.Color("39")).  // Blue background
+		Foreground(lipgloss.Color("15")).  // White text
+		Padding(0, 1).                     // Add padding like Glow logo
 		Bold(true)
 	engineText := fmt.Sprintf("TTS: %s", strings.ToUpper(t.engine))
 	
-	// Add initialization indicator
-	if t.isInitializing {
-		engineText += " (Initializing...)"
-	} else if !t.isInitialized {
+	// Add (Not Ready) only if not initialized and not initializing
+	if !t.isInitialized && !t.isInitializing {
 		engineText += " (Not Ready)"
 	}
 	
 	parts = append(parts, engineStyle.Render(engineText))
 
-	// Playback state (only show if initialized)
-	if t.isInitialized {
+	// Playback state or spinner (only show if initialized or loading)
+	if t.isInitialized || t.isInitializing || t.isSynthesizing || t.isBuffering {
 		stateStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("214"))
 		
 		var stateIcon string
-		if t.isPlaying {
-			stateIcon = "▶"
+		// Show spinner during any loading state
+		if t.isInitializing || t.isSynthesizing || t.isBuffering {
+			stateIcon = t.loadingSpinner.View()
+			// Spinner is already 2 chars wide, just add space after
+			stateIcon = stateIcon + " "
+		} else if t.isPlaying {
+			stateIcon = " ▶ "  // Add space on both sides
 		} else if t.isPaused {
-			stateIcon = "⏸"
+			stateIcon = " ⏸ "  // Add space on both sides
 		} else {
-			stateIcon = "■"
+			stateIcon = " ■ "  // Add space on both sides
 		}
 		parts = append(parts, stateStyle.Render(stateIcon))
 	}
 
-	// Speed indicator (only show if initialized)
-	if t.isInitialized {
+	// Speed indicator (show during init and after)
+	if t.isInitialized || t.isInitializing || t.isSynthesizing || t.isBuffering {
 		speedStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("141"))
 		var speedStr string
@@ -468,8 +529,39 @@ func (t *TTSState) RenderStatus() string {
 		parts = append(parts, speedStyle.Render(speedStr))
 	}
 
-	// Sentence position
-	if t.totalSentences > 0 {
+	// Loading status text (show after speed when loading)
+	if t.isInitializing || t.isSynthesizing || t.isBuffering {
+		statusStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("247")).
+			Italic(true)
+		
+		var statusText string
+		if t.isInitializing {
+			statusText = "Initializing..."
+		} else if t.isSynthesizing {
+			statusText = "Synthesizing..."
+		} else if t.isBuffering {
+			statusText = "Buffering..."
+		}
+		
+		if t.loadingMessage != "" && t.loadingMessage != "Initializing TTS engine" && t.loadingMessage != "Synthesizing audio..." {
+			// Use custom message if it's different from defaults
+			statusText = t.loadingMessage
+		}
+		
+		parts = append(parts, statusStyle.Render(statusText))
+	} else if t.isPlaying && !t.isPaused {
+		// Show timer when playing
+		timerStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("247"))
+		
+		elapsed := time.Since(t.playbackStart)
+		timerText := fmt.Sprintf("%02d:%02d", int(elapsed.Minutes()), int(elapsed.Seconds())%60)
+		parts = append(parts, timerStyle.Render(timerText))
+	}
+
+	// Sentence position (only show when not loading and not playing)
+	if t.totalSentences > 0 && !t.isInitializing && !t.isSynthesizing && !t.isBuffering && (!t.isPlaying || t.isPaused) {
 		posStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("247"))
 		parts = append(parts, posStyle.Render(

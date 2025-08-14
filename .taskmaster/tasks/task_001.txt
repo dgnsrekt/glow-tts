@@ -1,0 +1,43 @@
+# Task ID: 1
+# Title: Implement Core TTS Controller and Infrastructure
+# Status: done
+# Dependencies: None
+# Priority: high
+# Description: Create the main TTS Controller struct and establish critical subprocess management patterns to prevent stdin race conditions
+# Details:
+Create pkg/tts/controller.go with TTS Controller struct containing engine, queue, player, parser, cache, and speedCtrl fields. Implement subprocess management using cmd.Stdin = strings.NewReader(text) pattern before process start to prevent critical race conditions. Add basic state management and initialization logic. Create TTSEngine interface in pkg/tts/engine.go with Synthesize, SetSpeed, and Validate methods.
+
+# Test Strategy:
+Unit tests for Controller initialization, subprocess pattern validation with mock processes, and TTSEngine interface compliance tests
+
+# Subtasks:
+## 1. Create base TTS Controller struct with core fields [done]
+### Dependencies: None
+### Description: Define the main Controller struct in pkg/tts/controller.go with all necessary fields for managing TTS operations
+### Details:
+Create pkg/tts/controller.go and define the Controller struct with fields: engine (TTSEngine interface), queue (*AudioQueue), player (*AudioPlayer), parser (TextParser interface), cache (CacheManager interface), speedCtrl (SpeedController interface), state (sync.RWMutex protected state management), and context for lifecycle management. Add struct tags and documentation for each field. Include basic constructor function NewController() with field initialization.
+
+## 2. Define TTSEngine interface with core synthesis methods [done]
+### Dependencies: None
+### Description: Create the TTSEngine interface in pkg/tts/engine.go defining the contract for all TTS engine implementations
+### Details:
+Create pkg/tts/engine.go and define TTSEngine interface with methods: Synthesize(text string, speed float64) ([]byte, error) for text-to-speech conversion, SetSpeed(speed float64) error for speed adjustment validation, Validate() error for dependency checking, GetName() string for engine identification, and IsAvailable() bool for runtime availability checks. Add comprehensive documentation explaining the PCM output format requirements (16-bit mono 22050Hz) and error handling expectations.
+
+## 3. Implement subprocess management with stdin race prevention [done]
+### Dependencies: 1.1
+### Description: Create safe subprocess execution patterns in the controller to prevent stdin race conditions
+### Details:
+In pkg/tts/controller.go, implement executeSubprocess(cmd *exec.Cmd, input string) ([]byte, error) method using the critical pattern: cmd.Stdin = strings.NewReader(input) before cmd.Start() to prevent race conditions. Add process lifecycle management with proper cleanup using defer statements. Implement timeout handling with context.WithTimeout. Create error wrapping for better debugging. Add logging for subprocess execution lifecycle events. Document the race condition prevention pattern prominently.
+
+## 4. Add state management and lifecycle methods to Controller [done]
+### Dependencies: 1.1, 1.2
+### Description: Implement controller initialization, state tracking, and graceful shutdown mechanisms
+### Details:
+Add Initialize() error method to validate and setup all components. Implement Start(ctx context.Context) error for beginning TTS operations with goroutine management. Add Stop() error for graceful shutdown with resource cleanup. Create state enum (Uninitialized, Ready, Running, Stopping, Stopped) with thread-safe transitions using sync.RWMutex. Implement GetState() State and setState(state State) methods. Add error aggregation for multi-component initialization failures. Include panic recovery in critical paths.
+
+## 5. Create comprehensive unit tests for controller and subprocess patterns [done]
+### Dependencies: 1.3, 1.4
+### Description: Write unit tests validating controller initialization, subprocess management, and race condition prevention
+### Details:
+Create pkg/tts/controller_test.go with TestNewController for initialization validation. Implement TestSubprocessExecution with mock processes to verify stdin race prevention using concurrent goroutines attempting to write. Add TestControllerLifecycle covering all state transitions. Create TestEngineInterface compliance tests using mock implementations. Add benchmark tests for subprocess execution patterns. Include race detector tests with go test -race. Test error conditions including initialization failures and subprocess timeouts.
+
