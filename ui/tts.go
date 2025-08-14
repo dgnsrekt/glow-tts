@@ -64,6 +64,9 @@ type ttsInitMsg struct {
 	err error
 }
 
+// ttsTickMsg is sent periodically to refresh UI during initialization
+type ttsTickMsg struct{}
+
 // ttsPlayMsg is sent when play operation completes
 type ttsPlayMsg struct {
 	err error
@@ -111,9 +114,18 @@ type ttsStatusUpdateMsg struct {
 
 // TTS Commands - These are the async commands that perform TTS operations
 
+// ttsTick sends periodic tick messages to refresh UI
+func ttsTick() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg {
+		return ttsTickMsg{}
+	})
+}
+
 // initTTSCmd initializes the TTS controller with timeout
 func initTTSCmd(engine string, ttsState *TTSState) tea.Cmd {
 	return func() tea.Msg {
+		fmt.Fprintf(os.Stderr, "[TTS DEBUG] initTTSCmd executing for engine: %s\n", engine)
+		
 		// Create a channel to receive the result
 		resultChan := make(chan tea.Msg, 1)
 		
@@ -125,6 +137,7 @@ func initTTSCmd(engine string, ttsState *TTSState) tea.Cmd {
 		// Wait with timeout
 		select {
 		case result := <-resultChan:
+			fmt.Fprintf(os.Stderr, "[TTS DEBUG] initTTSCmd completed, returning result\n")
 			return result
 		case <-time.After(10 * time.Second):
 			fmt.Fprintf(os.Stderr, "[TTS DEBUG] Initialization timeout after 10 seconds\n")
@@ -374,6 +387,9 @@ func (t *TTSState) RenderStatus() string {
 		return ""
 	}
 
+	// Debug log the render call
+	fmt.Fprintf(os.Stderr, "[TTS DEBUG] RenderStatus called - isInitializing: %v, isInitialized: %v\n", 
+		t.isInitializing, t.isInitialized)
 
 	var parts []string
 

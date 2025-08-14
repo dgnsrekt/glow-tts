@@ -196,12 +196,18 @@ func newModel(cfg Config, content string) tea.Model {
 }
 
 func (m model) Init() tea.Cmd {
+	fmt.Fprintf(os.Stderr, "[TTS DEBUG] Init() called, state: %v\n", m.state)
 	cmds := []tea.Cmd{m.stash.spinner.Tick}
 
 	// Initialize TTS if enabled
 	if m.tts != nil && m.tts.IsEnabled() {
 		fmt.Fprintf(os.Stderr, "[TTS DEBUG] TTS enabled, queuing initialization command\n")
+		fmt.Fprintf(os.Stderr, "[TTS DEBUG] Initial state - isInitializing: %v, isInitialized: %v\n", 
+			m.tts.isInitializing, m.tts.isInitialized)
 		cmds = append(cmds, initTTSCmd(m.tts.engine, m.tts))
+		// Start ticker for UI updates during initialization
+		cmds = append(cmds, ttsTick())
+		fmt.Fprintf(os.Stderr, "[TTS DEBUG] Queued %d commands including TTS init\n", len(cmds))
 	}
 
 	switch m.state {
@@ -412,7 +418,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				fmt.Fprintf(os.Stderr, "[TTS DEBUG] State after init - isInitialized: %v, isInitializing: %v\n", 
 					m.tts.isInitialized, m.tts.isInitializing)
 			}
+			// Force a UI refresh by returning a no-op command
+			// This ensures the view is re-rendered with the updated TTS state
+			return m, tea.Batch(cmds...)
 		}
+
+	case ttsTickMsg:
+		// During initialization, continue ticking to refresh UI
+		if m.tts != nil && m.tts.isInitializing {
+			return m, ttsTick()
+		}
+		// Stop ticking once initialized
+		return m, nil
 
 	case ttsSentencesParsedMsg:
 		if m.tts != nil {
@@ -495,7 +512,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Process children (unless we've consumed the message)
-	if !skipChildUpdate {
+	// Special case: Always update pager for TTS messages to ensure UI refresh
+	if _, isTTSMsg := msg.(ttsTickMsg); isTTSMsg && m.state == stateShowDocument {
+		newPagerModel, cmd := m.pager.update(msg)
+		m.pager = newPagerModel
+		cmds = append(cmds, cmd)
+	} else if !skipChildUpdate {
 		switch m.state {
 		case stateShowStash:
 			newStashModel, cmd := m.stash.update(msg)
