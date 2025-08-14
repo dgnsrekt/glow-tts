@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-13T20:02:06.314Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Implement Core TTS Controller and Infrastructure",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Create the foundational TTS Controller architecture with emphasis on subprocess management patterns to prevent stdin race conditions. Include TTSEngine interface definition, controller struct initialization, state management lifecycle, and comprehensive unit tests for race condition prevention.",
+			"reasoning": "Medium complexity as it's greenfield code with no existing infrastructure. The main challenge is establishing proper patterns for subprocess management and race condition prevention. The codebase already has established patterns for state management and struct initialization that can be referenced."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Implement Audio Memory Management with OTO Integration",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Integrate OTO v3 audio library for cross-platform playback with careful memory lifecycle management. Focus on preventing audio corruption through proper data retention, implementing PCM format handling, playback controls with thread-safe state management, and comprehensive cross-platform testing.",
+			"reasoning": "Higher complexity due to external library integration, cross-platform audio handling, and critical memory management requirements to prevent audio corruption. Requires careful handling of low-level audio data and platform-specific considerations."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Integrate TTS Controls with Bubble Tea UI Framework",
+			"complexityScore": 5,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Integrate TTS functionality into the existing Bubble Tea UI framework. Add CLI flag parsing for --tts engine selection, extend the model struct with TTS state, implement async command patterns (no direct goroutines), add keyboard shortcuts, create status display component, and ensure TUI mode enforcement when TTS is enabled.",
+			"reasoning": "Medium-high complexity as it requires deep integration with existing Bubble Tea UI patterns. The codebase already uses Bubble Tea extensively, but adding TTS state management and command patterns while maintaining the existing architecture requires careful design."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Create Sentence Parser for Markdown Text Extraction",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Build a markdown parser leveraging the existing glamour integration for text extraction. Create sentence boundary detection with punctuation rules, handle special markdown elements (code blocks, links, headers) for speech synthesis, and maintain document structure positions for navigation.",
+			"reasoning": "Medium complexity as the codebase already uses glamour for markdown processing. The main work is adapting existing patterns for sentence extraction and handling edge cases in markdown parsing for TTS-specific needs."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Implement Basic Piper TTS Engine",
+			"complexityScore": 5,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Create Piper TTS engine implementing the TTSEngine interface. Include binary and ONNX model detection, subprocess management with stdin race prevention, --length-scale speed control integration, PCM audio handling, and comprehensive error handling with user guidance for missing dependencies.",
+			"reasoning": "Medium-high complexity due to external process management, dependency detection, and audio format conversion. Requires careful subprocess handling to prevent race conditions and proper error messaging for user setup."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Build Two-Level Caching System",
+			"complexityScore": 7,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Implement a sophisticated two-level cache (L1 memory, L2 disk) with automatic cleanup. Design cache architecture with interfaces, implement LRU eviction for memory cache, platform-specific disk storage, SHA256-based key generation, automatic cleanup based on size/age/lifecycle, metrics collection, and performance benchmarks targeting <1ms L1 access.",
+			"reasoning": "High complexity due to multi-tier architecture, concurrent access requirements, platform-specific implementations, and strict performance requirements. Requires careful design of eviction policies, cleanup mechanisms, and metrics collection."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Implement Audio Queue with Preprocessing Pipeline",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Create audio queue system with 2-3 sentence lookahead buffer and background synthesis. Design queue architecture, implement concurrent synthesis workers, navigation controls, seamless audio transitions with crossfading, memory management with GC optimization, and comprehensive state tracking/debugging.",
+			"reasoning": "Higher complexity due to concurrent processing requirements, audio preprocessing for seamless transitions, and memory management considerations. Requires careful synchronization between synthesis workers and playback."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Create Speed Control System",
+			"complexityScore": 3,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Build speed control system with discrete speed steps (0.5x-2.0x) and engine-specific parameter mapping. Create SpeedController struct, map speeds to engine parameters (Piper length-scale vs ffmpeg atempo), update cache key generation, and integrate keyboard controls with UI feedback.",
+			"reasoning": "Lower complexity as it's a focused feature with clear requirements. Main work is parameter mapping between engines and cache integration. The UI integration leverages existing patterns."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Implement Google TTS Engine with Pipeline",
+			"complexityScore": 6,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Create Google TTS engine with gTTS CLI and ffmpeg pipeline. Implement TTSEngine interface, detect gtts-cli and ffmpeg dependencies, build MP3 synthesis pipeline with connectivity validation, ffmpeg conversion with atempo speed control, complete pipeline orchestration, and comprehensive error handling for network failures.",
+			"reasoning": "Higher complexity due to multi-stage pipeline (gTTS → MP3 → ffmpeg → PCM), network dependency handling, and multiple external tool integrations. Requires robust error handling for various failure modes."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Add Comprehensive Error Handling and Production Polish",
+			"complexityScore": 5,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Implement production-ready error handling and polish. Add subprocess timeout protection (5s with SIGINT/SIGKILL), dependency validation with setup guidance, configuration file support using viper, structured logging with charmbracelet/log, comprehensive documentation, graceful shutdown handling, and cross-platform integration testing.",
+			"reasoning": "Medium-high complexity as it touches all components and requires thorough testing. Leverages existing patterns (viper config, charmbracelet/log) but requires careful implementation of timeout protection and cross-platform considerations."
+		}
+	]
+}
