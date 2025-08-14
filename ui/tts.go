@@ -171,12 +171,22 @@ type ttsStatusUpdateMsg struct {
 // ttsPlaybackFinishedMsg is sent when playback completes
 type ttsPlaybackFinishedMsg struct{}
 
+// ttsClearErrorMsg is sent to clear TTS error messages
+type ttsClearErrorMsg struct{}
+
 // TTS Commands - These are the async commands that perform TTS operations
 
 // ttsTick sends periodic tick messages to refresh UI
 func ttsTick() tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg {
 		return ttsTickMsg{}
+	})
+}
+
+// clearTTSErrorCmd clears the TTS error after a delay
+func clearTTSErrorCmd(delay time.Duration) tea.Cmd {
+	return tea.Tick(delay, func(time.Time) tea.Msg {
+		return ttsClearErrorMsg{}
 	})
 }
 
@@ -331,6 +341,11 @@ func playTTSCmd(controller *tts.Controller, text string) tea.Cmd {
 	}
 }
 
+// ttsMonitorMsg is sent periodically during playback monitoring
+type ttsMonitorMsg struct {
+	continueMonitoring bool
+}
+
 // monitorPlaybackCmd monitors playback and sends updates when it finishes
 func monitorPlaybackCmd(controller *tts.Controller) tea.Cmd {
 	return func() tea.Msg {
@@ -338,24 +353,36 @@ func monitorPlaybackCmd(controller *tts.Controller) tea.Cmd {
 			return nil
 		}
 		
-		// Check every 500ms if playback is still active
-		ticker := time.NewTicker(500 * time.Millisecond)
-		defer ticker.Stop()
-		
-		for range ticker.C {
-			// Get the audio player state
-			player := tts.GetGlobalAudioPlayer()
-			if player != nil {
-				state := player.GetState()
-				if state == tts.PlaybackStopped {
-					// Playback has finished
+		// Check the audio player state once
+		player := tts.GetGlobalAudioPlayer()
+		if player != nil {
+			state := player.GetState()
+			if state == tts.PlaybackStopped {
+				// Try to play the next segment
+				log.Debug("TTS: Current segment finished, attempting to play next")
+				err := controller.Next()
+				if err != nil {
+					// No more segments or error, stop playback
+					log.Debug("TTS: No more segments to play", "error", err)
 					return ttsPlaybackFinishedMsg{}
 				}
+				// Continue monitoring for the next segment
+				log.Debug("TTS: Playing next segment, continuing monitor")
+				return ttsMonitorMsg{continueMonitoring: true}
 			}
+			// Still playing, continue monitoring
+			return ttsMonitorMsg{continueMonitoring: true}
 		}
 		
 		return nil
 	}
+}
+
+// monitorDelayCmd waits before checking playback status again
+func monitorDelayCmd() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg {
+		return ttsMonitorMsg{continueMonitoring: true}
+	})
 }
 
 // pauseTTSCmd pauses TTS playback
@@ -403,11 +430,12 @@ func nextSentenceCmd(controller *tts.Controller, currentIndex int, totalSentence
 		// Use the controller's Next method to navigate
 		err := controller.Next()
 		if err != nil {
-			// Check if we're at the end
-			if currentIndex >= totalSentences-1 {
+			// Check if we're at the end - this is informational, not an error
+			if strings.Contains(err.Error(), "end of queue") {
+				// Just return current index, no error - user is at the end
 				return ttsNextMsg{
 					sentenceIndex: currentIndex,
-					err:           fmt.Errorf("already at last sentence"),
+					err:           nil, // Don't show error for boundary
 				}
 			}
 			return ttsNextMsg{
@@ -442,11 +470,12 @@ func prevSentenceCmd(controller *tts.Controller, currentIndex int) tea.Cmd {
 		// Use the controller's Previous method to navigate
 		err := controller.Previous()
 		if err != nil {
-			// Check if we're at the beginning
-			if currentIndex <= 0 {
+			// Check if we're at the beginning - this is informational, not an error
+			if strings.Contains(err.Error(), "beginning of queue") {
+				// Just return current index, no error - user is at the beginning
 				return ttsPrevMsg{
 					sentenceIndex: 0,
-					err:           fmt.Errorf("already at first sentence"),
+					err:           nil, // Don't show error for boundary
 				}
 			}
 			return ttsPrevMsg{
