@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour/styles"
+	"github.com/charmbracelet/glow/v2/pkg/tts"
 	"github.com/charmbracelet/glow/v2/utils"
 	"github.com/charmbracelet/log"
 	"github.com/muesli/gitcha"
@@ -40,6 +41,15 @@ func NewProgram(cfg Config, content string) *tea.Program {
 		"glamour",
 		cfg.GlamourEnabled,
 	)
+	
+	// Load TTS config if TTS is enabled
+	if cfg.TTSEngine != "" {
+		if ttsConfig, err := tts.LoadTTSConfig(); err == nil {
+			// Apply config settings
+			cfg.TTSEngine = ttsConfig.GetEngineOrDefault(cfg.TTSEngine)
+			log.Debug("Loaded TTS config", "engine", cfg.TTSEngine)
+		}
+	}
 
 	config = cfg
 	opts := []tea.ProgramOption{tea.WithAltScreen()}

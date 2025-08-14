@@ -45,6 +45,7 @@ var (
 	mouse            bool
 	ttsEngine        string
 	checkDeps        bool
+	generateTTSConfig bool
 
 	rootCmd = &cobra.Command{
 		Use:   "glow [SOURCE|DIR]",
@@ -239,6 +240,11 @@ func execute(cmd *cobra.Command, args []string) error {
 	// Check dependencies if requested
 	if checkDeps {
 		return checkTTSDependencies()
+	}
+	
+	// Generate TTS config if requested
+	if generateTTSConfig {
+		return generateTTSConfigFile()
 	}
 	
 	// if stdin is a pipe then use stdin for input. note that you can also
@@ -446,6 +452,51 @@ func checkTTSDependencies() error {
 	return nil
 }
 
+// generateTTSConfigFile generates an example TTS configuration file
+func generateTTSConfigFile() error {
+	// Generate example config
+	example := tts.GenerateExampleConfig()
+	
+	// Determine output path
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+	
+	configPath := filepath.Join(home, ".config", "glow", "glow-tts.yml")
+	
+	// Check if file already exists
+	if _, err := os.Stat(configPath); err == nil {
+		fmt.Printf("Config file already exists at: %s\n", configPath)
+		fmt.Println("To see an example config, use: glow --generate-tts-config | cat")
+		fmt.Println("\nCurrent config location priorities:")
+		fmt.Println("  1. ./.glow/glow-tts.yml (project-specific)")
+		fmt.Println("  2. ~/.config/glow/glow-tts.yml (user-wide)")
+		return nil
+	}
+	
+	// Create directory if needed
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	
+	// Write the config file
+	if err := os.WriteFile(configPath, []byte(example), 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+	
+	fmt.Printf("Generated TTS config file at: %s\n", configPath)
+	fmt.Println("\nEdit this file to customize your TTS settings.")
+	fmt.Println("Settings include:")
+	fmt.Println("  - Default TTS engine")
+	fmt.Println("  - Voice preferences")
+	fmt.Println("  - Cache settings")
+	fmt.Println("  - Playback speed defaults")
+	
+	return nil
+}
+
 func init() {
 	tryLoadConfigFromDefaultPlaces()
 	if len(CommitSHA) >= 7 {
@@ -471,6 +522,7 @@ func init() {
 	_ = rootCmd.Flags().MarkHidden("mouse")
 	rootCmd.Flags().StringVar(&ttsEngine, "tts", "", "enable TTS with specified engine (piper or gtts)")
 	rootCmd.Flags().BoolVar(&checkDeps, "check-deps", false, "check TTS dependencies and exit")
+	rootCmd.Flags().BoolVar(&generateTTSConfig, "generate-tts-config", false, "generate example TTS config file and exit")
 
 	// Config bindings
 	_ = viper.BindPFlag("pager", rootCmd.Flags().Lookup("pager"))
