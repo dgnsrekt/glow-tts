@@ -393,14 +393,35 @@ func stopTTSCmd(controller *tts.Controller) tea.Cmd {
 // nextSentenceCmd moves to the next sentence
 func nextSentenceCmd(controller *tts.Controller, currentIndex int, totalSentences int) tea.Cmd {
 	return func() tea.Msg {
-		if currentIndex >= totalSentences-1 {
+		if controller == nil {
 			return ttsNextMsg{
 				sentenceIndex: currentIndex,
-				err:           fmt.Errorf("already at last sentence"),
+				err:           fmt.Errorf("TTS controller not initialized"),
 			}
 		}
+		
+		// Use the controller's Next method to navigate
+		err := controller.Next()
+		if err != nil {
+			// Check if we're at the end
+			if currentIndex >= totalSentences-1 {
+				return ttsNextMsg{
+					sentenceIndex: currentIndex,
+					err:           fmt.Errorf("already at last sentence"),
+				}
+			}
+			return ttsNextMsg{
+				sentenceIndex: currentIndex,
+				err:           err,
+			}
+		}
+		
+		// Update the index
 		newIndex := currentIndex + 1
-		// TODO: Implement actual navigation logic
+		if newIndex >= totalSentences {
+			newIndex = totalSentences - 1
+		}
+		
 		return ttsNextMsg{
 			sentenceIndex: newIndex,
 			err:           nil,
@@ -411,14 +432,35 @@ func nextSentenceCmd(controller *tts.Controller, currentIndex int, totalSentence
 // prevSentenceCmd moves to the previous sentence
 func prevSentenceCmd(controller *tts.Controller, currentIndex int) tea.Cmd {
 	return func() tea.Msg {
-		if currentIndex <= 0 {
+		if controller == nil {
 			return ttsPrevMsg{
-				sentenceIndex: 0,
-				err:           fmt.Errorf("already at first sentence"),
+				sentenceIndex: currentIndex,
+				err:           fmt.Errorf("TTS controller not initialized"),
 			}
 		}
+		
+		// Use the controller's Previous method to navigate
+		err := controller.Previous()
+		if err != nil {
+			// Check if we're at the beginning
+			if currentIndex <= 0 {
+				return ttsPrevMsg{
+					sentenceIndex: 0,
+					err:           fmt.Errorf("already at first sentence"),
+				}
+			}
+			return ttsPrevMsg{
+				sentenceIndex: currentIndex,
+				err:           err,
+			}
+		}
+		
+		// Update the index
 		newIndex := currentIndex - 1
-		// TODO: Implement actual navigation logic
+		if newIndex < 0 {
+			newIndex = 0
+		}
+		
 		return ttsPrevMsg{
 			sentenceIndex: newIndex,
 			err:           nil,

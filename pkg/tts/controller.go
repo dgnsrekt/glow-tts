@@ -48,7 +48,7 @@ type Controller struct {
 	engine TTSEngine
 
 	// queue manages the audio buffer and preprocessing pipeline
-	queue *AudioQueue
+	queue *TTSAudioQueue
 
 	// player handles cross-platform audio playback
 	player *AudioPlayer
@@ -204,6 +204,41 @@ func (c *Controller) Play(text string) error {
 		return fmt.Errorf("cannot play in state %s", state)
 	}
 	
+	// Check if we have a queue for advanced playback
+	if c.queue != nil {
+		// Use the queue for buffered playback with lookahead
+		err := c.queue.AddText(text)
+		if err != nil {
+			return fmt.Errorf("failed to add text to queue: %w", err)
+		}
+		
+		// Start preloading in the background
+		go c.queue.Preload()
+		
+		// Wait for the first segment to be ready
+		err = c.queue.WaitForReady(5 * time.Second)
+		if err != nil {
+			return fmt.Errorf("queue not ready: %w", err)
+		}
+		
+		// Get the first segment and play it
+		segment, err := c.queue.GetCurrent()
+		if err != nil {
+			return fmt.Errorf("failed to get current segment: %w", err)
+		}
+		
+		if segment != nil && segment.ProcessedAudio != nil {
+			player := GetGlobalAudioPlayer()
+			if player == nil {
+				return fmt.Errorf("audio player not initialized")
+			}
+			return player.PlayPCM(segment.ProcessedAudio)
+		}
+		
+		return fmt.Errorf("no audio available")
+	}
+	
+	// Fallback to simple playback without queue
 	// Parse text into sentences
 	if c.parser == nil {
 		return fmt.Errorf("text parser not initialized")
@@ -290,6 +325,56 @@ func (c *Controller) Resume() error {
 	return nil
 }
 
+// Next moves to the next sentence/segment in the queue.
+func (c *Controller) Next() error {
+	if c.queue == nil {
+		return fmt.Errorf("queue not initialized")
+	}
+	
+	// Get the next segment from the queue
+	segment, err := c.queue.Next()
+	if err != nil {
+		return fmt.Errorf("failed to get next segment: %w", err)
+	}
+	
+	if segment != nil && segment.ProcessedAudio != nil {
+		// Stop current playback
+		player := GetGlobalAudioPlayer()
+		if player != nil {
+			player.Stop()
+			// Play the next segment
+			return player.PlayPCM(segment.ProcessedAudio)
+		}
+	}
+	
+	return fmt.Errorf("no next segment available")
+}
+
+// Previous moves to the previous sentence/segment in the queue.
+func (c *Controller) Previous() error {
+	if c.queue == nil {
+		return fmt.Errorf("queue not initialized")
+	}
+	
+	// Get the previous segment from the queue
+	segment, err := c.queue.Previous()
+	if err != nil {
+		return fmt.Errorf("failed to get previous segment: %w", err)
+	}
+	
+	if segment != nil && segment.ProcessedAudio != nil {
+		// Stop current playback
+		player := GetGlobalAudioPlayer()
+		if player != nil {
+			player.Stop()
+			// Play the previous segment
+			return player.PlayPCM(segment.ProcessedAudio)
+		}
+	}
+	
+	return fmt.Errorf("no previous segment available")
+}
+
 
 // GetState returns the current controller state.
 func (c *Controller) GetState() ControllerState {
@@ -356,11 +441,6 @@ type SpeedController interface {
 	GetSpeedSteps() []float64
 }
 
-// AudioQueue manages the audio preprocessing pipeline.
-type AudioQueue struct {
-	// This will be implemented in a separate file
-}
-
 // AudioPlayer handles cross-platform audio playback.
 type AudioPlayer struct {
 	// This will be implemented in a separate file
@@ -403,9 +483,18 @@ func (c *Controller) Initialize() error {
 	}
 
 	// Initialize audio queue
-	if c.queue == nil {
-		c.queue = &AudioQueue{
-			// Will be properly initialized when AudioQueue is implemented
+	if c.queue == nil && c.engine != nil {
+		queueConfig := DefaultQueueConfig()
+		queueConfig.Engine = c.engine
+		queueConfig.Parser = c.parser
+		// Note: Cache manager types are incompatible for now
+		// TODO: Create adapter or unify cache interfaces
+		
+		queue, err := NewAudioQueue(queueConfig)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to create audio queue: %w", err))
+		} else {
+			c.queue = queue
 		}
 	}
 
@@ -529,10 +618,16 @@ func (c *Controller) recoverPanic(context string) {
 	}
 }
 
-// processAudioQueue is a placeholder for the audio processing loop.
+// processAudioQueue manages the audio queue background processing.
 func (c *Controller) processAudioQueue() {
-	// This will be implemented when AudioQueue is fully defined
+	// The queue has its own internal workers and processing
+	// This goroutine just monitors the context for shutdown
 	<-c.ctx.Done()
+	
+	// Stop the queue when context is cancelled
+	if c.queue != nil {
+		c.queue.Stop()
+	}
 }
 
 // IsRunning returns true if the controller is currently running.
