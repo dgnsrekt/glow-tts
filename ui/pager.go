@@ -255,10 +255,13 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 
 	// Glow has rendered the content
 	case contentRenderedMsg:
-		log.Info("content rendered", "state", m.state)
+		log.Info("content rendered", "state", m.state, 
+			"contentLength", len(msg.content),
+			"rawMarkdownLength", len(msg.rawMarkdown))
 
 		m.setContent(msg.content)
 		m.rawMarkdownText = msg.rawMarkdown
+		log.Debug("pager rawMarkdownText set", "length", len(m.rawMarkdownText))
 		if m.viewport.HighPerformanceRendering {
 			cmds = append(cmds, viewport.Sync(m.viewport))
 		}
@@ -433,12 +436,16 @@ func (m pagerModel) helpView() (s string) {
 
 func renderWithGlamour(m pagerModel, md string) tea.Cmd {
 	return func() tea.Msg {
+		log.Debug("renderWithGlamour called", "markdownLength", len(md))
 		s, err := glamourRender(m, md)
 		if err != nil {
 			log.Error("error rendering with Glamour", "error", err)
 			return errMsg{err}
 		}
 		// Store the raw markdown for TTS
+		log.Debug("creating contentRenderedMsg", 
+			"contentLength", len(s), 
+			"rawMarkdownLength", len(md))
 		return contentRenderedMsg{content: s, rawMarkdown: md}
 	}
 }

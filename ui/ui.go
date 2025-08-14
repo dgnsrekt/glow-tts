@@ -220,6 +220,10 @@ func (m model) Init() tea.Cmd {
 			return func() tea.Msg { return errMsg{err} }
 		}
 		body := string(utils.RemoveFrontmatter(content))
+		log.Debug("initial document load", 
+			"path", m.common.cfg.Path,
+			"contentLength", len(content),
+			"bodyLength", len(body))
 		cmds = append(cmds, renderWithGlamour(m.pager, body))
 		
 		// Parse sentences for TTS if enabled
@@ -309,7 +313,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if documentText == "" {
 						// Fallback to currentDocument.Body if rawMarkdownText not set yet
 						documentText = m.pager.currentDocument.Body
+						log.Debug("rawMarkdownText empty, using currentDocument.Body", 
+							"bodyLength", len(documentText))
+					} else {
+						log.Debug("using rawMarkdownText", "length", len(documentText))
 					}
+					log.Debug("TTS play command", "textLength", len(documentText))
 					return m, playTTSCmd(m.tts.controller, documentText)
 				}
 			}
@@ -374,6 +383,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case contentRenderedMsg:
 		m.state = stateShowDocument
+		log.Debug("contentRenderedMsg received in main UI", 
+			"rawMarkdownLength", len(msg.rawMarkdown))
 
 	case localFileSearchFinished:
 		// Always pass these messages to the stash so we can keep it updated
