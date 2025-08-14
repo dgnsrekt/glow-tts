@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	
+	"github.com/charmbracelet/log"
 )
 
 // ControllerState represents the current state of the TTS controller.
@@ -227,12 +229,23 @@ func (c *Controller) Play(text string) error {
 			return fmt.Errorf("failed to get current segment: %w", err)
 		}
 		
-		if segment != nil && segment.ProcessedAudio != nil {
-			player := GetGlobalAudioPlayer()
-			if player == nil {
-				return fmt.Errorf("audio player not initialized")
+		if segment != nil {
+			// Use ProcessedAudio if available, otherwise fall back to raw Audio
+			audioToPlay := segment.ProcessedAudio
+			if audioToPlay == nil || len(audioToPlay) == 0 {
+				log.Debug("Controller: ProcessedAudio not available, using raw Audio",
+					"hasAudio", segment.Audio != nil,
+					"audioSize", len(segment.Audio))
+				audioToPlay = segment.Audio
 			}
-			return player.PlayPCM(segment.ProcessedAudio)
+			
+			if audioToPlay != nil && len(audioToPlay) > 0 {
+				player := GetGlobalAudioPlayer()
+				if player == nil {
+					return fmt.Errorf("audio player not initialized")
+				}
+				return player.PlayPCM(audioToPlay)
+			}
 		}
 		
 		return fmt.Errorf("no audio available")
