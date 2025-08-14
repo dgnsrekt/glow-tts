@@ -46,6 +46,8 @@ var (
 	ttsEngine        string
 	checkDeps        bool
 	generateTTSConfig bool
+	debugMode        bool
+	traceMode        bool
 
 	rootCmd = &cobra.Command{
 		Use:   "glow [SOURCE|DIR]",
@@ -237,6 +239,13 @@ func stdinIsPipe() (bool, error) {
 }
 
 func execute(cmd *cobra.Command, args []string) error {
+	// Initialize TTS logging if debug or trace mode
+	if debugMode || traceMode {
+		if err := tts.InitializeLogging(debugMode, traceMode); err != nil {
+			log.Warn("Failed to initialize TTS logging", "error", err)
+		}
+	}
+	
 	// Check dependencies if requested
 	if checkDeps {
 		return checkTTSDependencies()
@@ -523,6 +532,8 @@ func init() {
 	rootCmd.Flags().StringVar(&ttsEngine, "tts", "", "enable TTS with specified engine (piper or gtts)")
 	rootCmd.Flags().BoolVar(&checkDeps, "check-deps", false, "check TTS dependencies and exit")
 	rootCmd.Flags().BoolVar(&generateTTSConfig, "generate-tts-config", false, "generate example TTS config file and exit")
+	rootCmd.Flags().BoolVar(&debugMode, "debug", false, "enable debug logging for TTS operations")
+	rootCmd.Flags().BoolVar(&traceMode, "trace", false, "enable trace-level logging (very verbose)")
 
 	// Config bindings
 	_ = viper.BindPFlag("pager", rootCmd.Flags().Lookup("pager"))

@@ -218,6 +218,9 @@ func (e *PiperEngine) Synthesize(text string, speed float64) ([]byte, error) {
 	if text == "" {
 		return []byte{}, nil
 	}
+	
+	// Start metrics tracking (commented out for now - needs refactoring)
+	// metrics := tts.StartSynthesis("piper", text)
 
 	if err := e.Validate(); err != nil {
 		return nil, err
@@ -321,11 +324,15 @@ func (e *PiperEngine) Synthesize(text string, speed float64) ([]byte, error) {
 
 	// Validate we got audio data
 	if len(audioBytes) == 0 {
+		// metrics.EndSynthesis(0, false, fmt.Errorf("no audio data generated"))
 		return nil, &PiperError{
 			Type:    "synthesis",
 			Message: "no audio data generated",
 		}
 	}
+	
+	// End metrics tracking (commented out for now - needs refactoring)
+	// metrics.EndSynthesis(len(audioBytes), false, nil)
 
 	// Validate PCM format (should be even number of bytes for 16-bit samples)
 	if len(audioBytes)%2 != 0 {

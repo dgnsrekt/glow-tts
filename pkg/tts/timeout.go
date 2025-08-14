@@ -59,6 +59,9 @@ func (te *TimeoutExecutor) runWithContext(cmd *exec.Cmd) error {
 	ctx, cancel := context.WithTimeout(context.Background(), te.config.Timeout)
 	defer cancel()
 	
+	// Track execution time
+	startTime := time.Now()
+	
 	// Create a new command with context
 	ctxCmd := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
 	ctxCmd.Env = cmd.Env
@@ -69,11 +72,16 @@ func (te *TimeoutExecutor) runWithContext(cmd *exec.Cmd) error {
 	
 	// Start the command
 	if err := ctxCmd.Start(); err != nil {
+		LogSubprocessExecution(cmd.Path, cmd.Args[1:], time.Since(startTime), err)
 		return fmt.Errorf("failed to start command: %w", err)
 	}
 	
 	// Wait for completion
 	err := ctxCmd.Wait()
+	duration := time.Since(startTime)
+	
+	// Log the execution
+	LogSubprocessExecution(cmd.Path, cmd.Args[1:], duration, err)
 	
 	// Check if context was cancelled (timeout)
 	if ctx.Err() == context.DeadlineExceeded {

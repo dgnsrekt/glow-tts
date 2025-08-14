@@ -180,6 +180,9 @@ func (e *GTTSEngine) Synthesize(text string, speed float64) ([]byte, error) {
 		return nil, fmt.Errorf("empty text")
 	}
 	
+	// Start metrics tracking (commented out for now - needs refactoring)
+	// metrics := tts.StartSynthesis("gtts", text)
+	
 	// Create temporary files for the pipeline
 	timestamp := time.Now().UnixNano()
 	mp3File := filepath.Join(e.tempDir, fmt.Sprintf("gtts_%d.mp3", timestamp))
@@ -273,8 +276,12 @@ func (e *GTTSEngine) Synthesize(text string, speed float64) ([]byte, error) {
 	
 	pcmData := pcmBuffer.Bytes()
 	if len(pcmData) == 0 {
+		// metrics.EndSynthesis(0, false, fmt.Errorf("no audio data generated"))
 		return nil, fmt.Errorf("no audio data generated")
 	}
+	
+	// End metrics tracking (commented out for now - needs refactoring)
+	// metrics.EndSynthesis(len(pcmData), false, nil)
 	
 	log.Debug("GTTS: Synthesis complete", "pcmSize", len(pcmData))
 	return pcmData, nil
