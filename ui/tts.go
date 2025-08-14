@@ -221,6 +221,12 @@ func initTTSWithTimeout(engine string, ttsState *TTSState) tea.Msg {
 		
 		log.Debug("starting TTS initialization", "engine", engine)
 		
+		// Validate engine availability first
+		if err := tts.ValidateEngineAvailability(engine); err != nil {
+			log.Error("TTS engine validation failed", "engine", engine, "error", err)
+			return ttsInitMsg{err: err}
+		}
+		
 		// Initialize TTS controller
 		cfg := tts.ControllerConfig{
 			Engine:             engine,

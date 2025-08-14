@@ -16,6 +16,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/styles"
+	"github.com/charmbracelet/glow/v2/pkg/tts"
 	"github.com/charmbracelet/glow/v2/ui"
 	"github.com/charmbracelet/glow/v2/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -43,6 +44,7 @@ var (
 	preserveNewLines bool
 	mouse            bool
 	ttsEngine        string
+	checkDeps        bool
 
 	rootCmd = &cobra.Command{
 		Use:   "glow [SOURCE|DIR]",
@@ -234,6 +236,11 @@ func stdinIsPipe() (bool, error) {
 }
 
 func execute(cmd *cobra.Command, args []string) error {
+	// Check dependencies if requested
+	if checkDeps {
+		return checkTTSDependencies()
+	}
+	
 	// if stdin is a pipe then use stdin for input. note that you can also
 	// explicitly use a - to read from stdin.
 	if yes, err := stdinIsPipe(); err != nil {
@@ -396,6 +403,49 @@ func main() {
 	_ = closer()
 }
 
+// checkTTSDependencies checks and reports TTS dependencies
+func checkTTSDependencies() error {
+	// Determine which engine to check
+	engine := ttsEngine
+	if engine == "" {
+		// Check all if no specific engine specified
+		fmt.Println("Checking all TTS dependencies...\n")
+	} else {
+		fmt.Printf("Checking dependencies for %s engine...\n\n", engine)
+	}
+	
+	// Run dependency check
+	deps, err := tts.CheckSystemDependencies(engine)
+	if err != nil && engine != "" {
+		// If a specific engine was requested and has missing deps, that's an error
+		fmt.Println(deps.PrintReport())
+		return fmt.Errorf("missing required dependencies for %s engine", engine)
+	}
+	
+	// Print the report
+	fmt.Println(deps.PrintReport())
+	
+	// Provide summary
+	fmt.Println("\nSummary:")
+	hasPiper := deps.Results["piper"].Installed && deps.Results["piper_models"].Installed
+	hasGTTS := deps.Results["gtts-cli"].Installed && deps.Results["ffmpeg"].Installed
+	
+	if hasPiper && hasGTTS {
+		fmt.Println("✓ Both Piper and Google TTS engines are available")
+	} else if hasPiper {
+		fmt.Println("✓ Piper TTS engine is available")
+		fmt.Println("○ Google TTS engine is not available (optional)")
+	} else if hasGTTS {
+		fmt.Println("✓ Google TTS engine is available")
+		fmt.Println("○ Piper TTS engine is not available (optional)")
+	} else {
+		fmt.Println("✗ No TTS engines are available")
+		fmt.Println("  Install at least one engine to use TTS features")
+	}
+	
+	return nil
+}
+
 func init() {
 	tryLoadConfigFromDefaultPlaces()
 	if len(CommitSHA) >= 7 {
@@ -420,6 +470,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&mouse, "mouse", "m", false, "enable mouse wheel (TUI-mode only)")
 	_ = rootCmd.Flags().MarkHidden("mouse")
 	rootCmd.Flags().StringVar(&ttsEngine, "tts", "", "enable TTS with specified engine (piper or gtts)")
+	rootCmd.Flags().BoolVar(&checkDeps, "check-deps", false, "check TTS dependencies and exit")
 
 	// Config bindings
 	_ = viper.BindPFlag("pager", rootCmd.Flags().Lookup("pager"))

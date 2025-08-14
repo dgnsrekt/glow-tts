@@ -847,7 +847,7 @@
           1,
           8
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -855,7 +855,7 @@
             "description": "Implement the core Google TTS engine structure with TTSEngine interface methods in pkg/tts/engines/gtts.go",
             "dependencies": [],
             "details": "Create pkg/tts/engines/gtts.go file. Define GTTSEngine struct with fields for configuration (language, slow mode flag). Implement TTSEngine interface methods: Synthesize(text string) ([]byte, error), SetSpeed(speed float32) error, and Validate() error. Add internal fields for tracking ffmpeg speed setting and temporary file management. Follow the same patterns established in piper.go for consistency.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -866,7 +866,7 @@
               "9.1"
             ],
             "details": "Implement checkGTTSCLI() function to verify gtts-cli is installed via pip. Use exec.LookPath() to check for gtts-cli in PATH. Implement checkFFmpeg() function to verify ffmpeg binary availability. Add version checking for compatibility. Return detailed error messages with installation instructions: 'gtts-cli not found. Install with: pip install gTTS' and 'ffmpeg not found. Install via your package manager'. Call both checks in Validate() method.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -878,7 +878,7 @@
               "9.2"
             ],
             "details": "Create synthesizeToMP3() method that constructs gtts-cli command with proper arguments: gtts-cli --text 'text' --output temp.mp3 --lang en. Add internet connectivity check before synthesis attempt using net.Dial to google.com:443. Handle temporary file creation with ioutil.TempFile for MP3 output. Implement proper error handling for network failures, returning user-friendly messages like 'Internet connection required for Google TTS'. Use cmd.Stdin = strings.NewReader(text) pattern to avoid stdin race conditions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -889,7 +889,7 @@
               "9.3"
             ],
             "details": "Implement convertMP3ToPCM() method that takes MP3 file path and speed factor. Construct ffmpeg command: ffmpeg -i input.mp3 -af atempo=speed -f s16le -ar 22050 -ac 1 pipe:1. Map speed values (0.5-2.0) to atempo filter values. Handle ffmpeg stdout to capture PCM data into byte slice. Implement proper subprocess management with context cancellation. Add error handling for invalid speed values and ffmpeg failures. Clean up temporary MP3 file after conversion.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -901,7 +901,7 @@
               "9.4"
             ],
             "details": "Implement Synthesize() method orchestrating the full pipeline: call synthesizeToMP3(), then convertMP3ToPCM() with current speed setting. Add retry logic for transient network failures (max 2 retries with exponential backoff). Implement proper cleanup of all temporary files in defer blocks. Add detailed logging at each pipeline stage for debugging. Return PCM audio data in correct format (16-bit mono 22050Hz). Ensure all error messages guide users to solutions.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -912,7 +912,7 @@
               "9.5"
             ],
             "details": "Create custom error types for different failure modes: NetworkError, DependencyError, ProcessError. Implement fallback behavior for network failures (suggest offline engines). Add detailed error messages with resolution steps for each error type. Create validateConnectivity() helper for pre-flight checks. Implement GetLastError() method for debugging. Add timeout handling for long-running synthesis operations (30s max). Include example usage documentation in comments.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -936,7 +936,7 @@
             "description": "Add 5-second timeout mechanism with graceful SIGINT/SIGKILL sequence for all TTS engine subprocess calls",
             "dependencies": [],
             "details": "Create pkg/tts/timeout.go with TimeoutExecutor struct. Implement RunWithTimeout(cmd *exec.Cmd, timeout time.Duration) that sends SIGINT after timeout, waits 500ms for graceful shutdown, then sends SIGKILL if needed. Integrate with both Piper and Google TTS engine subprocess calls. Add context cancellation support for proper cleanup. Include timeout configuration in engine structs with sensible defaults.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -1012,7 +1012,7 @@
     ],
     "metadata": {
       "created": "2025-08-13T19:20:07.954Z",
-      "updated": "2025-08-14T20:23:38.617Z",
+      "updated": "2025-08-14T23:21:39.430Z",
       "description": "Tasks for master context"
     }
   }
