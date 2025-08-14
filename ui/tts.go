@@ -498,20 +498,20 @@ func (t *TTSState) RenderStatus() string {
 	// Playback state or spinner (only show if initialized or loading)
 	if t.isInitialized || t.isInitializing || t.isSynthesizing || t.isBuffering {
 		stateStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("214"))
+			Foreground(lipgloss.Color("214")).
+			Width(3).  // Fixed width of 3 chars
+			Align(lipgloss.Center)  // Center align within the width
 		
 		var stateIcon string
 		// Show spinner during any loading state
 		if t.isInitializing || t.isSynthesizing || t.isBuffering {
 			stateIcon = t.loadingSpinner.View()
-			// Spinner is already 2 chars wide, just add space after
-			stateIcon = stateIcon + " "
 		} else if t.isPlaying {
-			stateIcon = " ▶ "  // Add space on both sides
+			stateIcon = "▶"
 		} else if t.isPaused {
-			stateIcon = " ⏸ "  // Add space on both sides
+			stateIcon = "⏸"
 		} else {
-			stateIcon = " ■ "  // Add space on both sides
+			stateIcon = "■"
 		}
 		parts = append(parts, stateStyle.Render(stateIcon))
 	}
