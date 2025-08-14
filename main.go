@@ -42,6 +42,7 @@ var (
 	showLineNumbers  bool
 	preserveNewLines bool
 	mouse            bool
+	ttsEngine        string
 
 	rootCmd = &cobra.Command{
 		Use:   "glow [SOURCE|DIR]",
@@ -171,6 +172,19 @@ func validateOptions(cmd *cobra.Command) error {
 	showAllFiles = viper.GetBool("all")
 	preserveNewLines = viper.GetBool("preserveNewLines")
 	showLineNumbers = viper.GetBool("showLineNumbers")
+	ttsEngine = viper.GetString("tts")
+
+	// Validate TTS engine if specified
+	if ttsEngine != "" {
+		// Normalize engine name
+		ttsEngine = strings.ToLower(ttsEngine)
+		if ttsEngine != "piper" && ttsEngine != "gtts" {
+			return fmt.Errorf("invalid TTS engine: %s (must be 'piper' or 'gtts')", ttsEngine)
+		}
+		// Force TUI mode when TTS is enabled
+		tui = true
+		pager = false
+	}
 
 	if pager && tui {
 		return errors.New("cannot use both pager and tui")
@@ -359,6 +373,7 @@ func runTUI(path string, content string) error {
 	cfg.GlamourMaxWidth = width
 	cfg.EnableMouse = mouse
 	cfg.PreserveNewLines = preserveNewLines
+	cfg.TTSEngine = ttsEngine
 
 	// Run Bubble Tea program
 	if _, err := ui.NewProgram(cfg, content).Run(); err != nil {
@@ -404,6 +419,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&preserveNewLines, "preserve-new-lines", "n", false, "preserve newlines in the output")
 	rootCmd.Flags().BoolVarP(&mouse, "mouse", "m", false, "enable mouse wheel (TUI-mode only)")
 	_ = rootCmd.Flags().MarkHidden("mouse")
+	rootCmd.Flags().StringVar(&ttsEngine, "tts", "", "enable TTS with specified engine (piper or gtts)")
 
 	// Config bindings
 	_ = viper.BindPFlag("pager", rootCmd.Flags().Lookup("pager"))
@@ -415,6 +431,7 @@ func init() {
 	_ = viper.BindPFlag("preserveNewLines", rootCmd.Flags().Lookup("preserve-new-lines"))
 	_ = viper.BindPFlag("showLineNumbers", rootCmd.Flags().Lookup("line-numbers"))
 	_ = viper.BindPFlag("all", rootCmd.Flags().Lookup("all"))
+	_ = viper.BindPFlag("tts", rootCmd.Flags().Lookup("tts"))
 
 	viper.SetDefault("style", styles.AutoStyle)
 	viper.SetDefault("width", 0)
