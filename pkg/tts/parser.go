@@ -75,18 +75,13 @@ func NewSentenceParser(config *ParserConfig) (*SentenceParser, error) {
 		config = DefaultParserConfig()
 	}
 
-	// Create a simple glamour renderer for text extraction
-	renderer, err := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(0), // No word wrap for parsing
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create glamour renderer: %w", err)
-	}
-
+	// For now, don't create a glamour renderer - it can hang in some environments
+	// We'll use a simpler markdown stripping approach
+	// TODO: Investigate glamour hanging issue and re-enable when fixed
+	
 	return &SentenceParser{
 		config:   config,
-		renderer: renderer,
+		renderer: nil, // We'll handle markdown stripping without glamour for now
 		// Compile regex patterns for sentence detection
 		sentenceEndPattern:   regexp.MustCompile(`[.!?]+[\s\n]+|[.!?]+$`),
 		abbreviationPattern:  regexp.MustCompile(`\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|Inc|Ltd|Corp|Co|vs|etc|i\.e|e\.g|Ph\.D|M\.D|B\.A|M\.A|B\.S|M\.S)\.`),
@@ -101,19 +96,61 @@ func (p *SentenceParser) Parse(markdown string) ([]ParsedSentence, error) {
 		return []ParsedSentence{}, nil
 	}
 
-	// First, render the markdown to extract text
-	rendered, err := p.renderer.Render(markdown)
-	if err != nil {
-		return nil, fmt.Errorf("failed to render markdown: %w", err)
+	var cleanText string
+	
+	// If we have a renderer, use it. Otherwise, use simple markdown stripping
+	if p.renderer != nil {
+		// Use glamour renderer
+		rendered, err := p.renderer.Render(markdown)
+		if err != nil {
+			return nil, fmt.Errorf("failed to render markdown: %w", err)
+		}
+		cleanText = p.cleanRenderedText(rendered)
+	} else {
+		// Simple markdown stripping without glamour
+		cleanText = p.stripMarkdownSimple(markdown)
 	}
-
-	// Clean up the rendered text
-	cleanText := p.cleanRenderedText(rendered)
 
 	// Extract sentences from the clean text
 	sentences := p.extractSentences(cleanText, markdown)
 
 	return sentences, nil
+}
+
+// stripMarkdownSimple removes basic markdown formatting without using glamour
+func (p *SentenceParser) stripMarkdownSimple(markdown string) string {
+	text := markdown
+	
+	// Remove code blocks
+	text = regexp.MustCompile("```[^`]*```").ReplaceAllString(text, "")
+	text = regexp.MustCompile("`[^`]+`").ReplaceAllString(text, "")
+	
+	// Remove headers
+	text = regexp.MustCompile(`(?m)^#{1,6}\s+`).ReplaceAllString(text, "")
+	
+	// Remove bold and italic
+	text = regexp.MustCompile(`\*{1,3}([^*]+)\*{1,3}`).ReplaceAllString(text, "$1")
+	text = regexp.MustCompile(`_{1,3}([^_]+)_{1,3}`).ReplaceAllString(text, "$1")
+	
+	// Remove links but keep text
+	text = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`).ReplaceAllString(text, "$1")
+	
+	// Remove images
+	text = regexp.MustCompile(`!\[([^\]]*)\]\([^)]+\)`).ReplaceAllString(text, "")
+	
+	// Remove list markers
+	text = regexp.MustCompile(`(?m)^[\s]*[-*+]\s+`).ReplaceAllString(text, "")
+	text = regexp.MustCompile(`(?m)^[\s]*\d+\.\s+`).ReplaceAllString(text, "")
+	
+	// Remove blockquotes
+	text = regexp.MustCompile(`(?m)^>\s+`).ReplaceAllString(text, "")
+	
+	// Clean up whitespace
+	text = strings.TrimSpace(text)
+	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+	text = regexp.MustCompile(`\n{3,}`).ReplaceAllString(text, "\n\n")
+	
+	return text
 }
 
 // cleanRenderedText removes ANSI codes and extra whitespace from rendered text
