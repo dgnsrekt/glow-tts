@@ -106,6 +106,9 @@ type model struct {
 	stash stashModel
 	pager pagerModel
 
+	// TTS state (nil if TTS is disabled)
+	tts *TTSState
+
 	// Channel that receives paths to local markdown files
 	// (via the github.com/muesli/gitcha package)
 	localFileFinder chan gitcha.SearchResult
@@ -152,6 +155,13 @@ func newModel(cfg Config, content string) tea.Model {
 		stash:  newStashModel(&common),
 	}
 
+	// Initialize TTS if enabled
+	if cfg.TTSEngine != "" {
+		m.tts = NewTTSState(cfg.TTSEngine)
+		// Pass TTS state to pager for status display
+		m.pager.tts = m.tts
+	}
+
 	path := cfg.Path
 	if path == "" && content != "" {
 		m.state = stateShowDocument
@@ -186,6 +196,11 @@ func newModel(cfg Config, content string) tea.Model {
 func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{m.stash.spinner.Tick}
 
+	// Initialize TTS if enabled
+	if m.tts != nil && m.tts.IsEnabled() {
+		cmds = append(cmds, initTTSCmd(m.tts.engine, m.tts))
+	}
+
 	switch m.state {
 	case stateShowStash:
 		cmds = append(cmds, findLocalFiles(*m.common))
@@ -197,6 +212,11 @@ func (m model) Init() tea.Cmd {
 		}
 		body := string(utils.RemoveFrontmatter(content))
 		cmds = append(cmds, renderWithGlamour(m.pager, body))
+		
+		// Parse sentences for TTS if enabled
+		if m.tts != nil && m.tts.IsEnabled() {
+			cmds = append(cmds, parseSentencesCmd(body))
+		}
 	}
 
 	return tea.Batch(cmds...)
@@ -211,6 +231,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmds []tea.Cmd
+	var skipChildUpdate bool  // Flag to skip passing message to children
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -246,7 +267,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			return m, tea.Quit
 
-		case "left", "h", "delete":
+		case "h", "delete":
 			if m.state == stateShowDocument {
 				cmds = append(cmds, m.unloadDocument()...)
 				return m, tea.Batch(cmds...)
@@ -258,6 +279,70 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Ctrl+C always quits no matter where in the application you are.
 		case "ctrl+c":
 			return m, tea.Quit
+
+		// TTS keyboard shortcuts
+		case " ": // Space for play/pause
+			if m.tts != nil && m.tts.IsEnabled() && m.state == stateShowDocument {
+				// Check if TTS is initialized
+				if !m.tts.isInitialized {
+					// Don't process play command if not initialized
+					// The error will be shown in the status bar
+					return m, nil
+				}
+				
+				skipChildUpdate = true  // Don't pass space to pager
+				
+				if m.tts.isPlaying {
+					return m, pauseTTSCmd(m.tts.controller)
+				} else {
+					// Get the raw markdown text from the pager (not the glamour-rendered version)
+					documentText := m.pager.rawMarkdownText
+					if documentText == "" {
+						// Fallback to currentDocument.Body if rawMarkdownText not set yet
+						documentText = m.pager.currentDocument.Body
+					}
+					return m, playTTSCmd(m.tts.controller, documentText)
+				}
+			}
+
+		case "left":
+			// TTS: Previous sentence (when in document view with TTS)
+			if m.tts != nil && m.tts.IsEnabled() && m.state == stateShowDocument {
+				return m, prevSentenceCmd(m.tts.controller, m.tts.currentSentenceIndex)
+			}
+			// Otherwise, handle normally (go back)
+			if m.state == stateShowDocument {
+				cmds = append(cmds, m.unloadDocument()...)
+				return m, tea.Batch(cmds...)
+			}
+
+		case "right":
+			// TTS: Next sentence (when in document view with TTS)
+			if m.tts != nil && m.tts.IsEnabled() && m.state == stateShowDocument {
+				return m, nextSentenceCmd(m.tts.controller, m.tts.currentSentenceIndex, m.tts.totalSentences)
+			}
+
+		case "+", "=":
+			// TTS: Increase speed
+			if m.tts != nil && m.tts.IsEnabled() && m.state == stateShowDocument {
+				if cmd := m.tts.increaseSpeedCmd(); cmd != nil {
+					return m, cmd
+				}
+			}
+
+		case "-", "_":
+			// TTS: Decrease speed
+			if m.tts != nil && m.tts.IsEnabled() && m.state == stateShowDocument {
+				if cmd := m.tts.decreaseSpeedCmd(); cmd != nil {
+					return m, cmd
+				}
+			}
+
+		case "s", "S":
+			// TTS: Stop
+			if m.tts != nil && m.tts.IsEnabled() && m.state == stateShowDocument {
+				return m, stopTTSCmd(m.tts.controller)
+			}
 		}
 
 	// Window size is received when starting up and on every resize
@@ -306,19 +391,114 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stash = newStashModel
 			cmds = append(cmds, cmd)
 		}
+
+	// TTS message handling
+	case ttsInitMsg:
+		if m.tts != nil {
+			if msg.err != nil {
+				m.tts.lastError = msg.err
+				m.tts.isInitializing = false
+				m.tts.isInitialized = false
+			} else {
+				m.tts.lastError = nil  // Clear any previous errors on successful init
+				m.tts.isInitializing = false
+				m.tts.isInitialized = true
+			}
+		}
+
+	case ttsSentencesParsedMsg:
+		if m.tts != nil {
+			if msg.err != nil {
+				m.tts.lastError = msg.err
+			} else {
+				m.tts.sentences = msg.sentences
+				m.tts.totalSentences = len(msg.sentences)
+				m.tts.currentSentenceIndex = 0
+			}
+		}
+
+	case ttsPlayMsg:
+		if m.tts != nil {
+			if msg.err != nil {
+				m.tts.lastError = msg.err
+			} else {
+				m.tts.lastError = nil  // Clear any previous errors
+				m.tts.isPlaying = true
+				m.tts.isPaused = false
+				m.tts.isStopped = false
+			}
+		}
+
+	case ttsPauseMsg:
+		if m.tts != nil {
+			if msg.err != nil {
+				m.tts.lastError = msg.err
+			} else {
+				m.tts.isPlaying = false
+				m.tts.isPaused = true
+			}
+		}
+
+	case ttsStopMsg:
+		if m.tts != nil {
+			if msg.err != nil {
+				m.tts.lastError = msg.err
+			} else {
+				m.tts.isPlaying = false
+				m.tts.isPaused = false
+				m.tts.isStopped = true
+				m.tts.currentSentenceIndex = 0
+			}
+		}
+
+	case ttsNextMsg:
+		if m.tts != nil {
+			if msg.err != nil {
+				m.tts.lastError = msg.err
+			} else {
+				m.tts.currentSentenceIndex = msg.sentenceIndex
+			}
+		}
+
+	case ttsPrevMsg:
+		if m.tts != nil {
+			if msg.err != nil {
+				m.tts.lastError = msg.err
+			} else {
+				m.tts.currentSentenceIndex = msg.sentenceIndex
+			}
+		}
+
+	case ttsSpeedChangeMsg:
+		if m.tts != nil {
+			if msg.err != nil {
+				m.tts.lastError = msg.err
+			} else {
+				// Update the speed controller
+				if m.tts.speedController != nil {
+					m.tts.speedController.SetSpeed(msg.newSpeed)
+				}
+				// Also update the controller if it exists
+				if m.tts.controller != nil {
+					m.tts.controller.SetSpeed(msg.newSpeed)
+				}
+			}
+		}
 	}
 
-	// Process children
-	switch m.state {
-	case stateShowStash:
-		newStashModel, cmd := m.stash.update(msg)
-		m.stash = newStashModel
-		cmds = append(cmds, cmd)
+	// Process children (unless we've consumed the message)
+	if !skipChildUpdate {
+		switch m.state {
+		case stateShowStash:
+			newStashModel, cmd := m.stash.update(msg)
+			m.stash = newStashModel
+			cmds = append(cmds, cmd)
 
-	case stateShowDocument:
-		newPagerModel, cmd := m.pager.update(msg)
-		m.pager = newPagerModel
-		cmds = append(cmds, cmd)
+		case stateShowDocument:
+			newPagerModel, cmd := m.pager.update(msg)
+			m.pager = newPagerModel
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)

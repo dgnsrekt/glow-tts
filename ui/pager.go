@@ -78,8 +78,11 @@ var (
 )
 
 type (
-	contentRenderedMsg string
-	reloadMsg          struct{}
+	contentRenderedMsg struct {
+		content     string
+		rawMarkdown string
+	}
+	reloadMsg struct{}
 )
 
 type pagerState int
@@ -101,6 +104,12 @@ type pagerModel struct {
 	// Current document being rendered, sans-glamour rendering. We cache
 	// it here so we can re-render it on resize.
 	currentDocument markdown
+	
+	// Raw markdown text for TTS (before glamour rendering)
+	rawMarkdownText string
+
+	// TTS state reference for status display
+	tts *TTSState
 
 	watcher *fsnotify.Watcher
 }
@@ -248,7 +257,8 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 	case contentRenderedMsg:
 		log.Info("content rendered", "state", m.state)
 
-		m.setContent(string(msg))
+		m.setContent(msg.content)
+		m.rawMarkdownText = msg.rawMarkdown
 		if m.viewport.HighPerformanceRendering {
 			cmds = append(cmds, viewport.Sync(m.viewport))
 		}
@@ -322,6 +332,12 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		helpNote = statusBarHelpStyle(" ? Help ")
 	}
 
+	// TTS Status (if enabled)
+	var ttsStatus string
+	if m.tts != nil && m.tts.IsEnabled() {
+		ttsStatus = " " + m.tts.RenderStatus() + " "
+	}
+
 	// Note
 	var note string
 	if showStatusMessage {
@@ -333,7 +349,8 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		m.common.width-
 			ansi.PrintableRuneWidth(logo)-
 			ansi.PrintableRuneWidth(scrollPercent)-
-			ansi.PrintableRuneWidth(helpNote),
+			ansi.PrintableRuneWidth(helpNote)-
+			ansi.PrintableRuneWidth(ttsStatus),
 	)), ellipsis)
 	if showStatusMessage {
 		note = statusBarMessageStyle(note)
@@ -346,6 +363,7 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		m.common.width-
 			ansi.PrintableRuneWidth(logo)-
 			ansi.PrintableRuneWidth(note)-
+			ansi.PrintableRuneWidth(ttsStatus)-
 			ansi.PrintableRuneWidth(scrollPercent)-
 			ansi.PrintableRuneWidth(helpNote),
 	)
@@ -356,9 +374,10 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		emptySpace = statusBarNoteStyle(emptySpace)
 	}
 
-	fmt.Fprintf(b, "%s%s%s%s%s",
+	fmt.Fprintf(b, "%s%s%s%s%s%s",
 		logo,
 		note,
+		ttsStatus,
 		emptySpace,
 		scrollPercent,
 		helpNote,
@@ -414,7 +433,8 @@ func renderWithGlamour(m pagerModel, md string) tea.Cmd {
 			log.Error("error rendering with Glamour", "error", err)
 			return errMsg{err}
 		}
-		return contentRenderedMsg(s)
+		// Store the raw markdown for TTS
+		return contentRenderedMsg{content: s, rawMarkdown: md}
 	}
 }
 
