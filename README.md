@@ -188,6 +188,47 @@ glow --help
 Check out the [Glamour Style Section](https://github.com/charmbracelet/glamour/blob/master/styles/gallery/README.md)
 to find more styles. Or [make your own](https://github.com/charmbracelet/glamour/tree/master/styles)!
 
+### Text-to-Speech (TTS)
+
+Glow can read markdown documents aloud using Text-to-Speech engines. This feature supports both offline (Piper) and online (Google TTS) engines.
+
+```bash
+# Use Piper for offline TTS
+glow --tts piper README.md
+
+# Use Google TTS (requires internet)
+glow --tts gtts README.md
+
+# Check available TTS engines
+glow --check-deps
+```
+
+#### TTS Controls (TUI Mode)
+
+When TTS is enabled, use these keyboard shortcuts:
+
+- `Space` - Play/Pause
+- `s` - Stop
+- `→` / `n` - Next sentence  
+- `←` / `p` - Previous sentence
+- `↑` - Increase speed
+- `↓` - Decrease speed
+
+#### Quick Setup
+
+```bash
+# Generate TTS configuration
+glow --generate-tts-config
+
+# Install Piper (offline TTS)
+# See docs/TTS_SETUP.md for detailed instructions
+
+# Install Google TTS
+pip install gtts
+```
+
+For detailed setup instructions, see [TTS Setup Guide](docs/TTS_SETUP.md) and [TTS Troubleshooting](docs/TTS_TROUBLESHOOTING.md).
+
 ## The Config File
 
 If you find yourself supplying the same flags to `glow` all the time, it's
