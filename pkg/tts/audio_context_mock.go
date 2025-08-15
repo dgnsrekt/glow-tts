@@ -55,7 +55,7 @@ func (mac *MockAudioContext) NewPlayer(r io.Reader) (AudioPlayerInterface, error
 	if seeker, ok := r.(io.ReadSeeker); ok {
 		originalReader = seeker
 		// Reset position after reading all data
-		originalReader.Seek(0, io.SeekStart)
+		_, _ = originalReader.Seek(0, io.SeekStart)
 	}
 
 	player := &MockAudioPlayer{
@@ -84,7 +84,7 @@ func (mac *MockAudioContext) Close() error {
 
 	// Close all players
 	for _, player := range mac.players {
-		player.Close()
+		_ = player.Close()
 	}
 
 	mac.ready = false
@@ -205,18 +205,18 @@ func (m *MockAudioPlayer) simulatePlayback() {
 				
 				// Update reader position to match playback
 				if bytesPlayed < int64(len(m.data)) {
-					m.reader.Seek(bytesPlayed, io.SeekStart)
+					_, _ = m.reader.Seek(bytesPlayed, io.SeekStart)
 					// Also update the original reader if it exists
 					if m.originalReader != nil {
-						m.originalReader.Seek(bytesPlayed, io.SeekStart)
+						_, _ = m.originalReader.Seek(bytesPlayed, io.SeekStart)
 					}
 					m.position = bytesPlayed
 				} else {
 					// Playback completed
 					m.playing.Store(false)
-					m.reader.Seek(0, io.SeekStart)
+					_, _ = m.reader.Seek(0, io.SeekStart)
 					if m.originalReader != nil {
-						m.originalReader.Seek(0, io.SeekStart)
+						_, _ = m.originalReader.Seek(0, io.SeekStart)
 					}
 					m.position = 0
 					m.mu.Unlock()
@@ -252,9 +252,9 @@ func (m *MockAudioPlayer) Reset() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	
-	m.reader.Seek(0, io.SeekStart)
+	_, _ = m.reader.Seek(0, io.SeekStart)
 	if m.originalReader != nil {
-		m.originalReader.Seek(0, io.SeekStart)
+		_, _ = m.originalReader.Seek(0, io.SeekStart)
 	}
 	m.position = 0
 	m.startTime = time.Time{}

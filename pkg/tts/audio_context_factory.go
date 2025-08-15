@@ -134,7 +134,7 @@ func SetGlobalAudioContext(ctx AudioContextInterface) {
 // This is mainly useful for testing
 func ResetGlobalAudioContext() {
 	if globalAudioContextInterface != nil {
-		globalAudioContextInterface.Close()
+		_ = globalAudioContextInterface.Close()
 	}
 	globalAudioContextInterface = nil
 	audioContextInterfaceOnce = sync.Once{}

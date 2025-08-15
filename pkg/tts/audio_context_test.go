@@ -12,7 +12,7 @@ func TestMockAudioContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock audio context: %v", err)
 	}
-	defer mockCtx.Close()
+	defer func() { _ = mockCtx.Close() }()
 	
 	// Use as interface
 	var ctx AudioContextInterface = mockCtx
