@@ -168,13 +168,15 @@ func (pc *PiperChecker) Check() DependencyStatus {
 	}
 	
 	for _, path := range paths {
-		if _, err := exec.LookPath(path); err == nil {
-			// Found piper, get version
-			cmd := exec.Command(path, "--version")
-			if output, err := cmd.CombinedOutput(); err == nil {
+		if fullPath, err := exec.LookPath(path); err == nil {
+			// Found piper - it doesn't have a --version flag, so we'll test with --help
+			// If --help works, we know piper is properly installed
+			cmd := exec.Command(fullPath, "--help")
+			if output, err := cmd.CombinedOutput(); err == nil || strings.Contains(string(output), "piper") {
 				status.Installed = true
-				status.Path = path
-				status.Version = strings.TrimSpace(string(output))
+				status.Path = fullPath
+				// Since piper doesn't have a version flag, mark as installed without version
+				status.Version = "installed"
 				return status
 			}
 		}
