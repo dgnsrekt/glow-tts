@@ -872,19 +872,28 @@ func (aq *TTSAudioQueue) updateMetrics(synthesisTime time.Duration) {
 // GetMetrics returns current queue metrics
 func (aq *TTSAudioQueue) GetMetrics() map[string]interface{} {
 	aq.metrics.mu.RLock()
-	defer aq.metrics.mu.RUnlock()
+	synthesisCount := aq.metrics.synthesisCount
+	avgSynthesisTime := aq.metrics.avgSynthesisTime
+	queueDepth := aq.metrics.queueDepth
+	memoryUsage := aq.metrics.memoryUsage
+	aq.metrics.mu.RUnlock()
+	
+	aq.mu.RLock()
+	currentIdx := aq.currentIndex
+	workerCount := len(aq.workers)
+	aq.mu.RUnlock()
 	
 	return map[string]interface{}{
-		"synthesis_count":     aq.metrics.synthesisCount,
-		"avg_synthesis_time":  aq.metrics.avgSynthesisTime,
+		"synthesis_count":     synthesisCount,
+		"avg_synthesis_time":  avgSynthesisTime,
 		"buffer_hits":         atomic.LoadInt64(&aq.metrics.bufferHits),
 		"buffer_misses":       atomic.LoadInt64(&aq.metrics.bufferMisses),
-		"queue_depth":         aq.metrics.queueDepth,
-		"memory_usage_mb":     aq.metrics.memoryUsage / 1024 / 1024,
+		"queue_depth":         queueDepth,
+		"memory_usage_mb":     memoryUsage / 1024 / 1024,
 		"total_processed":     atomic.LoadInt64(&aq.totalProcessed),
 		"total_played":        atomic.LoadInt64(&aq.totalPlayed),
-		"current_index":       aq.currentIndex,
-		"worker_count":        len(aq.workers),
+		"current_index":       currentIdx,
+		"worker_count":        workerCount,
 	}
 }
 

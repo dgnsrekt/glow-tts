@@ -410,9 +410,12 @@ func TestQueueState(t *testing.T) {
 
 	// Test state transitions
 	stateChanges := make([]QueueState, 0)
+	var stateChangesMu sync.Mutex
 	queue.SetCallbacks(
 		func(state QueueState) {
+			stateChangesMu.Lock()
 			stateChanges = append(stateChanges, state)
+			stateChangesMu.Unlock()
 		},
 		nil,
 		nil,
@@ -439,11 +442,16 @@ func TestQueueState(t *testing.T) {
 
 	// Stop
 	queue.Stop()
-	if queue.GetState() != QueueStateStopped {
-		t.Error("Expected stopped state")
+	actualState := queue.GetState()
+	if actualState != QueueStateStopped {
+		t.Errorf("Expected stopped state, got %v", actualState)
 	}
 
-	if len(stateChanges) == 0 {
+	stateChangesMu.Lock()
+	numChanges := len(stateChanges)
+	stateChangesMu.Unlock()
+	
+	if numChanges == 0 {
 		t.Error("Expected state change callbacks")
 	}
 }

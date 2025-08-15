@@ -11,6 +11,7 @@ import (
 	"io"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ebitengine/oto/v3"
@@ -18,6 +19,45 @@ import (
 
 // Format specifies the OTO format for our audio
 const Format = oto.FormatSignedInt16LE
+
+// positionTrackingReader wraps a reader and tracks position atomically
+type positionTrackingReader struct {
+	reader   *bytes.Reader
+	position int64 // atomic
+	mu       sync.Mutex // protects reader operations
+}
+
+func newPositionTrackingReader(data []byte) *positionTrackingReader {
+	return &positionTrackingReader{
+		reader: bytes.NewReader(data),
+	}
+}
+
+func (ptr *positionTrackingReader) Read(p []byte) (n int, err error) {
+	ptr.mu.Lock()
+	defer ptr.mu.Unlock()
+	
+	n, err = ptr.reader.Read(p)
+	if n > 0 {
+		atomic.AddInt64(&ptr.position, int64(n))
+	}
+	return n, err
+}
+
+func (ptr *positionTrackingReader) Seek(offset int64, whence int) (int64, error) {
+	ptr.mu.Lock()
+	defer ptr.mu.Unlock()
+	
+	newPos, err := ptr.reader.Seek(offset, whence)
+	if err == nil {
+		atomic.StoreInt64(&ptr.position, newPos)
+	}
+	return newPos, err
+}
+
+func (ptr *positionTrackingReader) GetPosition() int64 {
+	return atomic.LoadInt64(&ptr.position)
+}
 
 // AudioContext manages the global OTO audio context
 type AudioContext struct {
@@ -128,8 +168,8 @@ type AudioStream struct {
 	// data holds the PCM audio data in memory
 	data []byte
 	
-	// reader provides streaming access to the audio data
-	reader *bytes.Reader
+	// reader provides streaming access to the audio data with position tracking
+	reader *positionTrackingReader
 	
 	// player is the audio player instance
 	player AudioPlayerInterface
@@ -180,7 +220,7 @@ func NewAudioStream(pcmData []byte) (*AudioStream, error) {
 
 	stream := &AudioStream{
 		data:     pcmData,
-		reader:   bytes.NewReader(pcmData),
+		reader:   newPositionTrackingReader(pcmData),
 		state:    PlaybackStopped,
 		duration: duration,
 		refCount: 1,
@@ -324,8 +364,9 @@ func (as *AudioStream) GetPosition() time.Duration {
 	as.mu.RLock()
 	defer as.mu.RUnlock()
 	
+	// Use the thread-safe position from our tracking reader
 	if as.reader != nil {
-		pos, _ := as.reader.Seek(0, io.SeekCurrent)
+		pos := as.reader.GetPosition()
 		samples := pos / BytesPerSample
 		return time.Duration(samples) * time.Second / SampleRate
 	}
@@ -368,7 +409,8 @@ func (as *AudioStream) monitorPlayback() {
 			if player != nil && !player.IsPlaying() {
 				// Check if we've actually reached the end of the data
 				as.mu.Lock()
-				pos, _ := as.reader.Seek(0, io.SeekCurrent)
+				// Use thread-safe position tracking
+				pos := as.reader.GetPosition()
 				if pos >= int64(len(as.data)) {
 					// Playback truly finished
 					as.state = PlaybackStopped

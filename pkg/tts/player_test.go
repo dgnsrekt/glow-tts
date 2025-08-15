@@ -208,7 +208,8 @@ func TestPlaybackCompletion(t *testing.T) {
 	}
 	
 	// Wait for playback to complete (with some buffer)
-	time.Sleep(150 * time.Millisecond)
+	// Monitor ticker runs every 100ms, so we need to wait longer
+	time.Sleep(250 * time.Millisecond)
 	
 	// State should return to Stopped
 	if stream.GetState() != PlaybackStopped {

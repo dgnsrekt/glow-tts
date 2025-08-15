@@ -148,10 +148,37 @@ func TestCIDetection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clear environment
-			clearEnv("CI")
-			clearEnv("GITHUB_ACTIONS")
-			clearEnv("MOCK_AUDIO")
+			// Clear all CI-related environment variables
+			ciVars := []string{
+				"CI",
+				"CONTINUOUS_INTEGRATION",
+				"GITHUB_ACTIONS",
+				"GITLAB_CI",
+				"JENKINS_URL",
+				"TRAVIS",
+				"CIRCLECI",
+				"BUILDKITE",
+				"DRONE",
+				"TEAMCITY_VERSION",
+				"MOCK_AUDIO",
+				"GLOW_TTS_MOCK_AUDIO",
+			}
+			
+			// Store original values to restore later
+			originalEnv := make(map[string]string)
+			for _, key := range ciVars {
+				if val, exists := os.LookupEnv(key); exists {
+					originalEnv[key] = val
+				}
+				clearEnv(key)
+			}
+			
+			// Restore original environment after test
+			defer func() {
+				for key, val := range originalEnv {
+					os.Setenv(key, val)
+				}
+			}()
 			
 			// Set test environment
 			for k, v := range tt.envVars {
