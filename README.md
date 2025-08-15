@@ -57,7 +57,7 @@ glow --generate-tts-config
 This fork maintains the same installation methods as the original Glow. Clone and build from source:
 
 ```bash
-git clone https://github.com/yourusername/glow-tts.git
+git clone https://github.com/dgnsrekt/glow-tts.git
 cd glow-tts
 go build -o glow
 ```
