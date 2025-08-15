@@ -133,54 +133,14 @@ jobs:
           sarif_file: gosec-results.sarif
         continue-on-error: true
 
-  # Custom ruleguard without CGO issues
-  ruleguard-custom:
-    name: Ruleguard Analysis
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-      
-      - name: Install audio dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libasound2-dev
-      
-      - name: Install ruleguard
-        run: go install github.com/quasilyte/go-ruleguard/cmd/ruleguard@latest
-      
-      - name: Download rules
-        run: |
-          # Download standard ruleguard rules with proper error handling
-          curl -fsSL https://raw.githubusercontent.com/quasilyte/go-ruleguard/master/rules.go -o rules.go || {
-            echo "Failed to download rules, using basic rules instead"
-            cat > rules.go << 'EOF'
-          package gorules
-
-          import "github.com/quasilyte/go-ruleguard/dsl"
-
-          func emptyIf(m dsl.Matcher) {
-            m.Match(`if $*_ {}`).
-              Report("empty if statement")
-          }
-          EOF
-          }
-      
-      - name: Run ruleguard
-        run: |
-          echo "Running ruleguard analysis..."
-          # Run on all packages
-          ruleguard -rules rules.go ./... || true
+  # Ruleguard removed - requires complex setup with DSL dependencies
+  # Other static analysis tools (golangci-lint, staticcheck, gosec) provide sufficient coverage
 
   # Summary of all checks
   analysis-summary:
     name: Analysis Summary
     if: always()
-    needs: [golangci-lint, staticcheck, go-vet, ineffassign, gosec, ruleguard-custom]
+    needs: [golangci-lint, staticcheck, go-vet, ineffassign, gosec]
     runs-on: ubuntu-latest
     steps:
       - name: Check analysis results
@@ -191,7 +151,6 @@ jobs:
           echo "- go-vet: ${{ needs.go-vet.result }}"
           echo "- ineffassign: ${{ needs.ineffassign.result }}"
           echo "- gosec: ${{ needs.gosec.result }}"
-          echo "- ruleguard: ${{ needs.ruleguard-custom.result }}"
           
           # Don't fail the workflow for static analysis issues
 
@@ -199,7 +158,7 @@ jobs:
   notify:
     name: Send Notification
     runs-on: ubuntu-latest
-    needs: [golangci-lint, staticcheck, go-vet, ineffassign, gosec, ruleguard-custom, analysis-summary]
+    needs: [golangci-lint, staticcheck, go-vet, ineffassign, gosec, analysis-summary]
     if: always()
     steps:
       - name: Send success notification
