@@ -9,6 +9,8 @@
 
 A fork of [Glow](https://github.com/charmbracelet/glow) with experimental Text-to-Speech capabilities.
 
+*Remember: Silent reading is optional. This fork makes your documentation speak for itself.*
+
 > **⚠️ DISCLAIMER**: This is an unofficial fork not affiliated with or maintained by the Charm team. See [FORK_NOTICE.md](FORK_NOTICE.md) for details.
 
 ## What is this?
