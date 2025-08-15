@@ -14,12 +14,12 @@ Glow-TTS adds Text-to-Speech functionality to the excellent [Glow markdown reade
 ## Features
 
 ### TTS Capabilities
-- 🎯 Two TTS engines (Piper offline, Google online)
-- ⏯️ Playback controls (play, pause, stop, skip)
-- 🎚️ Speed control (0.5x to 2.0x)
-- 💾 Audio caching for repeated content
-- 🎵 Sentence-by-sentence navigation
-- ⌨️ Keyboard shortcuts in TUI mode
+- Two TTS engines (Piper offline, Google online)
+- Playback controls (play, pause, stop, skip)
+- Speed control (0.5x to 2.0x)
+- Audio caching for repeated content
+- Sentence-by-sentence navigation
+- Keyboard shortcuts in TUI mode
 
 ### Keyboard Controls
 
@@ -78,9 +78,9 @@ pipx install gtts
 
 ## Documentation
 
-- 📖 [TTS Setup Guide](docs/TTS_SETUP.md) - Detailed installation instructions
-- 🔧 [TTS Troubleshooting](docs/TTS_TROUBLESHOOTING.md) - Common issues and solutions
-- 📚 [Original Glow Docs](https://github.com/charmbracelet/glow#readme) - For base markdown features
+- [TTS Setup Guide](docs/TTS_SETUP.md) - Detailed installation instructions
+- [TTS Troubleshooting](docs/TTS_TROUBLESHOOTING.md) - Common issues and solutions
+- [Original Glow Docs](https://github.com/charmbracelet/glow#readme) - For base markdown features
 
 ## Configuration
 
