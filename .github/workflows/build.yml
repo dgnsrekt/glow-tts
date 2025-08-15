@@ -85,9 +85,9 @@ jobs:
           echo "Running quick smoke tests with mock audio..."
           go test -v -short -race -timeout 30s ./pkg/tts/...
 
-  semgrep:
-    uses: charmbracelet/meta/.github/workflows/semgrep.yml@main
-
+  # Semgrep removed - was using charmbracelet's meta repository
+  # For security scanning, see govulncheck job above and gosec in static-analysis.yml
+  
   # Ruleguard moved to static-analysis.yml due to CGO issues
   # See .github/workflows/static-analysis.yml for comprehensive static analysis
 
@@ -95,7 +95,7 @@ jobs:
   notify:
     name: Send Notification
     runs-on: ubuntu-latest
-    needs: [govulncheck, build, semgrep]
+    needs: [govulncheck, build]
     if: always()
     steps:
       - name: Send success notification
