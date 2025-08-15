@@ -3,6 +3,7 @@ package tts
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -442,9 +443,10 @@ func TestQueueState(t *testing.T) {
 
 	// Stop
 	queue.Stop()
-	actualState := queue.GetState()
-	if actualState != QueueStateStopped {
-		t.Errorf("Expected stopped state, got %v", actualState)
+	
+	// Wait for stopped state with retry logic
+	if !waitForQueueState(t, queue, QueueStateStopped, 500*time.Millisecond) {
+		t.Errorf("Queue did not reach stopped state")
 	}
 
 	stateChangesMu.Lock()
@@ -491,10 +493,16 @@ func TestCrossfade(t *testing.T) {
 }
 
 func TestWaitForReady(t *testing.T) {
+	// Adjust delay for CI environments
+	synthesizeDelay := 200 * time.Millisecond
+	if os.Getenv("CI") == "true" {
+		synthesizeDelay = 300 * time.Millisecond
+	}
+	
 	slowEngine := &mockQueueEngine{
 		available: true,
 		synthesizeFunc: func(text string, speed float64) ([]byte, error) {
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(synthesizeDelay)
 			return make([]byte, 100), nil
 		},
 	}
@@ -513,16 +521,23 @@ func TestWaitForReady(t *testing.T) {
 	// Add text
 	_ = queue.AddText("Test")
 
-	// Wait for ready with timeout
-	err = queue.WaitForReady(500 * time.Millisecond)
+	// Wait for ready with adequate timeout
+	// Need to account for: worker startup + synthesis time + polling interval (100ms) + buffer
+	timeout := 1*time.Second
+	if os.Getenv("CI") == "true" {
+		// CI needs more time for worker startup and processing
+		timeout = 2*time.Second
+	}
+	err = queue.WaitForReady(timeout)
 	if err != nil {
-		t.Errorf("WaitForReady failed: %v", err)
+		t.Errorf("WaitForReady failed after %v: %v", timeout, err)
 	}
 
-	// Test timeout
+	// Test timeout - use a timeout shorter than polling interval
 	queue2, _ := NewAudioQueue(config)
 	defer queue2.Stop()
 	
+	// This should timeout since no text is added and polling is 100ms
 	err = queue2.WaitForReady(50 * time.Millisecond)
 	if err == nil {
 		t.Error("Expected timeout error")

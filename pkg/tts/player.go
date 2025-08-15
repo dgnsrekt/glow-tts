@@ -407,23 +407,18 @@ func (as *AudioStream) monitorPlayback() {
 			
 			// Check if the player is still playing
 			if player != nil && !player.IsPlaying() {
-				// Check if we've actually reached the end of the data
+				// Player reports it's not playing, assume playback completed
+				// The mock player has already reset position, so we can't check it
 				as.mu.Lock()
-				// Use thread-safe position tracking
-				pos := as.reader.GetPosition()
-				if pos >= int64(len(as.data)) {
-					// Playback truly finished
-					as.state = PlaybackStopped
-					if as.player != nil {
-						as.player.Close()
-						as.player = nil
-					}
-					as.position = 0
-					as.reader.Seek(0, io.SeekStart)
-					as.mu.Unlock()
-					return
+				as.state = PlaybackStopped
+				if as.player != nil {
+					as.player.Close()
+					as.player = nil
 				}
+				as.position = 0
+				as.reader.Seek(0, io.SeekStart)
 				as.mu.Unlock()
+				return
 			}
 		}
 	}

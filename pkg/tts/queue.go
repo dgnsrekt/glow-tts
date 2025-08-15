@@ -768,7 +768,14 @@ func (aq *TTSAudioQueue) Clear() {
 		<-aq.synthesisQueue
 	}
 	
-	aq.setState(QueueStateIdle)
+	// Only set to Idle if we're not already stopped
+	aq.stateMu.RLock()
+	currentState := aq.state
+	aq.stateMu.RUnlock()
+	
+	if currentState != QueueStateStopped {
+		aq.setState(QueueStateIdle)
+	}
 }
 
 // GetQueueDepth returns the number of segments in the queue

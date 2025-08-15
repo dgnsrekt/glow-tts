@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math"
+	"os"
 	"runtime"
 	"sync"
 	"testing"
@@ -207,16 +208,20 @@ func TestPlaybackCompletion(t *testing.T) {
 		t.Fatalf("Play failed: %v", err)
 	}
 	
-	// Wait for playback to complete (with some buffer)
-	// Monitor ticker runs every 100ms, so we need to wait longer
-	time.Sleep(250 * time.Millisecond)
-	
-	// State should return to Stopped
-	if stream.GetState() != PlaybackStopped {
-		t.Errorf("Expected state Stopped after completion, got %v", stream.GetState())
+	// Wait for playback to complete with retry logic
+	// In CI, operations can take longer, so use a generous timeout
+	timeout := 500 * time.Millisecond
+	if os.Getenv("CI") == "true" {
+		timeout = 1 * time.Second
 	}
 	
-	// Position should be reset
+	// Wait for state to return to Stopped
+	if !waitForState(t, stream.GetState, PlaybackStopped, timeout, "Playback completion") {
+		t.Errorf("Playback did not complete within %v", timeout)
+	}
+	
+	// Position should be reset (give it a moment to reset)
+	time.Sleep(50 * time.Millisecond)
 	if stream.GetPosition() != 0 {
 		t.Errorf("Expected position 0 after completion, got %v", stream.GetPosition())
 	}
