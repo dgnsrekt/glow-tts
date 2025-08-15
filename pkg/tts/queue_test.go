@@ -9,6 +9,16 @@ import (
 	"time"
 )
 
+// createTestQueueConfig creates a test queue configuration with proper defaults
+func createTestQueueConfig(engine TTSEngine, parser TextParser) *QueueConfig {
+	return &QueueConfig{
+		Engine:        engine,
+		Parser:        parser,
+		WorkerCount:   2, // Ensure workers are created
+		LookaheadSize: 3, // Ensure lookahead is set
+	}
+}
+
 // Mock components for testing
 type mockQueueEngine struct {
 	synthesizeFunc func(string, float64) ([]byte, error)
@@ -66,12 +76,12 @@ func (m *mockQueueParser) ParseSentences(text string) ([]Sentence, error) {
 }
 
 func TestNewAudioQueue(t *testing.T) {
-	config := &QueueConfig{
-		Engine: &mockQueueEngine{available: true},
-		Parser: &mockQueueParser{},
-		LookaheadSize: 3,
-		WorkerCount: 2,
-	}
+	config := createTestQueueConfig(
+		&mockQueueEngine{available: true},
+		&mockQueueParser{},
+	)
+	config.LookaheadSize = 3
+	config.WorkerCount = 2
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -151,11 +161,11 @@ func TestAddText(t *testing.T) {
 		},
 	}
 
-	config := &QueueConfig{
-		Engine: &mockQueueEngine{available: true},
-		Parser: parser,
-		LookaheadSize: 2,
-	}
+	config := createTestQueueConfig(
+		&mockQueueEngine{available: true},
+		parser,
+	)
+	config.LookaheadSize = 2
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -178,10 +188,10 @@ func TestAddText(t *testing.T) {
 }
 
 func TestQueueNavigation(t *testing.T) {
-	config := &QueueConfig{
-		Engine: &mockQueueEngine{available: true},
-		Parser: &mockQueueParser{},
-	}
+	config := createTestQueueConfig(
+		&mockQueueEngine{available: true},
+		&mockQueueParser{},
+	)
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -261,12 +271,12 @@ func TestLookaheadBuffer(t *testing.T) {
 		},
 	}
 
-	config := &QueueConfig{
-		Engine:        engine,
-		Parser:        &mockQueueParser{},
-		LookaheadSize: 2,
-		WorkerCount:   2,
-	}
+	config := createTestQueueConfig(
+		engine,
+		&mockQueueParser{},
+	)
+	config.LookaheadSize = 2
+	config.WorkerCount = 2
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -308,10 +318,10 @@ func TestLookaheadBuffer(t *testing.T) {
 }
 
 func TestAudioPreprocessing(t *testing.T) {
-	config := &QueueConfig{
-		Engine: &mockQueueEngine{available: true},
-		Parser: &mockQueueParser{},
-	}
+	config := createTestQueueConfig(
+		&mockQueueEngine{available: true},
+		&mockQueueParser{},
+	)
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -507,10 +517,10 @@ func TestWaitForReady(t *testing.T) {
 		},
 	}
 
-	config := &QueueConfig{
-		Engine: slowEngine,
-		Parser: &mockQueueParser{},
-	}
+	config := createTestQueueConfig(
+		slowEngine,
+		&mockQueueParser{},
+	)
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -534,7 +544,13 @@ func TestWaitForReady(t *testing.T) {
 	}
 
 	// Test timeout - use a timeout shorter than polling interval
-	queue2, _ := NewAudioQueue(config)
+	config2 := &QueueConfig{
+		Engine:        slowEngine,
+		Parser:        &mockQueueParser{},
+		WorkerCount:   2,
+		LookaheadSize: 3,
+	}
+	queue2, _ := NewAudioQueue(config2)
 	defer queue2.Stop()
 	
 	// This should timeout since no text is added and polling is 100ms
@@ -545,10 +561,10 @@ func TestWaitForReady(t *testing.T) {
 }
 
 func TestQueueMetrics(t *testing.T) {
-	config := &QueueConfig{
-		Engine: &mockQueueEngine{available: true},
-		Parser: &mockQueueParser{},
-	}
+	config := createTestQueueConfig(
+		&mockQueueEngine{available: true},
+		&mockQueueParser{},
+	)
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -579,11 +595,11 @@ func TestQueueMetrics(t *testing.T) {
 }
 
 func TestConcurrentAccess(t *testing.T) {
-	config := &QueueConfig{
-		Engine:      &mockQueueEngine{available: true},
-		Parser:      &mockQueueParser{},
-		WorkerCount: 4,
-	}
+	config := createTestQueueConfig(
+		&mockQueueEngine{available: true},
+		&mockQueueParser{},
+	)
+	config.WorkerCount = 4
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -629,10 +645,10 @@ func TestConcurrentAccess(t *testing.T) {
 }
 
 func TestQueueClear(t *testing.T) {
-	config := &QueueConfig{
-		Engine: &mockQueueEngine{available: true},
-		Parser: &mockQueueParser{},
-	}
+	config := createTestQueueConfig(
+		&mockQueueEngine{available: true},
+		&mockQueueParser{},
+	)
 
 	queue, err := NewAudioQueue(config)
 	if err != nil {
@@ -664,11 +680,11 @@ func TestQueueClear(t *testing.T) {
 }
 
 func BenchmarkQueueThroughput(b *testing.B) {
-	config := &QueueConfig{
-		Engine:      &mockQueueEngine{available: true},
-		Parser:      &mockQueueParser{},
-		WorkerCount: 4,
-	}
+	config := createTestQueueConfig(
+		&mockQueueEngine{available: true},
+		&mockQueueParser{},
+	)
+	config.WorkerCount = 4
 
 	queue, _ := NewAudioQueue(config)
 	defer queue.Stop()
