@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/glow/v2/pkg/tts"
+	"github.com/dgnsrekt/glow-tts/pkg/tts"
 	"github.com/charmbracelet/log"
 )
 

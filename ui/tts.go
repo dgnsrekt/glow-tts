@@ -8,8 +8,8 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/timer"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glow/v2/pkg/tts"
-	"github.com/charmbracelet/glow/v2/pkg/tts/engines"
+	"github.com/dgnsrekt/glow-tts/pkg/tts"
+	"github.com/dgnsrekt/glow-tts/pkg/tts/engines"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 )

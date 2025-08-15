@@ -1,4 +1,4 @@
-module github.com/charmbracelet/glow/v2
+module github.com/dgnsrekt/glow-tts
 
 go 1.23.6
 
