@@ -135,9 +135,8 @@ func (m *model) unloadDocument() []tea.Cmd {
 	m.pager.showHelp = false
 
 	var batch []tea.Cmd
-	if m.pager.viewport.HighPerformanceRendering {
-		batch = append(batch, tea.ClearScrollArea) //nolint:staticcheck
-	}
+	// High performance rendering is deprecated in newer Bubble Tea versions
+	// Removed deprecated code that was checking HighPerformanceRendering
 
 	if !m.stash.shouldSpin() {
 		batch = append(batch, m.stash.spinner.Tick)

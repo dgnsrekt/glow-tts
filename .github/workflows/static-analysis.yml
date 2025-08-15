@@ -83,10 +83,10 @@ jobs:
       - name: Install ineffassign
         run: go install github.com/gordonklaus/ineffassign@latest
       
-      - name: Run ineffassign with nocgo build tag
+      - name: Run ineffassign
         run: |
           echo "Checking for ineffectual assignments..."
-          ineffassign -tags nocgo ./...
+          ineffassign ./...
 
   # Gosec - security checker
   gosec:
