@@ -207,10 +207,10 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 			m.viewport.GotoBottom()
 
 		case "d":
-			m.viewport.HalfViewDown()
+			m.viewport.HalfPageDown()
 
 		case "u":
-			m.viewport.HalfViewUp()
+			m.viewport.HalfPageUp()
 
 		case "e":
 			lineno := int(math.RoundToEven(float64(m.viewport.TotalLineCount()) * m.viewport.ScrollPercent()))

@@ -258,12 +258,12 @@ func TestDiskCache(t *testing.T) {
 		_ = cache.Put("persist-key", persistData)
 
 		// Close and reopen cache
-		cache.Close()
+		_ = cache.Close()
 		cache2, err := NewDiskCache(tempDir, 1024*1024, time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to reopen cache: %v", err)
 		}
-		defer cache2.Close()
+		defer func() { _ = cache2.Close() }()
 
 		// Data should still exist
 		retrieved, err := cache2.Get("persist-key")

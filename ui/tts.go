@@ -162,12 +162,6 @@ type ttsSentencesParsedMsg struct {
 	err       error
 }
 
-// ttsStatusUpdateMsg is sent periodically to update playback status
-type ttsStatusUpdateMsg struct {
-	sentenceIndex int
-	isPlaying     bool
-}
-
 // ttsPlaybackFinishedMsg is sent when playback completes
 type ttsPlaybackFinishedMsg struct{}
 
@@ -412,13 +406,6 @@ func monitorPlaybackCmd(controller *tts.Controller) tea.Cmd {
 		
 		return nil
 	}
-}
-
-// monitorDelayCmd waits before checking playback status again
-func monitorDelayCmd() tea.Cmd {
-	return tea.Tick(500*time.Millisecond, func(time.Time) tea.Msg {
-		return ttsMonitorMsg{continueMonitoring: true}
-	})
 }
 
 // pauseTTSCmd pauses TTS playback
