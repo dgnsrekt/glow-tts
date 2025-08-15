@@ -140,7 +140,7 @@ jobs:
   notify:
     name: Send Notification
     runs-on: ubuntu-latest
-    needs: [lint, quick-test, platform-build, docs, pr-summary]
+    needs: [lint, quick-test, platform-build, docs, pr-status]
     if: always()
     steps:
       - name: Send success notification
