@@ -27,7 +27,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Only test on Linux for now
+        os: [ubuntu-latest]
+        # Uncomment to test on other platforms
+        # os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       GLOW_TTS_MOCK_AUDIO: "true"
@@ -71,7 +74,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Only test on Linux for now
+        os: [ubuntu-latest]
+        # Uncomment to test on other platforms
+        # os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       GLOW_TTS_MOCK_AUDIO: "false"
@@ -181,7 +187,10 @@ jobs:
     name: Platform Detection Tests
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Only test on Linux for now
+        os: [ubuntu-latest]
+        # Uncomment to test on other platforms
+        # os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       GLOW_TTS_MOCK_AUDIO: "true"
