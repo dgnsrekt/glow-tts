@@ -907,13 +907,19 @@ func (aq *TTSAudioQueue) GetState() QueueState {
 
 // updateMetrics updates queue metrics
 func (aq *TTSAudioQueue) updateMetrics(synthesisTime time.Duration) {
+	// Get queue depth safely
+	aq.mu.RLock()
+	queueDepth := len(aq.order)
+	aq.mu.RUnlock()
+	
+	// Update metrics
 	aq.metrics.mu.Lock()
 	defer aq.metrics.mu.Unlock()
 	
 	aq.metrics.synthesisCount++
 	aq.metrics.synthesisTime += synthesisTime
 	aq.metrics.avgSynthesisTime = aq.metrics.synthesisTime / time.Duration(aq.metrics.synthesisCount)
-	aq.metrics.queueDepth = len(aq.order)
+	aq.metrics.queueDepth = queueDepth
 	aq.metrics.memoryUsage = atomic.LoadInt64(&aq.memoryUsage)
 	aq.metrics.lastUpdate = time.Now()
 }
