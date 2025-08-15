@@ -22,15 +22,21 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       
+      - name: Install audio dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+      
       - name: Install golangci-lint
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
       
-      - name: Run golangci-lint with nocgo build tag
+      - name: Run golangci-lint
         run: |
-          echo "Running linter with nocgo build tag to exclude CGO files..."
-          # Skip ui and utils packages which have import issues with nocgo
-          golangci-lint run --config=.golangci.manual.yml --build-tags=nocgo --timeout=5m \
+          echo "Running linter..."
+          # Run without nocgo tag as it causes too many import issues
+          # The linter will still check for code quality issues
+          golangci-lint run --config=.golangci.manual.yml --timeout=5m \
             --skip-dirs=ui \
             --skip-dirs=utils \
             ./...
@@ -50,10 +56,10 @@ jobs:
       - name: Install staticcheck
         run: go install honnef.co/go/tools/cmd/staticcheck@latest
       
-      - name: Run staticcheck with nocgo build tag
+      - name: Run staticcheck
         run: |
-          echo "Running staticcheck with nocgo build tag..."
-          staticcheck -tags=nocgo ./...
+          echo "Running staticcheck..."
+          staticcheck ./...
 
   # Go vet analysis
   go-vet:
@@ -67,10 +73,10 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       
-      - name: Run go vet with nocgo build tag
+      - name: Run go vet
         run: |
-          echo "Running go vet with nocgo build tag..."
-          go vet -tags=nocgo ./...
+          echo "Running go vet..."
+          go vet ./...
 
   # Ineffassign - detect ineffectual assignments
   ineffassign:
@@ -107,10 +113,10 @@ jobs:
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
       
-      - name: Run gosec with nocgo build tag
+      - name: Run gosec
         run: |
           echo "Running security checks..."
-          gosec -tags=nocgo -fmt=sarif -out=gosec-results.sarif ./... || true
+          gosec -fmt=sarif -out=gosec-results.sarif ./... || true
       
       - name: Upload SARIF file
         if: always()
@@ -139,14 +145,11 @@ jobs:
           # Download standard ruleguard rules
           curl -L https://raw.githubusercontent.com/quasilyte/go-ruleguard/master/rules/rules.go -o rules.go
       
-      - name: Run ruleguard on non-CGO packages
+      - name: Run ruleguard
         run: |
           echo "Running ruleguard analysis..."
-          # Run on specific packages to avoid CGO issues
-          for pkg in cmd pkg/tts/engines pkg/tts/cache; do
-            echo "Analyzing $pkg..."
-            ruleguard -rules rules.go ./$pkg/... 2>&1 | grep -v "could not import C" || true
-          done
+          # Run on all packages
+          ruleguard -rules rules.go ./... || true
 
   # Summary of all checks
   analysis-summary:

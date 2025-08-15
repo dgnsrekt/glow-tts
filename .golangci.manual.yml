@@ -2,10 +2,7 @@
 # See https://golangci-lint.run/usage/configuration/
 run:
   tests: false
-  # Build tags to exclude CGO
-  build-tags:
-    - nocgo
-  # Skip directories that have import issues with nocgo
+  # Skip directories to reduce noise
   skip-dirs:
     - ui
     - utils
