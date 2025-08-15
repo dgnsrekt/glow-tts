@@ -342,18 +342,25 @@ func (w *queueWorker) run() {
 func (w *queueWorker) synthesizeSegment(segmentID string) {
 	log.Debug("TTS Worker: Starting synthesis", "workerID", w.id, "segmentID", segmentID)
 	
+	// Get segment data safely - copy what we need while holding the lock
 	w.queue.mu.RLock()
 	segment, exists := w.queue.segments[segmentID]
-	w.queue.mu.RUnlock()
-	
 	if !exists {
+		w.queue.mu.RUnlock()
 		log.Debug("TTS Worker: Segment not found", "segmentID", segmentID)
 		return
 	}
+	
+	// Check if already synthesized while we have the lock
 	if segment.Audio != nil {
+		w.queue.mu.RUnlock()
 		log.Debug("TTS Worker: Segment already synthesized", "segmentID", segmentID)
 		return
 	}
+	
+	// Copy the text we need to synthesize while holding the lock
+	textToSynthesize := segment.Text
+	w.queue.mu.RUnlock()
 	
 	start := time.Now()
 	
@@ -362,7 +369,7 @@ func (w *queueWorker) synthesizeSegment(segmentID string) {
 	var err error
 	
 	if w.queue.config.CacheManager != nil {
-		cacheKey := GenerateCacheKey(segment.Text, w.queue.config.Engine.GetName(), 1.0)
+		cacheKey := GenerateCacheKey(textToSynthesize, w.queue.config.Engine.GetName(), 1.0)
 		cached, cacheErr := w.queue.config.CacheManager.Get(cacheKey)
 		if cacheErr == nil && cached != nil {
 			audioData = cached.Audio
@@ -374,8 +381,8 @@ func (w *queueWorker) synthesizeSegment(segmentID string) {
 	
 	// Synthesize if not cached
 	if audioData == nil {
-		log.Debug("TTS Worker: Synthesizing text", "segmentID", segmentID, "textLen", len(segment.Text))
-		audioData, err = w.queue.config.Engine.Synthesize(segment.Text, 1.0)
+		log.Debug("TTS Worker: Synthesizing text", "segmentID", segmentID, "textLen", len(textToSynthesize))
+		audioData, err = w.queue.config.Engine.Synthesize(textToSynthesize, 1.0)
 		if err != nil {
 			log.Error("TTS Worker: Synthesis failed", "segmentID", segmentID, "error", err)
 			if w.queue.onError != nil {
@@ -387,10 +394,10 @@ func (w *queueWorker) synthesizeSegment(segmentID string) {
 		
 		// Cache the result
 		if w.queue.config.CacheManager != nil && len(audioData) > 0 {
-			cacheKey := GenerateCacheKey(segment.Text, w.queue.config.Engine.GetName(), 1.0)
+			cacheKey := GenerateCacheKey(textToSynthesize, w.queue.config.Engine.GetName(), 1.0)
 			cacheData := &AudioData{
 				Audio:    audioData,
-				Text:     segment.Text,
+				Text:     textToSynthesize,
 				Voice:    w.queue.config.Engine.GetName(),
 				Speed:    1.0,
 				CacheKey: cacheKey,
@@ -402,8 +409,16 @@ func (w *queueWorker) synthesizeSegment(segmentID string) {
 	// Preprocess audio
 	processedAudio := w.queue.preprocessAudio(audioData)
 	
-	// Update segment
+	// Update segment - re-fetch it safely to avoid stale pointer
 	w.queue.mu.Lock()
+	segment, exists = w.queue.segments[segmentID]
+	if !exists {
+		// Segment was cleared while we were synthesizing
+		w.queue.mu.Unlock()
+		log.Debug("TTS Worker: Segment cleared during synthesis", "segmentID", segmentID)
+		return
+	}
+	
 	segment.Audio = audioData
 	segment.ProcessedAudio = processedAudio
 	segment.Synthesized = time.Now()
@@ -745,28 +760,55 @@ func (aq *TTSAudioQueue) Skip(n int) (*AudioSegment, error) {
 
 // Clear clears the queue
 func (aq *TTSAudioQueue) Clear() {
+	// First drain the queues to prevent new work
+	// This needs to happen before taking the lock to avoid deadlock
+	done := make(chan struct{})
+	go func() {
+		// Clear text queue
+		for len(aq.textQueue) > 0 {
+			select {
+			case <-aq.textQueue:
+			default:
+				// If queue is empty, break
+				break
+			}
+		}
+		// Clear synthesis queue  
+		for len(aq.synthesisQueue) > 0 {
+			select {
+			case <-aq.synthesisQueue:
+			default:
+				// If queue is empty, break
+				break
+			}
+		}
+		close(done)
+	}()
+	
+	// Wait for queue draining with timeout
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+		// Continue anyway if draining takes too long
+	}
+	
+	// Now lock and clear everything
 	aq.mu.Lock()
 	defer aq.mu.Unlock()
 	
 	// Return segments to pool
 	for _, segment := range aq.segments {
-		segment.Audio = nil
-		segment.ProcessedAudio = nil
-		aq.segmentPool.Put(segment)
+		if segment != nil {
+			segment.Audio = nil
+			segment.ProcessedAudio = nil
+			aq.segmentPool.Put(segment)
+		}
 	}
 	
 	aq.segments = make(map[string]*AudioSegment)
 	aq.order = make([]string, 0, MaxQueueSize)
 	aq.currentIndex = -1
 	atomic.StoreInt64(&aq.memoryUsage, 0)
-	
-	// Clear queues
-	for len(aq.textQueue) > 0 {
-		<-aq.textQueue
-	}
-	for len(aq.synthesisQueue) > 0 {
-		<-aq.synthesisQueue
-	}
 	
 	// Only set to Idle if we're not already stopped
 	aq.stateMu.RLock()

@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -271,9 +272,21 @@ func TestLookaheadBuffer(t *testing.T) {
 		},
 	}
 
+	// Parser that splits on ". " to create multiple sentences
+	parser := &mockQueueParser{
+		parseFunc: func(text string) ([]Sentence, error) {
+			parts := strings.Split(text, ". ")
+			sentences := make([]Sentence, len(parts))
+			for i, part := range parts {
+				sentences[i] = Sentence{Text: part, Position: i}
+			}
+			return sentences, nil
+		},
+	}
+
 	config := createTestQueueConfig(
 		engine,
-		&mockQueueParser{},
+		parser,
 	)
 	config.LookaheadSize = 2
 	config.WorkerCount = 2
@@ -284,12 +297,17 @@ func TestLookaheadBuffer(t *testing.T) {
 	}
 	defer queue.Stop()
 
-	// Add 5 segments
+	// Add 5 segments as a single text to ensure proper positioning
+	text := ""
 	for i := 0; i < 5; i++ {
-		err = queue.AddText(fmt.Sprintf("Sentence %d", i))
-		if err != nil {
-			t.Fatalf("Failed to add text: %v", err)
+		if i > 0 {
+			text += ". "
 		}
+		text += fmt.Sprintf("Sentence %d", i)
+	}
+	err = queue.AddText(text)
+	if err != nil {
+		t.Fatalf("Failed to add text: %v", err)
 	}
 
 	// Wait for lookahead synthesis
