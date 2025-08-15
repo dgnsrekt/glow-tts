@@ -7,7 +7,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/dgnsrekt/glow-tts)](https://goreportcard.com/report/github.com/dgnsrekt/glow-tts)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/dgnsrekt/glow-tts)](go.mod)
 
-<video src="docs/demo.webm" controls></video>
+https://github.com/user-attachments/assets/f1e9e8c2-5d8b-4e8e-b9e7-e0e3e0b0f1e0
 
 A fork of [Glow](https://github.com/charmbracelet/glow) with experimental Text-to-Speech capabilities.
 
