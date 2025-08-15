@@ -38,16 +38,16 @@ When TTS is enabled in TUI mode:
 
 ```bash
 # Check TTS dependencies
-glow --check-deps
+glow-tts --check-deps
 
 # Use Piper TTS (offline)
-glow --tts piper README.md
+glow-tts --tts piper README.md
 
 # Use Google TTS (online)
-glow --tts gtts README.md
+glow-tts --tts gtts README.md
 
 # Generate TTS config file
-glow --generate-tts-config
+glow-tts --generate-tts-config
 ```
 
 ## Installation
@@ -59,7 +59,7 @@ This fork maintains the same installation methods as the original Glow. Clone an
 ```bash
 git clone https://github.com/dgnsrekt/glow-tts.git
 cd glow-tts
-go build -o glow
+go build -o glow-tts
 ```
 
 ### TTS Dependencies
@@ -86,7 +86,7 @@ pipx install gtts
 
 Generate a TTS config file:
 ```bash
-glow --generate-tts-config
+glow-tts --generate-tts-config
 ```
 
 This creates `~/.config/glow/glow-tts.yml` with options for:

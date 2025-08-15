@@ -317,7 +317,7 @@ func initTTSWithTimeout(engine string, ttsState *TTSState) tea.Msg {
 		lifecycle := tts.GetLifecycleManager()
 		
 		// Register engine for cleanup
-		lifecycle.Register(tts.NewEngineLifecycle(selectedEngine, engine))
+		lifecycle.Register(tts.NewEngineLifecycle(ttsEngine, engine))
 		
 		// Register queue if it exists
 		if queue := controller.GetQueue(); queue != nil {
@@ -326,7 +326,7 @@ func initTTSWithTimeout(engine string, ttsState *TTSState) tea.Msg {
 		
 		// Register audio player
 		if player := tts.GetGlobalAudioPlayer(); player != nil {
-			lifecycle.Register(tts.NewPlayerLifecycle(player))
+			lifecycle.Register(tts.NewPlayerLifecycle(&tts.AudioPlayer{}))
 		}
 		
 		// Register cache if enabled

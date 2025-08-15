@@ -674,9 +674,9 @@ func (c *Controller) GetQueue() *TTSAudioQueue {
 }
 
 // GetCache returns the cache manager if available
-func (c *Controller) GetCache() *TTSCache {
+func (c *Controller) GetCache() *Cache {
 	// Note: We currently have a type mismatch between CacheManager interface
-	// and TTSCache implementation. For now, return nil.
+	// and Cache implementation. For now, return nil.
 	// TODO: Unify cache interfaces
 	return nil
 }

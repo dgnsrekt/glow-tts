@@ -263,12 +263,12 @@ func (pl *PlayerLifecycle) ForceStop() error {
 
 // CacheLifecycle wraps the cache with lifecycle management
 type CacheLifecycle struct {
-	cache    *TTSCache
+	cache    *Cache
 	flushOnShutdown bool
 }
 
 // NewCacheLifecycle creates a lifecycle wrapper for the cache
-func NewCacheLifecycle(cache *TTSCache, flushOnShutdown bool) *CacheLifecycle {
+func NewCacheLifecycle(cache *Cache, flushOnShutdown bool) *CacheLifecycle {
 	return &CacheLifecycle{
 		cache: cache,
 		flushOnShutdown: flushOnShutdown,

@@ -293,7 +293,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Perform TTS cleanup if initialized
-			if m.tts.initialized {
+			if m.tts != nil && m.tts.isInitialized {
 				log.Debug("Performing TTS cleanup before quit")
 				go func() {
 					if err := tts.InitiateShutdown(); err != nil {
@@ -316,7 +316,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Ctrl+C always quits no matter where in the application you are.
 		case "ctrl+c":
 			// Perform TTS cleanup if initialized
-			if m.tts.initialized {
+			if m.tts != nil && m.tts.isInitialized {
 				log.Debug("Performing TTS cleanup before quit")
 				go func() {
 					if err := tts.InitiateShutdown(); err != nil {
