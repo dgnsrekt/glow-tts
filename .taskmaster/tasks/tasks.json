@@ -1,0 +1,1737 @@
+{
+  "currentTag": "master",
+  "tags": {
+    "master": {
+      "metadata": {
+        "created": "2025-01-13T00:00:00Z",
+        "description": "Main development tasks for Glow-TTS implementation"
+      },
+      "tasks": [
+        {
+          "id": "1",
+          "title": "Implement Core Infrastructure Foundation",
+          "description": "Establish the fundamental subprocess management patterns and audio memory handling to prevent critical race conditions",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "This task creates the foundation layer that all other components will build upon. Must implement stdin race prevention using strings.NewReader pattern, establish proper audio memory management for OTO library, and ensure Bubble Tea command pattern compliance for all async operations.",
+          "testStrategy": "Unit tests for subprocess creation patterns, memory leak tests for audio data lifecycle, integration tests with Bubble Tea UI to verify command pattern adherence",
+          "subtasks": []
+        },
+        {
+          "id": "2",
+          "title": "Create TTS Controller and State Management",
+          "description": "Build the main TTS Controller that orchestrates the entire text-to-speech pipeline",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [
+            "1"
+          ],
+          "details": "Implement the Controller struct that manages TTSEngine, AudioQueue, AudioPlayer, SentenceParser, CacheManager, and SpeedController components. This controller will coordinate all TTS operations and maintain state throughout the application lifecycle.",
+          "testStrategy": "Unit tests for state transitions, integration tests for component coordination, mock engine tests to verify controller behavior",
+          "subtasks": []
+        },
+        {
+          "id": "3",
+          "title": "Implement TTSEngine Interface and Basic Piper Engine",
+          "description": "Create the engine abstraction layer and implement basic Piper TTS functionality",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "details": "Define the TTSEngine interface that will allow multiple TTS backends. Implement the Piper engine with subprocess spawning, ONNX model loading, and basic synthesis capabilities. Include proper timeout protection and error handling.",
+          "testStrategy": "Unit tests for engine interface compliance, integration tests with actual Piper binary, performance tests for synthesis timing",
+          "subtasks": []
+        },
+        {
+          "id": "4",
+          "title": "Build Sentence Parser for Markdown",
+          "description": "Create the markdown-to-sentence parser that extracts speakable text while preserving structure",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [
+            "2"
+          ],
+          "details": "Implement SentenceParser that processes markdown documents and extracts sentences suitable for TTS synthesis. Must handle various markdown elements like headers, code blocks, links, and formatting while producing clean text for audio generation.",
+          "testStrategy": "Unit tests with various markdown formats, edge case testing for complex markdown structures, validation of sentence boundary detection",
+          "subtasks": []
+        },
+        {
+          "id": "5",
+          "title": "Implement Audio Playback with OTO",
+          "description": "Create cross-platform audio playback system with proper memory management",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [
+            "1",
+            "2"
+          ],
+          "details": "Build AudioPlayer using OTO v3 library with proper data lifecycle management to prevent memory corruption. Implement play, pause, stop controls and ensure audio data references remain alive during playback.",
+          "testStrategy": "Memory leak tests, cross-platform playback tests, stress tests with rapid play/pause cycles",
+          "subtasks": []
+        },
+        {
+          "id": "6",
+          "title": "Add CLI Flag Parsing and Engine Selection",
+          "description": "Implement command-line interface for TTS activation and engine selection",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [
+            "3"
+          ],
+          "details": "Add --tts flag with engine selection (piper/gtts), implement validation logic for dependencies, and provide clear error messages when requirements are not met. Force TUI mode when TTS is activated.",
+          "testStrategy": "CLI argument parsing tests, validation tests for missing dependencies, integration tests with main Glow application",
+          "subtasks": []
+        },
+        {
+          "id": "7",
+          "title": "Build Two-Level Cache System",
+          "description": "Implement memory and disk caching layers for audio data",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [
+            "2",
+            "5"
+          ],
+          "details": "Create CacheManager with L1 memory cache (100MB limit) and L2 disk cache (1GB limit). Implement SHA256-based cache key generation including text, voice, and speed parameters. Add automatic cleanup based on size, age, and session lifecycle.",
+          "testStrategy": "Cache hit/miss ratio tests, memory usage monitoring, disk space cleanup validation, concurrent access tests",
+          "subtasks": []
+        },
+        {
+          "id": "8",
+          "title": "Implement Audio Queue and Preprocessing",
+          "description": "Create queue management system with lookahead buffer for seamless playback",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [
+            "3",
+            "4",
+            "7"
+          ],
+          "details": "Build AudioQueue that maintains 2-3 sentence lookahead buffer, handles background preprocessing, and ensures smooth transitions between sentences. Integrate with caching system for optimal performance.",
+          "testStrategy": "Buffer management tests, preprocessing timing tests, transition smoothness validation",
+          "subtasks": []
+        },
+        {
+          "id": "9",
+          "title": "Complete Google TTS Engine Implementation",
+          "description": "Add Google TTS engine support with gTTS CLI and ffmpeg pipeline",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [
+            "3"
+          ],
+          "details": "Implement Google TTS engine using gTTS CLI for synthesis, MP3 to PCM conversion via ffmpeg, and speed control through atempo filter. Include dependency validation and error handling for network failures.",
+          "testStrategy": "Network failure handling tests, audio format conversion validation, speed control accuracy tests",
+          "subtasks": []
+        },
+        {
+          "id": "10",
+          "title": "Integrate TTS Controls into Bubble Tea UI",
+          "description": "Add TTS control interface to existing Glow UI framework",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [
+            "2",
+            "5",
+            "6"
+          ],
+          "details": "Integrate TTS controls into Bubble Tea UI with keyboard shortcuts (space for play/pause, arrows for navigation, +/- for speed). Implement proper command pattern for all async operations and add status display showing engine, speed, and position.",
+          "testStrategy": "UI interaction tests, keyboard shortcut validation, status display accuracy tests",
+          "subtasks": []
+        },
+        {
+          "id": "11",
+          "title": "Implement Speed Control System",
+          "description": "Add comprehensive speed control with engine-specific parameter mapping",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [
+            "3",
+            "9"
+          ],
+          "details": "Build SpeedController supporting 0.5x to 2.0x speeds in discrete steps. Map to Piper's length-scale parameter and Google TTS's ffmpeg atempo filter. Update cache keys to include speed parameter.",
+          "testStrategy": "Speed accuracy tests for each engine, cache key uniqueness validation, user control response tests",
+          "subtasks": []
+        },
+        {
+          "id": "12",
+          "title": "Add Comprehensive Error Handling",
+          "description": "Implement production-grade error handling and recovery mechanisms",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [
+            "3",
+            "9",
+            "10"
+          ],
+          "details": "Add 5-second timeout protection with SIGINT/SIGKILL sequence, implement graceful degradation for missing dependencies, create actionable error messages for users, and add recovery mechanisms for transient failures.",
+          "testStrategy": "Timeout enforcement tests, error message clarity validation, recovery mechanism tests",
+          "subtasks": []
+        },
+        {
+          "id": "13",
+          "title": "Create Configuration System",
+          "description": "Build configuration file support with default settings management",
+          "status": "pending",
+          "priority": "low",
+          "dependencies": [
+            "2",
+            "7",
+            "11"
+          ],
+          "details": "Implement YAML-based configuration system for TTS settings including engine preferences, cache sizes, voice selection, and default speeds. Support both global and project-specific configurations.",
+          "testStrategy": "Configuration parsing tests, default value validation, override precedence tests",
+          "subtasks": []
+        },
+        {
+          "id": "14",
+          "title": "Add Logging and Debugging Capabilities",
+          "description": "Implement comprehensive logging system for troubleshooting",
+          "status": "pending",
+          "priority": "low",
+          "dependencies": [
+            "12"
+          ],
+          "details": "Add structured logging with configurable levels, implement debug mode for verbose output, create performance metrics collection, and add cache hit rate monitoring.",
+          "testStrategy": "Log output format tests, performance impact validation, metrics accuracy tests",
+          "subtasks": []
+        },
+        {
+          "id": "15",
+          "title": "Write User Documentation",
+          "description": "Create comprehensive user guides and troubleshooting documentation",
+          "status": "pending",
+          "priority": "medium",
+          "dependencies": [
+            "12",
+            "13"
+          ],
+          "details": "Write installation guides for all dependencies, create troubleshooting guides for common issues, document keyboard shortcuts and controls, and provide configuration examples.",
+          "testStrategy": "Documentation accuracy validation, example code testing, user feedback incorporation",
+          "subtasks": []
+        }
+      ]
+    }
+  },
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Implement Core TTS Controller and Infrastructure",
+        "description": "Create the main TTS Controller struct and establish critical subprocess management patterns to prevent stdin race conditions",
+        "details": "Create pkg/tts/controller.go with TTS Controller struct containing engine, queue, player, parser, cache, and speedCtrl fields. Implement subprocess management using cmd.Stdin = strings.NewReader(text) pattern before process start to prevent critical race conditions. Add basic state management and initialization logic. Create TTSEngine interface in pkg/tts/engine.go with Synthesize, SetSpeed, and Validate methods.",
+        "testStrategy": "Unit tests for Controller initialization, subprocess pattern validation with mock processes, and TTSEngine interface compliance tests",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create base TTS Controller struct with core fields",
+            "description": "Define the main Controller struct in pkg/tts/controller.go with all necessary fields for managing TTS operations",
+            "dependencies": [],
+            "details": "Create pkg/tts/controller.go and define the Controller struct with fields: engine (TTSEngine interface), queue (*AudioQueue), player (*AudioPlayer), parser (TextParser interface), cache (CacheManager interface), speedCtrl (SpeedController interface), state (sync.RWMutex protected state management), and context for lifecycle management. Add struct tags and documentation for each field. Include basic constructor function NewController() with field initialization.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Define TTSEngine interface with core synthesis methods",
+            "description": "Create the TTSEngine interface in pkg/tts/engine.go defining the contract for all TTS engine implementations",
+            "dependencies": [],
+            "details": "Create pkg/tts/engine.go and define TTSEngine interface with methods: Synthesize(text string, speed float64) ([]byte, error) for text-to-speech conversion, SetSpeed(speed float64) error for speed adjustment validation, Validate() error for dependency checking, GetName() string for engine identification, and IsAvailable() bool for runtime availability checks. Add comprehensive documentation explaining the PCM output format requirements (16-bit mono 22050Hz) and error handling expectations.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement subprocess management with stdin race prevention",
+            "description": "Create safe subprocess execution patterns in the controller to prevent stdin race conditions",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "In pkg/tts/controller.go, implement executeSubprocess(cmd *exec.Cmd, input string) ([]byte, error) method using the critical pattern: cmd.Stdin = strings.NewReader(input) before cmd.Start() to prevent race conditions. Add process lifecycle management with proper cleanup using defer statements. Implement timeout handling with context.WithTimeout. Create error wrapping for better debugging. Add logging for subprocess execution lifecycle events. Document the race condition prevention pattern prominently.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add state management and lifecycle methods to Controller",
+            "description": "Implement controller initialization, state tracking, and graceful shutdown mechanisms",
+            "dependencies": [
+              "1.1",
+              "1.2"
+            ],
+            "details": "Add Initialize() error method to validate and setup all components. Implement Start(ctx context.Context) error for beginning TTS operations with goroutine management. Add Stop() error for graceful shutdown with resource cleanup. Create state enum (Uninitialized, Ready, Running, Stopping, Stopped) with thread-safe transitions using sync.RWMutex. Implement GetState() State and setState(state State) methods. Add error aggregation for multi-component initialization failures. Include panic recovery in critical paths.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create comprehensive unit tests for controller and subprocess patterns",
+            "description": "Write unit tests validating controller initialization, subprocess management, and race condition prevention",
+            "dependencies": [
+              "1.3",
+              "1.4"
+            ],
+            "details": "Create pkg/tts/controller_test.go with TestNewController for initialization validation. Implement TestSubprocessExecution with mock processes to verify stdin race prevention using concurrent goroutines attempting to write. Add TestControllerLifecycle covering all state transitions. Create TestEngineInterface compliance tests using mock implementations. Add benchmark tests for subprocess execution patterns. Include race detector tests with go test -race. Test error conditions including initialization failures and subprocess timeouts.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Implement Audio Memory Management with OTO Integration",
+        "description": "Build cross-platform audio playback system with proper memory lifecycle management to prevent audio corruption",
+        "details": "Add github.com/ebitengine/oto/v3 to go.mod. Create pkg/tts/player.go with AudioStream struct containing data []byte, reader *bytes.Reader, and player oto.Player fields. Implement proper memory lifecycle management to keep audio data alive during playback. Add PCM audio format support (16-bit mono 22050Hz). Create playback controls (play, pause, stop) with proper resource cleanup.",
+        "testStrategy": "Audio playback tests with different PCM formats, memory lifecycle tests to prevent corruption, and cross-platform compatibility validation",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add OTO v3 dependency and initialize audio context",
+            "description": "Add github.com/ebitengine/oto/v3 to go.mod and create initialization logic for the OTO audio context with proper error handling",
+            "dependencies": [],
+            "details": "Run 'go get github.com/ebitengine/oto/v3' to add the dependency. Create an initialization function that sets up the OTO context with appropriate sample rate (22050Hz), channel count (1 for mono), and bit depth (16-bit). Include platform-specific initialization parameters and handle context creation errors gracefully. Validate that the audio context can be created on the target platform.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create AudioStream struct with memory management",
+            "description": "Implement the AudioStream struct in pkg/tts/player.go with proper fields for data persistence and memory lifecycle management",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Define AudioStream struct with fields: data []byte (to hold PCM audio data), reader *bytes.Reader (for streaming), player oto.Player (for playback control), and additional fields for state management (isPlaying bool, isPaused bool, mutex sync.RWMutex). Implement NewAudioStream constructor that properly initializes all fields and ensures data remains in memory during the stream's lifetime. Add methods to safely access and modify the audio data while preventing garbage collection during playback.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement PCM audio format handling",
+            "description": "Add PCM format validation and conversion utilities for 16-bit mono 22050Hz audio data",
+            "dependencies": [
+              "2.2"
+            ],
+            "details": "Create ValidatePCMFormat function to verify incoming audio data matches expected format (16-bit signed integer, mono channel, 22050Hz sample rate). Implement conversion utilities if needed to normalize audio data to the expected format. Add methods to calculate buffer sizes, duration, and byte positions based on PCM parameters. Include helper functions for reading/writing PCM headers if necessary for debugging or file output.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Build playback controls with state management",
+            "description": "Implement Play, Pause, Stop, and Resume methods with proper state transitions and thread safety",
+            "dependencies": [
+              "2.3"
+            ],
+            "details": "Implement Play() method that creates an OTO player instance, starts audio streaming from the bytes.Reader, and updates state flags. Add Pause() to temporarily halt playback while maintaining position. Implement Resume() to continue from paused position. Create Stop() to terminate playback and reset position. Use mutex locks to ensure thread-safe state transitions. Add GetState() method to query current playback status. Include position tracking for seek functionality foundation.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Add resource cleanup and memory lifecycle management",
+            "description": "Implement proper cleanup mechanisms to prevent memory leaks and audio corruption during stream lifecycle",
+            "dependencies": [
+              "2.4"
+            ],
+            "details": "Implement Close() method that properly releases OTO player resources, clears audio buffers, and signals garbage collection readiness. Add finalizer using runtime.SetFinalizer to ensure cleanup even if Close() isn't explicitly called. Implement reference counting or pinning mechanism to prevent premature garbage collection of audio data during playback. Create cleanup validation to ensure all resources are properly released. Add panic recovery in cleanup paths to prevent resource leaks on errors.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Write cross-platform tests for audio playback",
+            "description": "Create comprehensive test suite validating audio playback, memory management, and cross-platform compatibility",
+            "dependencies": [
+              "2.5"
+            ],
+            "details": "Write unit tests for AudioStream creation and initialization across different platforms (Linux, macOS, Windows). Create integration tests that play short PCM samples and verify proper playback without corruption. Add memory leak tests using runtime.MemStats to ensure proper cleanup. Implement stress tests with rapid play/stop cycles to validate resource management. Create benchmark tests for performance validation. Add platform-specific test cases for audio context initialization. Include tests for concurrent playback scenarios and edge cases like zero-length audio or invalid PCM data.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Integrate TTS Controls with Bubble Tea UI Framework",
+        "description": "Add TTS command patterns to existing Bubble Tea UI and implement CLI flag detection for explicit TTS activation",
+        "details": "Add --tts flag to main.go CLI arguments with engine selection (piper|gtts). Modify ui/ui.go to include TTS state in model struct. Implement Bubble Tea command pattern for all TTS async operations - no direct goroutines. Add TTS status display showing engine, speed, sentence position. Create keyboard shortcuts: Space (play/pause), arrows (navigation), +/- (speed control). Ensure TUI mode is mandatory when --tts flag is used.",
+        "testStrategy": "UI integration tests for TTS controls, command pattern validation, keyboard shortcut functionality, and CLI flag parsing tests",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add --tts CLI flag parsing with engine selection",
+            "description": "Implement command-line flag parsing in main.go to detect --tts flag with engine selection (piper|gtts)",
+            "dependencies": [],
+            "details": "Modify main.go to add --tts flag using existing CLI parsing structure. Accept engine parameter as --tts=piper or --tts=gtts. Default to piper if no engine specified. Store selected engine in config struct. Ensure TUI mode is automatically enabled when --tts flag is present. Pass TTS configuration to ui.NewProgram() initialization.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Extend Bubble Tea model struct with TTS state",
+            "description": "Modify ui/ui.go model struct to include comprehensive TTS state management fields",
+            "dependencies": [],
+            "details": "Add TTSController field to model struct in ui/ui.go. Include TTS state fields: isPlaying bool, isPaused bool, currentSentenceIndex int, currentSpeed float64, ttsEngine string. Add fields for audio queue management and sentence navigation tracking. Ensure proper initialization of TTS state in NewProgram() when --tts flag is detected.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement Bubble Tea commands for async TTS operations",
+            "description": "Create command pattern implementation for all TTS operations following Bubble Tea async patterns",
+            "dependencies": [
+              "3.1",
+              "3.2"
+            ],
+            "details": "Create ttsPlayCmd, ttsPauseCmd, ttsNextCmd, ttsPrevCmd commands in ui/ui.go. Implement ttsSpeedChangeCmd for speed adjustments. Use tea.Cmd return type for all async operations - no direct goroutines. Create command factories that return tea.Cmd functions wrapping TTS controller calls. Ensure proper error handling and state updates through command results.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add keyboard shortcuts for TTS control",
+            "description": "Implement keyboard event handlers for Space, arrow keys, and +/- speed controls",
+            "dependencies": [
+              "3.3"
+            ],
+            "details": "In Update() method, add case handlers for: Space key to toggle play/pause, Left/Right arrows for previous/next sentence navigation, Up/Down arrows for paragraph navigation, +/- keys for speed increment/decrement. Return appropriate TTS commands from key handlers. Ensure shortcuts only active when TTS is enabled. Add visual feedback for key actions in status display.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create TTS status display component",
+            "description": "Build UI component showing TTS engine, playback status, speed, and sentence position",
+            "dependencies": [
+              "3.2",
+              "3.4"
+            ],
+            "details": "Create renderTTSStatus() method in ui/ui.go View() function. Display current engine (Piper/Google TTS), playback state (Playing/Paused/Stopped), current speed (0.5x-2.0x), sentence position (e.g., '3/15 sentences'). Use lipgloss for styling consistent with existing UI. Position status bar at bottom or integrate with existing status display. Update display reactively based on model state changes.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Enforce TUI mode and integrate TTS initialization",
+            "description": "Ensure TUI mode is mandatory with --tts flag and properly initialize TTS controller",
+            "dependencies": [
+              "3.1",
+              "3.2",
+              "3.3"
+            ],
+            "details": "In main.go, force TUI mode when --tts flag is detected regardless of other flags. Initialize TTS controller in ui.NewProgram() when TTS is enabled. Connect TTS controller to model struct. Implement Init() command to start TTS preprocessing if auto-play is enabled. Add graceful shutdown handling for TTS resources in tea.Quit command. Validate TTS engine availability before UI initialization.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Create Sentence Parser for Markdown Text Extraction",
+        "description": "Build intelligent markdown parser that extracts speakable sentences while preserving document structure",
+        "details": "Create pkg/tts/parser.go with SentenceParser struct. Implement markdown parsing that extracts clean text for synthesis while maintaining original formatting. Create Sentence struct with Text (clean), Position (document index), and Original (markdown) fields. Handle special markdown elements (code blocks, links, headers) appropriately for speech. Implement sentence boundary detection with proper punctuation handling.",
+        "testStrategy": "Parser tests with various markdown formats, sentence extraction accuracy validation, and edge case handling for complex markdown structures",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create SentenceParser struct and Sentence model",
+            "description": "Define the core data structures for sentence parsing including SentenceParser struct in pkg/tts/parser.go and Sentence struct with Text, Position, and Original fields",
+            "dependencies": [],
+            "details": "Create pkg/tts/parser.go file. Define Sentence struct with fields: Text (string for clean speakable text), Position (int for document index), Original (string for original markdown). Define SentenceParser struct with necessary fields for markdown processing state. Add constructor function NewSentenceParser() and basic initialization logic.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Integrate glamour markdown parsing",
+            "description": "Implement markdown element extraction leveraging the existing glamour integration patterns from the codebase",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Study existing glamour usage in the codebase for markdown rendering. Create Parse(markdown string) method on SentenceParser that uses glamour to extract text content. Handle markdown AST traversal to extract plain text while preserving structure information. Map glamour elements to internal representation for further processing.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement sentence boundary detection logic",
+            "description": "Add intelligent sentence boundary detection with proper punctuation rules and edge case handling",
+            "dependencies": [
+              "4.2"
+            ],
+            "details": "Implement detectSentences(text string) []Sentence method with punctuation-based splitting (periods, exclamation marks, question marks). Handle abbreviations and decimal numbers that contain periods. Implement lookahead/lookbehind logic for proper sentence boundaries. Handle ellipsis and other special punctuation patterns. Preserve original markdown positions during sentence extraction.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Handle special markdown elements for speech",
+            "description": "Process code blocks, links, headers, and other markdown elements appropriately for TTS synthesis",
+            "dependencies": [
+              "4.3"
+            ],
+            "details": "Implement handleCodeBlock() to either skip or announce code blocks based on configuration. Convert links to speakable format (e.g., 'link to [text]' or just the link text). Transform headers into pausable boundaries with appropriate emphasis. Handle lists and blockquotes with proper speech formatting. Process inline code, bold, and italic elements for natural speech flow.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Write comprehensive parser tests",
+            "description": "Create thorough test suite covering various markdown formats and edge cases for the sentence parser",
+            "dependencies": [
+              "4.4"
+            ],
+            "details": "Create pkg/tts/parser_test.go with test cases for basic sentence extraction. Add tests for complex markdown with nested elements (links in lists, code in blockquotes). Test sentence boundary detection with abbreviations, numbers, and special punctuation. Verify correct handling of empty lines and whitespace. Test performance with large markdown documents. Include edge cases like malformed markdown and unicode content.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Implement Basic Piper TTS Engine",
+        "description": "Create the offline Piper TTS engine implementation with dependency validation and basic synthesis capability",
+        "details": "Create pkg/tts/engines/piper.go implementing TTSEngine interface. Add dependency detection for piper binary in PATH and ONNX voice models. Implement synthesis using fresh process per call with proper subprocess management. Add --length-scale parameter for speed control (0.5x-2.0x). Include model validation and voice selection. Handle PCM audio output conversion and error handling with clear user guidance.",
+        "testStrategy": "Piper binary detection tests, synthesis quality validation, speed control verification, and comprehensive error handling tests",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          4
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Piper engine structure and TTSEngine interface implementation",
+            "description": "Set up the basic Piper engine struct in pkg/tts/engines/piper.go with all required fields and implement the TTSEngine interface methods (Synthesize, SetSpeed, Validate)",
+            "dependencies": [],
+            "details": "Create piper.go file with PiperEngine struct containing fields for binary path, model path, speed setting, and process management. Implement TTSEngine interface with method stubs. Add constants for default speed range (0.5-2.0) and audio format parameters (16-bit mono 22050Hz PCM).",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Piper binary and ONNX model detection",
+            "description": "Add dependency validation logic to detect piper binary in PATH and locate ONNX voice models in standard locations",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Implement Validate() method to check for piper binary using exec.LookPath. Search for ONNX models in common locations (~/.local/share/piper-voices/, /usr/share/piper-voices/). Validate model files exist and are accessible. Return clear error messages with installation instructions if dependencies are missing.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement subprocess management for synthesis",
+            "description": "Create the core synthesis logic using fresh process per call with proper stdin handling to prevent race conditions",
+            "dependencies": [
+              "5.1",
+              "5.2"
+            ],
+            "details": "Implement Synthesize() method using exec.Command for piper binary. Apply the cmd.Stdin = strings.NewReader(text) pattern before process start. Add --output-raw flag for PCM output, --model flag for ONNX model path. Implement proper process lifecycle management with context support for cancellation. Handle process exit codes and stderr for error reporting.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add speed control with --length-scale parameter",
+            "description": "Implement SetSpeed method and integrate --length-scale parameter into synthesis command",
+            "dependencies": [
+              "5.3"
+            ],
+            "details": "Implement SetSpeed() method to store speed setting (0.5-2.0 range). Add --length-scale parameter to piper command with inverse calculation (2.0 speed = 0.5 length-scale). Validate speed values and provide clear error messages for out-of-range values. Update synthesis command builder to include length-scale when speed != 1.0.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Handle PCM audio output conversion and buffering",
+            "description": "Implement PCM audio data collection from piper stdout with proper buffering and format validation",
+            "dependencies": [
+              "5.3",
+              "5.4"
+            ],
+            "details": "Read PCM data from cmd.StdoutPipe() into byte buffer. Validate PCM format (16-bit mono 22050Hz). Handle partial reads and implement proper buffering strategy. Convert raw PCM bytes to []byte for return value. Add audio data size validation and handle edge cases like empty output.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Create comprehensive error handling with user guidance",
+            "description": "Implement detailed error handling throughout the engine with actionable user messages",
+            "dependencies": [
+              "5.2",
+              "5.3",
+              "5.5"
+            ],
+            "details": "Create custom error types for different failure scenarios (dependency missing, model not found, synthesis failed). Add helpful error messages with installation/fix instructions. Implement error wrapping for context preservation. Add logging for debugging subprocess issues. Handle timeout scenarios and provide recovery suggestions.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Build Two-Level Caching System",
+        "description": "Implement memory and disk caching architecture for optimal TTS performance with automatic cleanup",
+        "details": "Create pkg/tts/cache.go with CacheManager struct. Implement L1 memory cache (100MB limit, <1ms access) and L2 disk cache (1GB limit, 7-day TTL). Use SHA256(text|voice|speed) for cache keys. Add automatic cleanup based on size, age, and session lifecycle. Implement cache hit rate monitoring. Create AudioData struct with Audio []byte, Text string, Speed float64, and CacheKey string fields. Use platform-specific cache directories with restricted permissions.",
+        "testStrategy": "Cache performance benchmarks, hit rate validation (target >80%), cleanup mechanism tests, and cross-session persistence verification",
+        "priority": "medium",
+        "dependencies": [
+          4,
+          5
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design CacheManager Architecture and Interfaces",
+            "description": "Create the core CacheManager struct and define interfaces for L1 and L2 cache layers with common operations",
+            "dependencies": [],
+            "details": "Create pkg/tts/cache.go with CacheManager struct containing L1Cache and L2Cache interfaces. Define Cache interface with Get(key string), Put(key string, data *AudioData), Delete(key string), Size() int64, and Clear() methods. Create AudioData struct with Audio []byte, Text string, Speed float64, and CacheKey string fields. Design configuration struct with L1SizeLimit (100MB), L2SizeLimit (1GB), and TTL (7 days) parameters.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement L1 Memory Cache with LRU Eviction",
+            "description": "Build the in-memory cache layer with size-based LRU eviction and sub-millisecond access times",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Implement MemoryCache struct satisfying L1Cache interface. Use sync.Map or custom concurrent map for <1ms access. Implement LRU eviction using container/list for tracking access order. Add size tracking with atomic operations for thread safety. Implement automatic eviction when approaching 100MB limit. Include metrics for hit/miss rates and access times using sync/atomic counters.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build L2 Disk Cache with Platform-Specific Storage",
+            "description": "Create the persistent disk cache layer with platform-aware directory management and file permissions",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Implement DiskCache struct satisfying L2Cache interface. Use os.UserCacheDir() for platform-specific cache directories (XDG_CACHE_HOME on Linux, ~/Library/Caches on macOS, %LOCALAPPDATA% on Windows). Set restrictive permissions (0700) on cache directory. Implement file-based storage with metadata files containing timestamp, size, and access count. Add file locking for concurrent access safety. Include compression for audio data to optimize disk usage.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement SHA256-Based Cache Key Generation",
+            "description": "Create deterministic cache key generation using SHA256 hashing of text, voice, and speed parameters",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create GenerateCacheKey(text, voice, speed string) function using crypto/sha256. Normalize input parameters before hashing (trim whitespace, lowercase voice names, format speed to 2 decimal places). Generate hex-encoded 64-character keys. Add key validation and collision detection. Implement key prefix for versioning (v1_<hash>). Include unit tests for key determinism and parameter sensitivity.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Build Automatic Cleanup and Lifecycle Management",
+            "description": "Implement multi-criteria cleanup system based on size limits, age, and session lifecycle",
+            "dependencies": [
+              "6.2",
+              "6.3"
+            ],
+            "details": "Create CleanupManager with goroutine-based background cleanup. Implement size-based cleanup triggering at 90% capacity for both L1 and L2. Add age-based cleanup removing entries older than 7 days for L2, 1 hour for L1. Implement session lifecycle hooks for cleanup on application exit. Use heap data structure for efficient LRU/LFU tracking. Add configurable cleanup intervals and thresholds. Include graceful shutdown with cleanup completion.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add Cache Metrics and Hit Rate Monitoring",
+            "description": "Implement comprehensive metrics collection for cache performance monitoring and optimization",
+            "dependencies": [
+              "6.2",
+              "6.3",
+              "6.4"
+            ],
+            "details": "Create CacheMetrics struct with hit/miss counters, access times, and size tracking. Implement rolling window statistics for hit rates (1min, 5min, 15min averages). Add per-cache-level metrics (L1 vs L2 hit rates). Include cache promotion/demotion tracking between levels. Export metrics in Prometheus-compatible format. Add debug logging for cache operations with configurable verbosity. Target >80% combined hit rate.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Write Performance Benchmarks and Persistence Tests",
+            "description": "Create comprehensive test suite validating performance requirements and cross-session persistence",
+            "dependencies": [
+              "6.2",
+              "6.3",
+              "6.4",
+              "6.5",
+              "6.6"
+            ],
+            "details": "Write benchmark tests validating <1ms L1 access using testing.B. Create load tests simulating concurrent access patterns. Test LRU eviction correctness under memory pressure. Validate disk persistence across process restarts. Test cleanup mechanisms with time manipulation. Benchmark cache key generation performance. Validate platform-specific directory creation and permissions. Test cache coherency between L1 and L2 layers.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Implement Audio Queue with Preprocessing Pipeline",
+        "description": "Create background audio processing with 2-3 sentence lookahead buffer for seamless playback transitions",
+        "details": "Create pkg/tts/queue.go with AudioQueue struct managing preprocessing and playback order. Implement 2-3 sentence lookahead buffer with background synthesis. Add queue management for previous/next navigation. Implement preprocessing pipeline that eliminates gaps between sentences. Create buffer management with proper memory handling and garbage collection considerations. Add queue state tracking and debugging capabilities.",
+        "testStrategy": "Queue management tests, lookahead buffer validation, seamless transitions verification, and memory usage monitoring",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          6
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design AudioQueue Struct and Core Architecture",
+            "description": "Create AudioQueue struct with fields for buffer management, state tracking, and concurrent processing control",
+            "dependencies": [],
+            "details": "Define AudioQueue struct in pkg/tts/queue.go with fields: buffer []AudioSegment, bufferSize int, currentIndex int, processingQueue chan TextSegment, synthesisWorkers int, mu sync.RWMutex, state QueueState, and ctx context.Context. Create AudioSegment type containing audio data, text reference, and metadata. Define QueueState enum (idle, processing, playing). Establish interfaces for queue operations and callback mechanisms.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Lookahead Buffer with Background Synthesis",
+            "description": "Build 2-3 sentence lookahead buffer system with background synthesis workers for continuous audio preparation",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "Implement NewAudioQueue(bufferSize int) constructor with default 3-sentence lookahead. Create background worker pool using goroutines for concurrent synthesis. Implement AddToQueue(text string) method that triggers background processing. Build buffer management logic to maintain 2-3 sentences ahead of current playback position. Add automatic buffer refill when dropping below threshold. Implement proper synchronization between synthesis workers and buffer updates.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build Queue Navigation and Control Methods",
+            "description": "Implement previous/next navigation with proper buffer management and state transitions",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "Create Next() and Previous() methods for queue navigation with bounds checking. Implement Skip(n int) for jumping to specific positions. Add GetCurrent() and GetQueuedItems() for state inspection. Build position tracking with currentPosition and totalItems counters. Implement queue reordering logic for dynamic priority changes. Add Clear() and Reset() methods for queue management.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Create Preprocessing Pipeline for Seamless Transitions",
+            "description": "Implement audio preprocessing pipeline that eliminates gaps between sentences for continuous playback",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "Build PreprocessAudio(raw []byte) method to normalize audio segments. Implement silence trimming at segment boundaries using audio amplitude detection. Add crossfade blending between consecutive segments (50-100ms overlap). Create audio level normalization to maintain consistent volume. Implement format conversion pipeline ensuring consistent PCM parameters. Add configurable transition duration settings.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement Memory Management and Garbage Collection",
+            "description": "Build efficient memory management system with proper cleanup and garbage collection optimization",
+            "dependencies": [
+              "7.3",
+              "7.4"
+            ],
+            "details": "Implement buffer eviction policy using LRU cache for processed segments. Create ReleaseSegment(index int) for manual memory release. Add automatic cleanup of played segments after configurable retention period. Implement memory pooling for AudioSegment allocations to reduce GC pressure. Add MaxMemoryUsage limit with automatic buffer size adjustment. Create background cleanup goroutine monitoring memory usage and triggering collection when threshold exceeded.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add Queue State Tracking and Debugging Capabilities",
+            "description": "Implement comprehensive state tracking, metrics collection, and debugging tools for queue operations",
+            "dependencies": [
+              "7.5"
+            ],
+            "details": "Create GetQueueStats() returning metrics: queue depth, buffer utilization, synthesis rate, memory usage. Implement state change notifications using callback pattern or channels. Add detailed logging with configurable levels (debug, info, warn, error). Create DumpQueueState() for debugging snapshots. Implement performance metrics tracking (synthesis time, buffer hits/misses). Add visual queue state representation for debugging output.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Implement loading states with Bubbles spinner",
+            "description": "Add visual loading indicators using the Bubbles spinner component for TTS initialization, audio synthesis, and buffering operations to provide better user feedback",
+            "details": "",
+            "status": "done",
+            "dependencies": [],
+            "parentTaskId": 7
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Create Speed Control System",
+        "description": "Build comprehensive speed control with engine-specific parameter mapping and discrete speed steps",
+        "details": "Create pkg/tts/speed.go with SpeedController struct. Implement discrete speed steps from 0.5x to 2.0x (0.5, 0.75, 1.0, 1.25, 1.5, 2.0). Add engine-specific parameter mapping (Piper length-scale vs Google TTS ffmpeg atempo). Speed changes affect new synthesis only, maintaining current playback. Update cache keys to include speed parameter. Add keyboard controls (+/-) for speed adjustment with visual feedback in UI.",
+        "testStrategy": "Speed control accuracy tests, engine-specific parameter validation, cache key generation with speed, and UI feedback verification",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create SpeedController struct with discrete speed steps",
+            "description": "Implement the core SpeedController struct in pkg/tts/speed.go with predefined discrete speed values and state management",
+            "dependencies": [],
+            "details": "Create pkg/tts/speed.go with SpeedController struct containing currentSpeed float64, availableSpeeds []float64 (0.5, 0.75, 1.0, 1.25, 1.5, 2.0), and mutex for thread-safe operations. Implement NewSpeedController() constructor with default speed 1.0. Add GetSpeed(), SetSpeed(speed float64), NextSpeed(), and PreviousSpeed() methods. Validate speed values against available discrete steps. Include IsValidSpeed(speed float64) helper method.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement engine-specific parameter mapping",
+            "description": "Create parameter mapping logic that translates generic speed values to engine-specific parameters for Piper and Google TTS",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Add GetEngineParameter(engineType string, speed float64) method to SpeedController. For Piper engine, map speed to --length-scale parameter (inverse relationship: speed 2.0 = length-scale 0.5). For Google TTS, prepare ffmpeg atempo parameter mapping (direct relationship: speed 2.0 = atempo 2.0). Create EngineParameterMap type for storing engine-specific configurations. Include validation for parameter ranges specific to each engine.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Update cache key generation to include speed parameter",
+            "description": "Modify cache key generation logic to incorporate speed value, ensuring different speeds generate unique cache entries",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Update cache key generation to use SHA256(text|voice|speed) format. Modify GenerateCacheKey() function to accept speed parameter. Ensure speed value is normalized to string format with consistent precision (e.g., '1.50' not '1.5'). Update all cache lookups and stores to use new key format. Add migration logic to handle existing cache entries without speed parameter.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Integrate keyboard controls with UI feedback",
+            "description": "Add keyboard handlers for speed adjustment and visual feedback display in the TUI",
+            "dependencies": [
+              "8.1",
+              "8.2",
+              "8.3"
+            ],
+            "details": "Implement keyboard handlers for '+' (increase speed) and '-' (decrease speed) keys in the TUI event loop. Add visual speed indicator to UI showing current speed value (e.g., 'Speed: 1.25x'). Create UpdateSpeedDisplay() method for real-time UI updates. Ensure speed changes only affect new synthesis, not current playback. Add toast notification or status message when speed changes. Include bounds checking to prevent invalid speed selections.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Implement Google TTS Engine with Pipeline",
+        "description": "Create online Google TTS engine using gTTS CLI with ffmpeg audio processing pipeline",
+        "details": "Create pkg/tts/engines/gtts.go implementing TTSEngine interface. Add dependency detection for gtts-cli (pip install gTTS) and ffmpeg. Implement synthesis pipeline: gTTS CLI → MP3 → ffmpeg atempo → PCM conversion. Use ffmpeg atempo filter for speed control instead of Piper's length-scale. Add internet connectivity validation. Implement proper error handling with actionable user guidance. No API key required - uses free gTTS service.",
+        "testStrategy": "Dependency detection tests, synthesis pipeline validation, speed control via ffmpeg, connectivity handling, and error recovery tests",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          8
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create GTTSEngine struct implementing TTSEngine interface",
+            "description": "Implement the core Google TTS engine structure with TTSEngine interface methods in pkg/tts/engines/gtts.go",
+            "dependencies": [],
+            "details": "Create pkg/tts/engines/gtts.go file. Define GTTSEngine struct with fields for configuration (language, slow mode flag). Implement TTSEngine interface methods: Synthesize(text string) ([]byte, error), SetSpeed(speed float32) error, and Validate() error. Add internal fields for tracking ffmpeg speed setting and temporary file management. Follow the same patterns established in piper.go for consistency.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement dependency detection for gtts-cli and ffmpeg",
+            "description": "Add robust dependency checking for both gtts-cli Python package and ffmpeg binary with actionable error messages",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Implement checkGTTSCLI() function to verify gtts-cli is installed via pip. Use exec.LookPath() to check for gtts-cli in PATH. Implement checkFFmpeg() function to verify ffmpeg binary availability. Add version checking for compatibility. Return detailed error messages with installation instructions: 'gtts-cli not found. Install with: pip install gTTS' and 'ffmpeg not found. Install via your package manager'. Call both checks in Validate() method.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build gTTS to MP3 synthesis pipeline",
+            "description": "Implement the first stage of the pipeline using gTTS CLI to generate MP3 output with internet connectivity validation",
+            "dependencies": [
+              "9.1",
+              "9.2"
+            ],
+            "details": "Create synthesizeToMP3() method that constructs gtts-cli command with proper arguments: gtts-cli --text 'text' --output temp.mp3 --lang en. Add internet connectivity check before synthesis attempt using net.Dial to google.com:443. Handle temporary file creation with ioutil.TempFile for MP3 output. Implement proper error handling for network failures, returning user-friendly messages like 'Internet connection required for Google TTS'. Use cmd.Stdin = strings.NewReader(text) pattern to avoid stdin race conditions.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement ffmpeg audio processing pipeline with atempo filter",
+            "description": "Create the MP3 to PCM conversion pipeline with ffmpeg atempo filter for speed control",
+            "dependencies": [
+              "9.3"
+            ],
+            "details": "Implement convertMP3ToPCM() method that takes MP3 file path and speed factor. Construct ffmpeg command: ffmpeg -i input.mp3 -af atempo=speed -f s16le -ar 22050 -ac 1 pipe:1. Map speed values (0.5-2.0) to atempo filter values. Handle ffmpeg stdout to capture PCM data into byte slice. Implement proper subprocess management with context cancellation. Add error handling for invalid speed values and ffmpeg failures. Clean up temporary MP3 file after conversion.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Integrate complete synthesis pipeline with error recovery",
+            "description": "Wire together the complete gTTS → MP3 → ffmpeg → PCM pipeline in the Synthesize method",
+            "dependencies": [
+              "9.3",
+              "9.4"
+            ],
+            "details": "Implement Synthesize() method orchestrating the full pipeline: call synthesizeToMP3(), then convertMP3ToPCM() with current speed setting. Add retry logic for transient network failures (max 2 retries with exponential backoff). Implement proper cleanup of all temporary files in defer blocks. Add detailed logging at each pipeline stage for debugging. Return PCM audio data in correct format (16-bit mono 22050Hz). Ensure all error messages guide users to solutions.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add comprehensive error handling and user guidance",
+            "description": "Implement detailed error handling with actionable messages for all failure scenarios",
+            "dependencies": [
+              "9.5"
+            ],
+            "details": "Create custom error types for different failure modes: NetworkError, DependencyError, ProcessError. Implement fallback behavior for network failures (suggest offline engines). Add detailed error messages with resolution steps for each error type. Create validateConnectivity() helper for pre-flight checks. Implement GetLastError() method for debugging. Add timeout handling for long-running synthesis operations (30s max). Include example usage documentation in comments.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Add Comprehensive Error Handling and Production Polish",
+        "description": "Implement robust error handling, dependency validation, timeout protection, and user documentation",
+        "details": "Add 5-second timeout protection with graceful SIGINT/SIGKILL sequence for all subprocess calls. Implement comprehensive dependency checking with clear setup guidance. Add engine availability detection with helpful error messages. Create configuration file support (.glow/config.yml) with TTS settings. Implement logging and debugging capabilities. Add user documentation for setup and troubleshooting. Create installation guides for Piper and Google TTS dependencies. Add graceful shutdown handling and resource cleanup.",
+        "testStrategy": "Timeout protection validation, dependency error message clarity, configuration loading tests, and comprehensive integration testing across platforms",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          9
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement subprocess timeout protection system",
+            "description": "Add 5-second timeout mechanism with graceful SIGINT/SIGKILL sequence for all TTS engine subprocess calls",
+            "dependencies": [],
+            "details": "Create pkg/tts/timeout.go with TimeoutExecutor struct. Implement RunWithTimeout(cmd *exec.Cmd, timeout time.Duration) that sends SIGINT after timeout, waits 500ms for graceful shutdown, then sends SIGKILL if needed. Integrate with both Piper and Google TTS engine subprocess calls. Add context cancellation support for proper cleanup. Include timeout configuration in engine structs with sensible defaults.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Build dependency validation and setup guidance system",
+            "description": "Create comprehensive dependency checking with clear error messages and installation instructions",
+            "dependencies": [],
+            "details": "Create pkg/tts/dependencies.go with DependencyChecker interface. Implement CheckPiper() for piper binary and ONNX models, CheckGTTS() for gtts-cli and ffmpeg. Add CheckSystemDependencies() that validates all required tools on startup. Create helpful error messages with platform-specific installation commands (brew/apt/pip). Include version checking where applicable. Add --check-deps flag to validate without running.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create configuration file system with .glow/config.yml",
+            "description": "Implement YAML configuration support for TTS settings using viper",
+            "dependencies": [],
+            "details": "Create pkg/config/config.go extending existing viper setup. Define config structure for TTS settings: default engine, cache limits, timeout values, voice preferences, speed defaults. Support ~/.config/glow/config.yml and ./.glow/config.yml with proper precedence. Add config validation and migration from old settings. Include example config generation with --generate-config flag. Integrate with existing glamour style configuration.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement logging and debugging capabilities",
+            "description": "Add structured logging using charmbracelet/log with debug levels and TTS-specific logging",
+            "dependencies": [
+              "10.3"
+            ],
+            "details": "Extend existing charmbracelet/log usage for TTS operations. Add debug levels: ERROR, WARN, INFO, DEBUG, TRACE. Create TTS-specific loggers for cache hits/misses, engine selection, synthesis timing, subprocess execution. Add --debug and --trace flags for verbose output. Include performance metrics logging (synthesis time, cache efficiency). Write logs to ~/.glow/debug.log when debug enabled.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Write comprehensive user documentation",
+            "description": "Create setup guides, troubleshooting docs, and installation instructions for all TTS dependencies",
+            "dependencies": [
+              "10.2"
+            ],
+            "details": "Create docs/TTS_SETUP.md with platform-specific Piper installation (models, voices). Add docs/TTS_TROUBLESHOOTING.md for common issues and solutions. Write Google TTS setup guide with pip installation steps. Document configuration file options and examples. Add keyboard shortcuts reference for TTS controls. Include performance tuning guide for cache settings. Create quick-start section in main README.md.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add graceful shutdown and resource cleanup",
+            "description": "Implement proper signal handling and resource cleanup for TTS subsystems",
+            "dependencies": [
+              "10.1",
+              "10.4"
+            ],
+            "details": "Create pkg/tts/lifecycle.go with cleanup coordination. Implement signal handlers for SIGINT/SIGTERM with graceful TTS shutdown. Add defer cleanup in all engine implementations. Ensure subprocess termination on exit. Implement cache flush on shutdown if configured. Add audio playback interruption handling. Create resource leak detection in debug mode. Ensure all goroutines terminate properly.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Perform cross-platform integration testing",
+            "description": "Validate all production features work correctly across Linux, macOS, and Windows",
+            "dependencies": [
+              "10.1",
+              "10.2",
+              "10.3",
+              "10.4",
+              "10.5",
+              "10.6"
+            ],
+            "details": "Create integration test suite in tts_integration_test.go. Test timeout protection with slow/hanging processes. Validate dependency detection messages on each platform. Test configuration loading and precedence. Verify graceful shutdown sequences. Test cache behavior across sessions. Validate error messages and recovery paths. Add CI matrix testing for all platforms. Document platform-specific quirks discovered.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-13T19:20:07.954Z",
+      "updated": "2025-08-15T00:28:24.969Z",
+      "description": "Tasks for master context"
+    }
+  },
+  "ci_fixes": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Fix compilation errors in main.go",
+        "description": "Remove redundant newlines from fmt.Println statements that are causing build failures across all platforms",
+        "details": "Fix fmt.Println statements at line 438 and other instances where \\n is redundantly added to fmt.Println calls. The fmt.Println function automatically adds a newline, so manual \\n causes compilation errors. This is the critical blocker preventing all CI workflows from running. Search for all instances of fmt.Println with \\n and remove the redundant newlines.",
+        "testStrategy": "Run go build ./... to ensure compilation succeeds on all platforms. Verify that output formatting remains correct after removing redundant newlines.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Search and identify all fmt.Println calls with redundant newlines",
+            "description": "Scan the entire codebase to find all instances of fmt.Println that include \\n characters",
+            "dependencies": [],
+            "details": "Use grep or code search to find all occurrences of fmt.Println that contain \\n characters. Document the exact line numbers and files where these redundant newlines appear. Focus on patterns like fmt.Println(\"...\\n\") and fmt.Println(variable + \"\\n\"). Create a list of all locations that need to be fixed.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Fix the primary compilation error at line 438 in main.go",
+            "description": "Remove the redundant newline from the fmt.Println statement at line 438 that is causing the build failure",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "Navigate to line 438 in main.go and remove the \\n character from the fmt.Println call. Ensure the output formatting remains correct by verifying that fmt.Println's automatic newline provides the expected behavior. Test the fix by running 'go build ./...' to confirm this specific error is resolved.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Fix all remaining fmt.Println statements with redundant newlines",
+            "description": "Remove \\n characters from all other fmt.Println calls identified in the search",
+            "dependencies": [
+              "1.1",
+              "1.2"
+            ],
+            "details": "Using the list from subtask 1.1, systematically fix each remaining instance of fmt.Println with redundant newlines. Verify each change maintains the intended output format. After all fixes are complete, run 'go build ./...' on all target platforms to ensure no compilation errors remain. Run the application to verify output formatting is preserved.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Update mapstructure dependency for security fix",
+        "description": "Update github.com/go-viper/mapstructure from v2.2.1 to v2.3.0 to address GO-2025-3787 vulnerability",
+        "details": "Update go.mod to use mapstructure v2.3.0 which fixes vulnerability GO-2025-3787 that could leak sensitive information in logs. Run 'go mod tidy' after updating. The vulnerability affects configuration parsing in pkg/tts/config.go via viper. While non-critical, this security fix should be applied to maintain security baseline.",
+        "testStrategy": "Run govulncheck ./... to verify the vulnerability is resolved. Test configuration loading functionality to ensure no regressions. Check that all TTS configuration parsing still works correctly.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update mapstructure dependency version in go.mod",
+            "description": "Modify go.mod file to update github.com/go-viper/mapstructure from v2.2.1 to v2.3.0",
+            "dependencies": [],
+            "details": "Edit line 48 in go.mod to change the mapstructure dependency version from v2.2.1 to v2.3.0. This addresses the GO-2025-3787 vulnerability that could potentially leak sensitive information in logs during configuration parsing.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Run go mod tidy and verify dependency resolution",
+            "description": "Execute go mod tidy to update go.sum and ensure all dependencies are properly resolved",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Run 'go mod tidy' command to update the go.sum file with the new dependency checksums. Verify that the command completes successfully without errors and that mapstructure v2.3.0 is properly downloaded and integrated into the module dependencies.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Test configuration loading and verify security fix",
+            "description": "Run govulncheck and test configuration parsing to ensure the vulnerability is resolved and no regressions occur",
+            "dependencies": [
+              "2.2"
+            ],
+            "details": "Execute 'govulncheck ./...' to confirm GO-2025-3787 vulnerability is resolved. Test the configuration loading functionality in pkg/tts/config.go that uses viper with mapstructure. Run existing tests with 'go test ./pkg/tts/...' to ensure configuration parsing works correctly without regressions.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Fix race conditions in TTS queue operations",
+        "description": "Add proper mutex synchronization to TTSAudioQueue operations to prevent data races during concurrent access",
+        "details": "Analyze pkg/tts/queue.go for race conditions, particularly in processTextQueue() method around line 261. Add proper mutex protection for concurrent access to TTSAudioQueue fields including segments map, order slice, and currentIndex. Implement atomic operations for counters and state management. Focus on areas where multiple goroutines access shared state without synchronization.",
+        "testStrategy": "Run go test -race ./pkg/tts/... to verify race conditions are eliminated. Specifically test TestPlaybackControls, TestAddText, TestQueueNavigation for race condition resolution. Monitor for 'Synthesis queue full' warnings that indicate synchronization issues.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Audit concurrent access patterns in queue.go",
+            "description": "Perform comprehensive analysis of all goroutine access patterns to shared state in pkg/tts/queue.go",
+            "dependencies": [],
+            "details": "Review pkg/tts/queue.go thoroughly to identify all locations where multiple goroutines access shared state. Document each concurrent access point including: segments map reads/writes, order slice operations, currentIndex modifications, and any other shared fields. Create a matrix of which methods access which shared resources to understand the complete synchronization requirements.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Add mutex protection to processTextQueue method",
+            "description": "Implement proper mutex locking in processTextQueue() method around line 244 to prevent concurrent access issues",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Add mutex.Lock() and defer mutex.Unlock() at appropriate points in processTextQueue() method. Ensure all access to shared state within this method is properly synchronized. Pay special attention to the loop iterations and any goroutines spawned from within this method. Consider using RLock() for read-only operations to improve performance.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Protect segments map operations",
+            "description": "Add synchronization for all read and write operations to the segments map in TTSAudioQueue",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Implement mutex protection for every access to the segments map. This includes map insertions, deletions, lookups, and iterations. Consider whether a sync.RWMutex would be more appropriate for better read concurrency. Ensure map operations in methods like AddSegment(), GetSegment(), and RemoveSegment() are atomic.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Synchronize order slice modifications",
+            "description": "Implement thread-safe access to the order slice that maintains segment ordering",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Add mutex protection for all operations on the order slice including appends, deletions, reordering, and iterations. Ensure that operations that read the slice length and then access elements are performed atomically. Pay special attention to slice resizing operations and index boundary checks.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Make currentIndex atomic",
+            "description": "Convert currentIndex to use atomic operations or protect with appropriate synchronization",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Replace direct currentIndex access with atomic.LoadInt32() and atomic.StoreInt32() operations, or protect all currentIndex modifications with mutex. Ensure increment, decrement, and reset operations are atomic. Consider using atomic.AddInt32() for modifications and atomic.CompareAndSwapInt32() for conditional updates.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add synchronization to callback invocations",
+            "description": "Ensure callback functions are invoked safely without causing deadlocks or race conditions",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4"
+            ],
+            "details": "Review all callback invocation points and ensure they're called in a thread-safe manner. Consider whether callbacks should be invoked while holding locks or if they should be deferred. Implement a callback queue if necessary to avoid holding locks during potentially long-running callback operations.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Fix race conditions in memory manager goroutine",
+            "description": "Address synchronization issues in any background goroutines managing memory or cleanup operations",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4",
+              "3.5"
+            ],
+            "details": "Identify and fix race conditions in memory management goroutines. Ensure proper synchronization when accessing shared memory statistics, cleaning up segments, or performing garbage collection. Add appropriate channel synchronization or mutex protection for communication between the memory manager and other components.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Comprehensive race detector testing",
+            "description": "Run extensive tests with Go race detector to verify all race conditions are eliminated",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4",
+              "3.5",
+              "3.6",
+              "3.7"
+            ],
+            "details": "Execute 'go test -race ./pkg/tts/...' multiple times to ensure race conditions are consistently resolved. Focus on TestPlaybackControls, TestAddText, and TestQueueNavigation test cases. Create additional stress tests that spawn multiple goroutines to exercise concurrent access patterns. Monitor for 'Synthesis queue full' warnings that may indicate remaining synchronization issues. Document any performance impact from added synchronization.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Create mock audio interface for CI testing",
+        "description": "Implement a mock audio context interface that allows tests to run in CI environments without audio hardware",
+        "details": "Create an audio context interface and mock implementation for testing. Add build tags (ci, notts, integration) to separate unit tests from hardware-dependent integration tests. Implement dummy audio driver that simulates audio operations without requiring actual sound hardware. This allows CI environments to run tests without ALSA/CoreAudio/WASAPI dependencies.",
+        "testStrategy": "Run tests with CI build tag to verify mock audio context works. Ensure all unit tests pass in mock environment while integration tests are properly skipped. Test on GitHub Actions runners to confirm ALSA configuration issues are resolved.",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define audio context interface",
+            "description": "Create the core AudioContext interface that abstracts all oto audio operations",
+            "dependencies": [],
+            "details": "Define an AudioContext interface in a new file audio_context.go that includes all necessary methods for audio operations: NewContext(), NewPlayer(), Close(), SampleRate(), ChannelCount(), Format(). The interface should fully abstract the oto.Context and oto.Player types to allow for both real and mock implementations.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement production audio context",
+            "description": "Create the real audio context implementation that wraps the actual oto library",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Implement ProductionAudioContext struct that wraps real oto.Context and implements the AudioContext interface. This should delegate all calls to the actual oto library while maintaining the interface contract. Include proper error handling and resource management.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create mock audio context implementation",
+            "description": "Build a mock audio context that simulates audio operations without hardware",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Implement MockAudioContext struct that simulates audio behavior without requiring hardware. Include mock player that accepts audio data but doesn't play it, maintains state for testing assertions, and provides controllable behavior for different test scenarios. Add methods to inspect mock state for test verification.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement audio context factory",
+            "description": "Create factory pattern for audio context creation based on environment",
+            "dependencies": [
+              "4.2",
+              "4.3"
+            ],
+            "details": "Build NewAudioContext() factory function that detects environment (CI, testing, production) and returns appropriate implementation. Check for CI environment variables (CI=true, GITHUB_ACTIONS=true), test build tags, and provide configuration options. Include fallback logic when audio hardware is unavailable.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Update player.go to use audio interface",
+            "description": "Refactor the main player code to use the new audio context interface",
+            "dependencies": [
+              "4.4"
+            ],
+            "details": "Modify player.go to use AudioContext interface instead of direct oto calls. Update NewPlayer() to accept AudioContext parameter or use factory. Ensure all audio operations go through the interface. Maintain backward compatibility where possible and update any dependent code.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Update test files to use mock context",
+            "description": "Refactor all test files to use the mock audio context",
+            "dependencies": [
+              "4.5"
+            ],
+            "details": "Update player_test.go, queue_test.go, and cache_test.go to use MockAudioContext. Replace direct oto initialization with mock context creation. Add test helper functions for common mock setup. Ensure tests can verify audio behavior through mock inspection rather than actual playback.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Add CI environment detection and configuration",
+            "description": "Implement automatic CI detection with proper logging and configuration",
+            "dependencies": [
+              "4.6"
+            ],
+            "details": "Add environment detection logic to automatically configure mock audio in CI. Implement IsCI() function checking standard CI environment variables. Add debug logging for audio context selection. Create configuration system that adapts behavior based on environment. Include documentation comments explaining the detection logic.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Add build tags for test separation",
+        "description": "Implement build tags to separate unit tests from integration tests that require audio hardware",
+        "details": "Add build tags: '//go:build !ci' for hardware-dependent tests, '//go:build ci' for CI-safe tests. Create separate test files for unit tests (pure logic) vs integration tests (requiring audio). Configure CI environment detection to automatically use appropriate build tags. This allows full test coverage locally while running safe subset in CI.",
+        "testStrategy": "Run 'go test -tags=ci ./...' to verify CI-safe tests pass. Run 'go test -tags=integration ./...' locally with audio hardware to verify integration tests work. Confirm that CI workflows can run tests without audio hardware errors.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze and categorize existing tests",
+            "description": "Review all test files in pkg/tts to identify which tests require audio hardware (integration) vs pure logic tests (unit)",
+            "dependencies": [],
+            "details": "Examine player_test.go, queue_test.go, and other test files in pkg/tts. Create a comprehensive list categorizing each test function as either unit test (pure logic, no audio hardware needed) or integration test (requires audio context/hardware). Document test dependencies and identify helper functions that need build tag consideration.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Add build tags to hardware-dependent tests",
+            "description": "Apply '//go:build !ci' tags to all integration tests that require audio hardware",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Add '//go:build !ci' directive at the top of test files or sections containing hardware-dependent tests. Focus on player_test.go and queue_test.go files that contain audio playback tests. Ensure proper spacing and syntax for build tags. Group related integration tests together for cleaner organization.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create CI-safe test files with unit tests",
+            "description": "Extract pure logic unit tests into new files with '//go:build ci' tags",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Create new test files like player_ci_test.go and queue_ci_test.go containing only unit tests that don't require audio hardware. Add '//go:build ci' tag at the top of these files. Move or duplicate pure logic tests from original files, ensuring they test business logic, data structures, and algorithms without audio dependencies.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Update test helper functions for build tags",
+            "description": "Modify shared test utilities and helper functions to respect build tag boundaries",
+            "dependencies": [
+              "5.2",
+              "5.3"
+            ],
+            "details": "Review test helper functions and utilities to ensure they're available in the correct build contexts. Create separate helper files if needed with appropriate build tags. Ensure mock implementations and test fixtures are accessible to CI-safe tests. Handle any shared test data or configuration that needs to be available across build contexts.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Document build tag usage and test categories",
+            "description": "Create documentation explaining the build tag strategy and how to run different test suites",
+            "dependencies": [
+              "5.4"
+            ],
+            "details": "Add comments in test files explaining the build tag strategy. Create or update testing documentation (possibly in docs/TESTING.md or similar) explaining: how to run CI-safe tests with 'go test -tags=ci ./...', how to run integration tests locally with 'go test -tags=!ci ./...', guidelines for categorizing new tests, and the rationale behind the separation. Include examples of running specific test suites.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement platform-specific test fixes",
+        "description": "Add platform-specific handling for Linux ALSA, macOS CoreAudio, and Windows audio system differences in test environment",
+        "details": "Handle Linux ALSA configuration errors by providing fallback configurations or detecting missing sound cards. Address macOS CoreAudio race conditions in oto library by adding retry logic or timeouts. Ensure Windows WASAPI tests work properly after compilation fixes. Add platform-specific audio system detection and graceful fallbacks.",
+        "testStrategy": "Test on each platform (Linux, macOS, Windows) to verify platform-specific fixes work. Check that ALSA configuration errors are handled gracefully on Linux. Verify macOS oto race conditions are mitigated. Ensure Windows tests pass after audio dependencies are resolved.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement OS and audio subsystem detection",
+            "description": "Create a platform detection module that identifies the operating system and available audio subsystems at runtime",
+            "dependencies": [],
+            "details": "Implement a detection system that checks runtime.GOOS for OS identification and probes for available audio subsystems (ALSA on Linux, CoreAudio on macOS, WASAPI on Windows). Create a platform.go file with detection functions that return platform type and available audio capabilities. Include checks for audio device availability and system audio service status.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create Linux ALSA fallback handler",
+            "description": "Implement fallback mechanisms for Linux systems when ALSA is unavailable or misconfigured",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create ALSA-specific error handling that detects missing sound cards or ALSA configuration issues. Implement fallback to dummy audio driver when ALSA is unavailable. Add configuration detection for common ALSA issues like missing /dev/snd devices or permission problems. Include graceful degradation that allows tests to continue with limited audio functionality.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Add macOS CoreAudio retry logic",
+            "description": "Implement retry mechanisms and timeouts for macOS CoreAudio operations to handle oto library race conditions",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create CoreAudio-specific wrapper functions that add exponential backoff retry logic for audio context initialization. Implement configurable timeouts for CoreAudio operations that may experience race conditions in the oto library. Add synchronization mechanisms to prevent concurrent CoreAudio access. Include diagnostic logging to identify when retries are triggered.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Ensure Windows WASAPI compatibility",
+            "description": "Implement Windows-specific audio handling to ensure WASAPI tests work correctly after compilation fixes",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create WASAPI-specific initialization and error handling for Windows platforms. Verify audio COM initialization is properly handled in test environments. Add fallback to Windows Audio Session API when WASAPI is unavailable. Include Windows-specific audio device enumeration and selection logic. Handle Windows-specific permission and service availability issues.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create platform-specific test helpers",
+            "description": "Develop a set of test helper functions tailored for each platform's audio system requirements",
+            "dependencies": [
+              "6.2",
+              "6.3",
+              "6.4"
+            ],
+            "details": "Create test_helpers_linux.go, test_helpers_darwin.go, and test_helpers_windows.go with platform-specific utilities. Implement skip conditions based on platform capabilities and audio availability. Add helper functions for platform-specific audio context setup and teardown. Include utilities for detecting and reporting platform-specific audio issues in test output.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Implement graceful degradation system",
+            "description": "Create a comprehensive fallback system that allows tests to run with reduced functionality when audio hardware is unavailable",
+            "dependencies": [
+              "6.5"
+            ],
+            "details": "Implement a multi-tier fallback system: hardware audio → virtual audio → mock audio → skip test. Create capability detection that determines which test features can run on current platform. Add test annotations to specify minimum audio requirements for each test. Implement clear logging that explains why certain tests are skipped or running in degraded mode. Ensure all platforms can run core functionality tests even without audio hardware.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Update GitHub Actions workflows for CI-friendly testing",
+        "description": "Modify CI workflows to use build tags, install minimal audio dependencies, and run appropriate test suites for each environment",
+        "details": "Update .github/workflows/build.yml to use CI build tags when running tests. Add conditional test execution that runs integration tests only when audio hardware is available. Include environment variables like CI=true, GLOW_TTS_MOCK_AUDIO=true for test configuration. Optimize workflow performance by separating unit tests from integration tests.",
+        "testStrategy": "Run updated workflows on GitHub Actions to verify they pass. Check that unit tests run in CI while integration tests are appropriately skipped. Monitor workflow execution time and ensure performance improvements. Verify all platforms (Linux, macOS, Windows) work with updated configuration.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add CI build tags to test commands in build.yml",
+            "description": "Modify the go test commands in .github/workflows/build.yml to use -tags=ci flag for running CI-safe tests only",
+            "dependencies": [],
+            "details": "Update all 'go test' commands in build.yml to include '-tags=ci' flag. This ensures only tests marked as CI-safe will run in the GitHub Actions environment. Locate all test execution steps across different job matrices (Linux, macOS, Windows) and consistently apply the build tag.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Set CI environment variables in workflow",
+            "description": "Add CI=true and GLOW_TTS_MOCK_AUDIO=true environment variables to the workflow configuration",
+            "dependencies": [],
+            "details": "Add environment variables at the workflow level or job level in build.yml. Set 'CI: true' and 'GLOW_TTS_MOCK_AUDIO: true' to ensure tests detect CI environment and use mock audio instead of real hardware. These variables should be available to all test execution steps.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Separate unit and integration test jobs",
+            "description": "Split the current test job into two distinct jobs: one for unit tests and another for optional integration tests",
+            "dependencies": [
+              "7.1",
+              "7.2"
+            ],
+            "details": "Create two separate jobs in the workflow: 'unit-tests' that runs with -tags=ci, and 'integration-tests' that runs full test suite. The integration-tests job should have a condition to run only on specific events or when manually triggered. Update job dependencies to ensure proper execution order.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add conditional logic for integration test execution",
+            "description": "Implement conditional execution logic to skip integration tests in standard CI runs",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "Add 'if' conditions to the integration-tests job using GitHub Actions conditional syntax. Consider conditions like: manual workflow dispatch, presence of specific labels on PRs, or scheduled runs. Ensure integration tests are skipped by default in PR checks but can be triggered when needed.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Optimize workflow with parallel platform builds",
+            "description": "Configure parallel execution of platform-specific builds to improve CI performance",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "Restructure the workflow matrix strategy to run Linux, macOS, and Windows builds in parallel. Ensure each platform's unit tests run independently without waiting for others. Consider using job outputs and needs declarations to coordinate between jobs while maximizing parallelization. Monitor and document performance improvements.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Fix ruleguard static analysis CGO issues",
+        "description": "Resolve CGO import issues preventing ruleguard static analysis from running by excluding problematic packages",
+        "details": "Address 'could not import C (no metadata for C)' error in ebitengine/oto/v3 package. Configure ruleguard to exclude CGO-dependent packages from analysis or create separate workflow for Go-only code analysis. This is a nice-to-have improvement that doesn't affect core functionality but helps maintain code quality.",
+        "testStrategy": "Verify ruleguard workflow passes without CGO import errors. Check that static analysis covers appropriate Go code while properly excluding CGO dependencies. Ensure code quality checks still function for core application logic.",
+        "priority": "low",
+        "dependencies": [
+          7
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze ruleguard configuration and CGO dependencies",
+            "description": "Investigate current ruleguard setup and identify all CGO-dependent packages that need exclusion",
+            "dependencies": [],
+            "details": "Examine the current ruleguard configuration in the project. Identify the ebitengine/oto/v3 package and any other CGO-dependent packages causing 'could not import C' errors. Document all packages that require exclusion from static analysis. Review the current static analysis workflow to understand how ruleguard is integrated.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Configure ruleguard exclusion rules",
+            "description": "Add exclusion patterns to ruleguard configuration to skip CGO-dependent packages",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Modify ruleguard configuration file or command-line arguments to exclude the ebitengine/oto/v3 package and any other identified CGO dependencies. Use appropriate exclusion patterns like '-exclude=vendor/github.com/ebitengine/oto' or similar. Ensure the exclusion is specific enough to not skip legitimate Go code analysis.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create alternative workflow for non-CGO analysis",
+            "description": "Set up a separate static analysis workflow that runs with CGO_ENABLED=0 for pure Go code",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Create a new GitHub Actions workflow or modify existing one to run ruleguard with CGO_ENABLED=0 environment variable. This workflow should focus on analyzing pure Go code without CGO dependencies. Configure the workflow to run in parallel with regular tests but skip CGO-dependent code paths. Add appropriate job names and descriptions to clarify the purpose.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Verify static analysis coverage and functionality",
+            "description": "Test that ruleguard still provides adequate code quality checks after CGO exclusions",
+            "dependencies": [
+              "8.2",
+              "8.3"
+            ],
+            "details": "Run the modified ruleguard configuration locally and in CI to ensure no CGO import errors occur. Verify that core application logic in pkg/tts, cmd, and other non-CGO packages are still being analyzed. Check that important static analysis rules are still being applied. Document any limitations or trade-offs from excluding CGO packages. Ensure the solution maintains effective code quality checks.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Add CI environment detection and configuration",
+        "description": "Implement automatic detection of CI environments with appropriate test configuration and fallback behavior",
+        "details": "Add environment variable detection (CI=true, GITHUB_ACTIONS=true) to automatically configure test behavior. Implement smart fallbacks when audio hardware is unavailable. Create configuration system that adapts to CI vs local development environments. Include proper logging to help debug CI-specific issues.",
+        "testStrategy": "Test environment detection locally by setting CI environment variables. Verify automatic fallback behavior works correctly. Check that debug logging provides useful information for troubleshooting CI issues. Ensure smooth experience for both local development and CI environments.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create environment detection package",
+            "description": "Implement a dedicated package for detecting CI environments and runtime conditions",
+            "dependencies": [],
+            "details": "Create pkg/environment/detector.go with functions to detect CI=true, GITHUB_ACTIONS, GITLAB_CI, TRAVIS, JENKINS_HOME, and other common CI environment variables. Implement IsCI(), IsCIEnvironment(name string), and GetEnvironmentType() functions. Include detection for Docker containers and minimal environments. Return structured environment info including platform, CI type, and available capabilities.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement adaptive configuration loader",
+            "description": "Create configuration system that automatically adapts settings based on detected environment",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Extend pkg/config/loader.go to use environment detection results. Create LoadWithEnvironment() function that applies CI-specific defaults when CI is detected. Automatically set mock_audio=true, disable_hardware_tests=true, and verbose_logging=true in CI environments. Support configuration precedence: explicit config > environment-based defaults > standard defaults. Add methods to override specific settings programmatically.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Add automatic mock audio selection",
+            "description": "Implement logic to automatically use mock audio backend in CI environments",
+            "dependencies": [
+              "9.1",
+              "9.2"
+            ],
+            "details": "Modify pkg/tts/audio/factory.go to check environment and automatically select mock backend when CI is detected. Create fallback chain: try hardware audio -> try pulse/alsa -> fallback to mock. Add GLOW_TTS_FORCE_MOCK_AUDIO environment variable for explicit control. Ensure mock backend is always available as last resort. Log audio backend selection decisions for debugging.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Create dependency fallback system",
+            "description": "Implement graceful fallback mechanisms for missing system dependencies",
+            "dependencies": [
+              "9.3"
+            ],
+            "details": "Create pkg/fallback/manager.go to handle missing dependencies gracefully. Implement checks for audio libraries, TTS engines, and system tools. When dependencies are missing, automatically switch to mock implementations or skip non-critical features. Add IsDependencyAvailable(name string) and RegisterFallback(dependency, fallbackFunc) methods. Include specific handling for piper, gtts, and audio subsystems.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Add structured CI debugging logs",
+            "description": "Implement comprehensive logging system for debugging CI-specific issues",
+            "dependencies": [
+              "9.1",
+              "9.4"
+            ],
+            "details": "Create pkg/logging/ci.go with structured logging for CI environments. Add log levels: CI_DEBUG, CI_INFO, CI_WARN, CI_ERROR. Log environment detection results, configuration decisions, fallback activations, and test skips. Include timestamps, component names, and correlation IDs. Output in GitHub Actions format when GITHUB_ACTIONS is detected (::debug::, ::warning::, etc.). Add GLOW_TTS_CI_DEBUG=true for verbose CI logging.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Create environment-specific initialization",
+            "description": "Implement different initialization paths for CI vs local development",
+            "dependencies": [
+              "9.1",
+              "9.2",
+              "9.3",
+              "9.4",
+              "9.5"
+            ],
+            "details": "Modify cmd/glow-tts/main.go to use environment-aware initialization. Create InitForCI() and InitForLocal() functions with appropriate setup. In CI mode: skip interactive prompts, use defaults, enable verbose logging, activate mocks. In local mode: allow full configuration, check hardware, enable all features. Add --ci flag to force CI mode locally for testing. Ensure clean separation between initialization paths.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Create comprehensive CI documentation and monitoring",
+        "description": "Document CI setup requirements, create troubleshooting guide, and implement workflow status monitoring",
+        "details": "Create documentation explaining CI setup, build tags usage, and troubleshooting common issues. Add workflow status badges to README. Set up failure notifications for maintainers. Document which tests require hardware and how to run different test suites locally. Include examples of running tests with various build tags and configurations.",
+        "testStrategy": "Verify documentation is accurate by following setup instructions on clean environment. Test that troubleshooting guide helps resolve common issues. Check that status badges reflect current workflow state. Ensure new contributors can understand and work with CI system.",
+        "priority": "low",
+        "dependencies": [
+          8
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create CI_SETUP.md with build tags and environment documentation",
+            "description": "Write comprehensive CI setup guide explaining build tags system, environment variables, and test categorization",
+            "dependencies": [],
+            "details": "Create docs/CI_SETUP.md file documenting: 1) Build tag system (ci, notts, integration) and their purpose, 2) Required environment variables (GLOW_TTS_CACHE_MAX_SIZE, GLOW_TTS_PIPER_SPEED, etc.), 3) Test categories (unit vs integration) and when each runs, 4) How to configure local development environment to match CI, 5) Matrix testing strategy across OS platforms (Linux, macOS, Windows)",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Add CI troubleshooting section with common failure scenarios",
+            "description": "Document common CI failures and their solutions to help contributors quickly resolve issues",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "Add troubleshooting section to CI_SETUP.md covering: 1) ALSA configuration errors on Linux runners, 2) Audio hardware dependency failures and mock audio context usage, 3) Build tag misconfigurations and how to diagnose them, 4) Compilation errors from redundant newlines or similar issues, 5) Vulnerability scan failures and dependency update procedures, 6) Include specific error messages and their solutions",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Document test suites and local execution examples",
+            "description": "Create detailed documentation for running different test suites locally with various configurations",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "Document in CI_SETUP.md: 1) Commands for running unit tests only: 'go test -tags=ci ./...', 2) Running integration tests with hardware: 'go test -tags=integration ./...', 3) Running specific test suites (TTS tests, cache tests, etc.), 4) Examples with different build tags combinations, 5) How to test with mock audio context vs real audio, 6) Performance testing with different cache sizes and TTS speeds",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add workflow status badges to README.md",
+            "description": "Implement GitHub Actions workflow status badges for all CI workflows in the main README",
+            "dependencies": [],
+            "details": "Add status badges to README.md for: 1) Quality workflow badge showing build/test status, 2) Security workflow badge for vulnerability scanning, 3) Platform-specific badges (Linux, macOS, Windows) if separate workflows exist, 4) Position badges near the top of README after project title, 5) Use standard GitHub Actions badge format with links to workflow runs, 6) Consider adding coverage badge if coverage reporting is implemented",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Configure GitHub Actions failure notifications",
+            "description": "Set up automated notifications for CI workflow failures to alert maintainers",
+            "dependencies": [
+              "10.4"
+            ],
+            "details": "Configure failure notifications: 1) Add notification step to .github/workflows/quality.yml and security.yml on failure, 2) Use GitHub Actions built-in notifications or webhook integration, 3) Document notification setup in CI_SETUP.md for maintainers, 4) Include failure context in notifications (workflow name, branch, commit), 5) Consider using GitHub Issues API to auto-create issues for repeated failures, 6) Test notification system with intentional failure",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-15T02:16:47.751Z",
+      "updated": "2025-08-15T15:55:10.671Z",
+      "description": "Tasks for ci_fixes context"
+    }
+  }
+}

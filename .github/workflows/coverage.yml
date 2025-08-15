@@ -15,6 +15,11 @@ jobs:
         with:
           go-version: stable
 
+      - name: Install audio dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+
       - name: Coverage
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}

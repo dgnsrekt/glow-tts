@@ -78,8 +78,11 @@ var (
 )
 
 type (
-	contentRenderedMsg string
-	reloadMsg          struct{}
+	contentRenderedMsg struct {
+		content     string
+		rawMarkdown string
+	}
+	reloadMsg struct{}
 )
 
 type pagerState int
@@ -101,6 +104,12 @@ type pagerModel struct {
 	// Current document being rendered, sans-glamour rendering. We cache
 	// it here so we can re-render it on resize.
 	currentDocument markdown
+	
+	// Raw markdown text for TTS (before glamour rendering)
+	rawMarkdownText string
+
+	// TTS state reference for status display
+	tts *TTSState
 
 	watcher *fsnotify.Watcher
 }
@@ -246,9 +255,13 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 
 	// Glow has rendered the content
 	case contentRenderedMsg:
-		log.Info("content rendered", "state", m.state)
+		log.Info("content rendered", "state", m.state, 
+			"contentLength", len(msg.content),
+			"rawMarkdownLength", len(msg.rawMarkdown))
 
-		m.setContent(string(msg))
+		m.setContent(msg.content)
+		m.rawMarkdownText = msg.rawMarkdown
+		log.Debug("pager rawMarkdownText set", "length", len(m.rawMarkdownText))
 		if m.viewport.HighPerformanceRendering {
 			cmds = append(cmds, viewport.Sync(m.viewport))
 		}
@@ -267,7 +280,20 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 	// We've received terminal dimensions, either for the first time or
 	// after a resize
 	case tea.WindowSizeMsg:
-		return m, renderWithGlamour(m, m.currentDocument.Body)
+		// Don't re-render if we don't have content yet
+		// This can happen when opening a file directly
+		if m.currentDocument.Body == "" && m.rawMarkdownText == "" {
+			log.Debug("WindowSizeMsg in pager - skipping render, no content yet")
+			return m, nil
+		}
+		// Use rawMarkdownText if available (for direct file opening)
+		// Otherwise use currentDocument.Body (for browsing)
+		markdownToRender := m.currentDocument.Body
+		if m.rawMarkdownText != "" {
+			markdownToRender = m.rawMarkdownText
+		}
+		log.Debug("WindowSizeMsg in pager", "markdownLength", len(markdownToRender))
+		return m, renderWithGlamour(m, markdownToRender)
 
 	case statusMessageTimeoutMsg:
 		m.state = pagerStateBrowse
@@ -322,6 +348,17 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		helpNote = statusBarHelpStyle(" ? Help ")
 	}
 
+	// TTS Status (if enabled)
+	var ttsStatus string
+	if m.tts != nil && m.tts.IsEnabled() {
+		renderedStatus := m.tts.RenderStatus()
+		if renderedStatus != "" {
+			ttsStatus = " " + renderedStatus + " "
+			// Log status changes for debugging
+			log.Debug("TTS status in pager", "status", renderedStatus)
+		}
+	}
+
 	// Note
 	var note string
 	if showStatusMessage {
@@ -333,7 +370,8 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		m.common.width-
 			ansi.PrintableRuneWidth(logo)-
 			ansi.PrintableRuneWidth(scrollPercent)-
-			ansi.PrintableRuneWidth(helpNote),
+			ansi.PrintableRuneWidth(helpNote)-
+			ansi.PrintableRuneWidth(ttsStatus),
 	)), ellipsis)
 	if showStatusMessage {
 		note = statusBarMessageStyle(note)
@@ -346,6 +384,7 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		m.common.width-
 			ansi.PrintableRuneWidth(logo)-
 			ansi.PrintableRuneWidth(note)-
+			ansi.PrintableRuneWidth(ttsStatus)-
 			ansi.PrintableRuneWidth(scrollPercent)-
 			ansi.PrintableRuneWidth(helpNote),
 	)
@@ -356,9 +395,10 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 		emptySpace = statusBarNoteStyle(emptySpace)
 	}
 
-	fmt.Fprintf(b, "%s%s%s%s%s",
+	fmt.Fprintf(b, "%s%s%s%s%s%s",
 		logo,
 		note,
+		ttsStatus,
 		emptySpace,
 		scrollPercent,
 		helpNote,
@@ -409,12 +449,17 @@ func (m pagerModel) helpView() (s string) {
 
 func renderWithGlamour(m pagerModel, md string) tea.Cmd {
 	return func() tea.Msg {
+		log.Debug("renderWithGlamour called", "markdownLength", len(md))
 		s, err := glamourRender(m, md)
 		if err != nil {
 			log.Error("error rendering with Glamour", "error", err)
 			return errMsg{err}
 		}
-		return contentRenderedMsg(s)
+		// Store the raw markdown for TTS
+		log.Debug("creating contentRenderedMsg", 
+			"contentLength", len(s), 
+			"rawMarkdownLength", len(md))
+		return contentRenderedMsg{content: s, rawMarkdown: md}
 	}
 }
 

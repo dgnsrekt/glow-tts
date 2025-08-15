@@ -1,0 +1,30 @@
+# Ruleguard configuration for glow-tts
+# This file configures exclusions for static analysis
+
+# Exclude packages with CGO dependencies
+excludes:
+  # Audio libraries that use CGO
+  - "github.com/ebitengine/oto/v3"
+  - "github.com/ebitengine/oto/v3/**"
+  
+  # Generated files
+  - "**/*_gen.go"
+  - "**/*.pb.go"
+  
+  # Vendor directory
+  - "vendor/**"
+
+# Skip analysis for specific files that import CGO packages
+skip_files:
+  - "pkg/tts/player.go"
+  - "pkg/tts/audio_context_production.go"
+
+# Analysis settings
+settings:
+  # Enable all checks except those requiring CGO
+  enable_all: true
+  
+  # Disable checks that don't work well with our codebase
+  disable:
+    - "httpNoBody"  # False positives with our HTTP handlers
+    - "hugeParam"   # Audio data can be large

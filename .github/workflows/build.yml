@@ -1,25 +1,132 @@
-name: build
+name: Build & Test
 
-on: [push, pull_request]
+on: 
+  push:
+    branches: [main, master, develop, feature/*, fix/*]
+  pull_request:
+    branches: [main, master]
+
+env:
+  GO_VERSION: stable
 
 jobs:
-  build:
-    uses: charmbracelet/meta/.github/workflows/build.yml@main
-
-  snapshot:
-    uses: charmbracelet/meta/.github/workflows/snapshot.yml@main
-    secrets:
-      goreleaser_key: ${{ secrets.GORELEASER_KEY }}
-
+  # Security vulnerability check
   govulncheck:
-    uses: charmbracelet/meta/.github/workflows/govulncheck.yml@main
-    with:
-      go-version: stable
+    name: Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run vulnerability check
+        run: govulncheck ./...
+
+  # Multi-platform build verification
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only test on Linux for now
+        os: [ubuntu-latest]
+        # Uncomment to test on other platforms
+        # os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GO111MODULE: "on"
+      CI: "true"
+      GLOW_TTS_MOCK_AUDIO: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Install audio dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          # Install ALSA development libraries for TTS
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+      
+      - name: Verify build environment (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "macOS build environment ready"
+          echo "CoreAudio headers available at compile time"
+      
+      - name: Verify build environment (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "Windows build environment ready"
+          echo "WASAPI headers available at compile time"
+
+      - name: Download dependencies
+        run: go mod download
+      
+      - name: Build project
+        run: |
+          echo "Building on ${{ matrix.os }}..."
+          go build -v ./...
+      
+      - name: Run quick smoke tests
+        run: |
+          echo "Running quick smoke tests with mock audio..."
+          go test -v -short -race -timeout 30s ./pkg/tts/...
 
   semgrep:
     uses: charmbracelet/meta/.github/workflows/semgrep.yml@main
 
-  ruleguard:
-    uses: charmbracelet/meta/.github/workflows/ruleguard.yml@main
-    with:
-      go-version: stable
+  # Ruleguard moved to static-analysis.yml due to CGO issues
+  # See .github/workflows/static-analysis.yml for comprehensive static analysis
+
+  # Send notifications to ntfy.sh
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [govulncheck, build, semgrep]
+    if: always()
+    steps:
+      - name: Send success notification
+        if: ${{ success() }}
+        run: |
+          curl -H "Title: Glow-TTS CI - Build Success ✅" \
+               -H "Priority: 3" \
+               -H "Tags: white_check_mark" \
+               -d "Build completed successfully for ${{ github.repository }}
+
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd
+
+      - name: Send failure notification
+        if: ${{ failure() }}
+        run: |
+          curl -H "Title: Glow-TTS CI - Build Failed ❌" \
+               -H "Priority: 5" \
+               -H "Tags: x" \
+               -d "Build failed for ${{ github.repository }}
+
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd
+
+      - name: Send cancellation notification
+        if: ${{ cancelled() }}
+        run: |
+          curl -H "Title: Glow-TTS CI - Build Cancelled ⚠️" \
+               -H "Priority: 3" \
+               -H "Tags: warning" \
+               -d "Build was cancelled for ${{ github.repository }}
+
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd

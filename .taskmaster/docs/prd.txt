@@ -1,0 +1,266 @@
+<context>
+# Overview  
+Glow-TTS is a production-ready fork of the popular Glow markdown reader that adds sophisticated Text-to-Speech (TTS) functionality for terminal-based documentation consumption. It solves the problem of inaccessible technical documentation by providing high-quality audio narration with sentence-level synchronization, enabling multitasking, improving accessibility for visually impaired users, and supporting both offline (Piper) and online (Google TTS) synthesis engines.
+
+The product targets three primary user groups: terminal power users who want to multitask while consuming documentation, accessibility-focused users who need audio narration, and documentation readers who prefer auditory learning. Built on proven technical foundations, Glow-TTS eliminates critical race conditions and memory management issues discovered through extensive research, providing a reliable TTS experience that maintains Glow's performance and elegance.
+
+# Core Features  
+**Explicit Engine Selection with Robust Validation**
+- Users explicitly choose between Piper (offline) or Google TTS (online) engines via CLI flags
+- Comprehensive availability detection validates dependencies before initialization  
+- No automatic fallbacks - clear error messages guide users through setup issues
+- Critical for reliability and user understanding of system requirements
+
+**Sentence-Level Audio Processing with Intelligent Preprocessing**
+- Parses markdown into speakable sentences while preserving structure
+- Maintains 2-3 sentence lookahead buffer for seamless playback transitions
+- Background preprocessing eliminates gaps between sentences during navigation
+- Essential for smooth listening experience and responsive user controls
+
+**Two-Level Caching Architecture for Performance**
+- L1 memory cache (100MB, <1ms access) for active session optimization
+- L2 disk cache (1GB, 7-day TTL) for cross-session persistence  
+- 80%+ combined hit rate eliminates synthesis delays for repeated content
+- Automatic cleanup based on size, age, and session lifecycle
+
+**Comprehensive Speed Control System**
+- Support for 0.5x to 2.0x playback speeds in discrete steps
+- Engine-specific parameter mapping (Piper length-scale, gTTS ffmpeg atempo)
+- Speed changes affect new synthesis only, maintaining current playback
+- Cache keys include speed parameter for accurate retrieval
+
+**Production-Grade Error Handling and Recovery**
+- Resolves critical stdin race condition through proven subprocess patterns
+- 5-second timeout protection with graceful SIGINT/SIGKILL sequence
+- Audio memory management prevents corruption during playback
+- Bubble Tea command pattern prevents UI threading issues
+
+# User Experience  
+**Primary Personas:**
+- **Developer Documentation Consumer:** Wants to listen while coding, needs non-blocking operation and keyboard-only controls
+- **Accessibility-Focused User:** Requires reliable audio narration with precise sentence navigation and clear feedback
+- **Documentation Reader:** Expects smooth playback without technical interruptions or setup complexity
+
+**Key User Flows:**
+1. **Explicit Activation:** `glow --tts piper document.md` forces TUI mode with TTS controls
+2. **Engine Validation:** System checks dependencies and provides clear setup guidance on failure
+3. **Interactive Reading:** Space to play/pause, arrow keys for sentence navigation, +/- for speed control
+4. **Error Recovery:** Clear error messages with actionable resolution steps, no cryptic failures
+
+**UI/UX Considerations:**
+- TTS controls only appear when `--tts` flag is used - no mode confusion
+- Real-time status display shows engine, speed, sentence position, and cache status
+- Loading indicators during engine initialization and preprocessing
+- Mandatory TUI mode ensures consistent interactive experience
+- Keyboard shortcuts follow media player conventions for intuitive operation
+</context>
+<PRD>
+# Technical Architecture  
+**Core Component Design:**
+```go
+// TTS Controller - Orchestrates entire pipeline
+type Controller struct {
+    engine      TTSEngine     // Abstracts Piper/Google TTS
+    queue       *AudioQueue   // Manages preprocessing and playback order
+    player      *AudioPlayer  // Cross-platform playback with memory management
+    parser      *SentenceParser // Extracts speakable text from markdown
+    cache       *CacheManager   // Two-level caching system
+    speedCtrl   *SpeedController // 0.5x-2.0x speed management
+}
+```
+
+**Critical Implementation Patterns:**
+- **Stdin Race Prevention:** Use `cmd.Stdin = strings.NewReader(text)` before process start
+- **Audio Memory Management:** Keep data references alive during OTO playback to prevent corruption
+- **Bubble Tea Compliance:** All async operations use Commands, never direct goroutines
+- **Timeout Protection:** 5-second timeouts with graceful shutdown for all subprocess calls
+
+**Engine Implementations:**
+- **Piper Engine:** Fresh process per synthesis, ONNX models, --length-scale for speed control
+- **Google TTS Engine:** gTTS CLI → MP3 → ffmpeg atempo → PCM pipeline, no API key required
+
+**Data Models:**
+```go
+type Sentence struct {
+    Text     string    // Clean text for synthesis
+    Position int       // Position in document
+    Original string    // Original markdown with formatting
+}
+
+type AudioData struct {
+    Audio    []byte    // PCM audio data
+    Text     string    // Source text
+    Speed    float64   // Synthesis speed
+    CacheKey string    // SHA256(text|voice|speed)
+}
+```
+
+**Infrastructure Requirements:**
+- Go 1.23+ with standard library subprocess management
+- OTO v3 for cross-platform audio playback
+- Bubble Tea/Lipgloss for TUI integration with existing Glow
+- Platform-specific cache directories with restricted permissions
+
+# Development Roadmap  
+
+**Phase 1: Core Infrastructure Foundation**
+- Implement TTS Controller with state management
+- Create TTSEngine interface with basic Piper implementation
+- Build Sentence Parser for markdown text extraction
+- Establish subprocess management with race condition prevention
+- Implement basic audio playback with OTO memory management
+- Add CLI flag parsing and engine selection logic
+
+**Phase 2: Caching and Performance Layer**
+- Build two-level CacheManager with memory and disk caches
+- Implement cache key generation with text/voice/speed parameters
+- Add automatic cleanup based on size, age, and session lifecycle
+- Create AudioQueue with preprocessing capabilities
+- Implement 2-3 sentence lookahead buffer management
+- Add cache hit rate monitoring and optimization
+
+**Phase 3: Engine Implementation and Validation**
+- Complete Piper engine with model validation and configuration
+- Implement Google TTS engine with gTTS CLI and ffmpeg pipeline
+- Add comprehensive dependency checking for both engines
+- Build engine availability detection with clear error messaging
+- Implement engine-specific speed control (length-scale vs atempo)
+- Add voice selection and configuration management
+
+**Phase 4: User Interface Integration**
+- Integrate TTS controls into existing Bubble Tea UI
+- Implement Bubble Tea command pattern for all async operations
+- Add real-time status display with engine/speed/position info
+- Create keyboard shortcut handling for TTS controls
+- Build loading indicators for engine initialization
+- Add error display with actionable resolution guidance
+
+**Phase 5: Advanced Features and Polish**
+- Implement SpeedController with discrete speed steps
+- Add comprehensive error handling and recovery mechanisms
+- Build process timeout protection with graceful shutdown
+- Implement configuration file support and default settings
+- Add comprehensive logging and debugging capabilities
+- Create user documentation and troubleshooting guides
+
+# Logical Dependency Chain
+
+**Foundation Layer (Must Be First):**
+1. **Subprocess Management Patterns** - Critical race condition prevention must be established before any engine work
+2. **Audio Memory Management** - OTO data lifecycle patterns required before any playback implementation  
+3. **Bubble Tea Command Integration** - UI threading model must be correct from the start
+
+**Visible Progress Layer (Quick User Validation):**
+1. **Basic Piper Engine** - Single sentence synthesis with manual play to prove concept works
+2. **Simple TUI Integration** - Space bar to trigger synthesis, visible in existing Glow interface
+3. **CLI Flag Detection** - `--tts piper` activates mode, shows TTS status in UI
+
+**Functional Completeness Layer (Atomic Features):**
+1. **Sentence Navigation** - Previous/next controls with queue management
+2. **Caching System** - Memory cache first (immediate performance boost), disk cache second
+3. **Speed Control** - Engine-specific parameter mapping with user controls
+
+**Production Readiness Layer (Build Upon Foundation):**
+1. **Google TTS Engine** - Second engine proves interface abstraction works
+2. **Error Handling** - Comprehensive validation and recovery mechanisms  
+3. **Advanced Preprocessing** - Lookahead buffer and cache optimization
+
+**Each phase builds atomically:**
+- Phase 1 creates working TTS with manual controls
+- Phase 2 adds performance optimization without changing UX
+- Phase 3 adds second engine without changing architecture
+- Phase 4 completes user experience without changing core functionality
+- Phase 5 adds polish without changing fundamental behavior
+
+# Risks and Mitigations  
+
+**Critical Technical Challenges:**
+- **Stdin Race Condition:** Subprocess immediately reads stdin before pipes are ready
+  - *Mitigation:* Use proven `strings.NewReader` pattern, never `StdinPipe()`
+- **Audio Memory Corruption:** OTO streams data that gets garbage collected during playback
+  - *Mitigation:* Maintain AudioStream struct with data references throughout playback lifecycle
+- **UI Threading Issues:** Direct goroutines in Bubble Tea cause race conditions and freezing
+  - *Mitigation:* Strict command pattern enforcement, all async operations return `tea.Cmd`
+
+**MVP Definition and Scope:**
+- **Risk:** Over-engineering before proving basic TTS works
+  - *Mitigation:* Phase 1 focuses on single sentence synthesis with manual controls
+- **Risk:** Complex caching before basic functionality is stable
+  - *Mitigation:* Phase 2 adds caching after Phase 1 proves synthesis pipeline works
+- **Risk:** Multi-engine complexity before single engine is reliable
+  - *Mitigation:* Phase 3 adds Google TTS only after Piper engine is production-ready
+
+**Resource and Dependency Constraints:**
+- **External Dependencies:** Piper binary, gTTS Python package, ffmpeg installation
+  - *Mitigation:* Clear installation guides, comprehensive dependency validation, helpful error messages
+- **Cross-Platform Compatibility:** Audio systems vary significantly between Linux/macOS/Windows
+  - *Mitigation:* OTO library handles platform differences, extensive testing on each platform
+- **Performance Requirements:** TTS synthesis can be CPU-intensive and slow
+  - *Mitigation:* Aggressive caching strategy, background preprocessing, timeout protection
+
+# Appendix  
+
+**Research Findings:**
+- Critical stdin race condition discovered through experimental branch testing - affects any subprocess that reads stdin immediately
+- Bubble Tea has strict concurrency model - direct goroutines bypass scheduler and cause crashes
+- OTO audio library streams data without loading into memory - GC of source data causes static/corruption
+- Google TTS can be accessed freely through gTTS CLI without API keys or authentication
+- Two-level caching with 80%+ hit rates eliminates user-perceived synthesis delays
+
+**Technical Specifications:**
+```yaml
+Performance Targets:
+  - Engine initialization: <3 seconds
+  - Navigation response: <200ms  
+  - Cache hit rate: >80% combined
+  - Memory usage: <75MB total
+  - Audio format: PCM 16-bit mono 22050Hz
+
+Dependencies:
+  Piper Engine:
+    - piper binary in PATH
+    - ONNX voice models (.onnx files)
+    - Model configuration files (.json)
+  
+  Google TTS Engine:
+    - gtts-cli (pip install gTTS)
+    - ffmpeg for audio conversion
+    - Internet connectivity
+
+Configuration Schema:
+  tts:
+    engine: piper|gtts  # Required, no default
+    memory_cache_size: 100MB
+    disk_cache_size: 1GB
+    lookahead: 3
+  piper:
+    model_path: ~/.local/share/piper/models
+    voice: en_US-amy-medium
+  gtts:
+    language: en
+    slow: false
+```
+
+**Critical Implementation Patterns:**
+```go
+// ✅ REQUIRED: Prevents stdin race condition
+cmd := exec.Command("piper", args...)
+cmd.Stdin = strings.NewReader(text)  // Set BEFORE Start()
+output, err := cmd.Output()
+
+// ✅ REQUIRED: Keeps audio data alive during playback  
+type AudioStream struct {
+    data []byte         // MUST stay alive!
+    reader *bytes.Reader
+    player oto.Player
+}
+
+// ✅ REQUIRED: All async ops use Bubble Tea Commands
+func synthesizeCmd(text string) tea.Cmd {
+    return func() tea.Msg {
+        audio := engine.Synthesize(text)
+        return AudioReadyMsg{Audio: audio}
+    }
+}
+```
+</PRD>

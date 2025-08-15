@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-08-15T02:22:24.414Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Fix compilation errors in main.go",
+			"complexityScore": 2,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down the compilation fix into: 1) Search and identify all redundant newline instances in fmt.Println calls, 2) Fix the primary error at line 438, 3) Fix any additional instances found throughout the codebase. Each subtask should be atomic and verifiable.",
+			"reasoning": "Very straightforward fix - only requires removing '\\n' from fmt.Println calls. Found 1 confirmed instance at line 438 and potentially 3-4 other similar patterns. Simple string replacement with minimal risk."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Update mapstructure dependency for security fix",
+			"complexityScore": 2,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Create subtasks for: 1) Update the mapstructure dependency version in go.mod from v2.2.1 to v2.3.0, 2) Run go mod tidy and verify dependency resolution, 3) Test configuration loading functionality to ensure no regressions. Focus on verifying the security fix is applied.",
+			"reasoning": "Simple dependency update - just changing version in go.mod (line 48) from v2.2.1 to v2.3.0. Minimal testing required as it's a patch version update. Configuration code using viper is already established."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Fix race conditions in TTS queue operations",
+			"complexityScore": 7,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "Expand into comprehensive race condition fixes: 1) Audit all concurrent access patterns in queue.go, 2) Add mutex protection to processTextQueue method, 3) Protect segments map operations, 4) Synchronize order slice modifications, 5) Make currentIndex atomic, 6) Add synchronization to callback invocations, 7) Fix any race conditions in memory manager goroutine, 8) Comprehensive race detector testing. Each subtask should focus on a specific data structure or method.",
+			"reasoning": "Complex concurrency fix requiring careful analysis of queue.go. Found 39 existing mutex operations but processTextQueue at line 244 and related methods need comprehensive synchronization. Multiple goroutines access shared state (segments map, order slice, currentIndex). Requires understanding of existing locking patterns and careful addition of new synchronization."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Create mock audio interface for CI testing",
+			"complexityScore": 6,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "Design and implement mock audio system: 1) Define audio context interface abstracting oto operations, 2) Implement production audio context using real oto library, 3) Create mock audio context for testing without hardware, 4) Add factory pattern for context creation based on environment, 5) Update player.go to use the interface, 6) Update all test files to use mock context, 7) Add CI environment detection logic. Focus on maintaining API compatibility while enabling hardware-free testing.",
+			"reasoning": "Moderate complexity - requires creating new abstraction layer over oto audio library. Multiple test files (player_test.go, queue_test.go, cache_test.go) need updates. Must maintain compatibility with existing audio functionality while adding mock capability."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Add build tags for test separation",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Implement build tag strategy: 1) Add '//go:build !ci' tags to hardware-dependent tests in player_test.go and queue_test.go, 2) Create CI-safe test files with '//go:build ci' tags containing unit tests only, 3) Separate integration tests requiring audio from pure logic tests, 4) Update test helper functions to respect build tags, 5) Document build tag usage and test categories. Ensure clear separation between unit and integration tests.",
+			"reasoning": "Straightforward but requires careful organization of existing tests. No build tags currently exist in pkg/tts. Need to analyze and categorize each test function as unit vs integration, then apply appropriate tags."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Implement platform-specific test fixes",
+			"complexityScore": 5,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Add platform-specific handling: 1) Detect runtime OS and audio subsystem availability, 2) Implement Linux ALSA fallback for missing sound cards, 3) Add macOS CoreAudio retry logic for oto race conditions, 4) Ensure Windows WASAPI compatibility after compilation fixes, 5) Create platform-specific test helpers, 6) Add graceful degradation when audio hardware unavailable. Each platform should have tailored error handling.",
+			"reasoning": "Moderate complexity requiring platform-specific code paths. Need to handle ALSA, CoreAudio, and WASAPI differently. Existing tests don't have platform-specific handling. Requires understanding of each platform's audio subsystem quirks."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Update GitHub Actions workflows for CI-friendly testing",
+			"complexityScore": 4,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Modify CI workflows: 1) Update build.yml to use 'go test -tags=ci' for test execution, 2) Add CI=true and GLOW_TTS_MOCK_AUDIO=true environment variables, 3) Separate unit test job from integration test job, 4) Add conditional logic to skip integration tests in CI, 5) Optimize workflow performance by parallelizing platform builds. Focus on maintaining test coverage while ensuring CI reliability.",
+			"reasoning": "Straightforward workflow updates. Existing workflows use simple 'go test -race ./...' commands. Need to add build tags, environment variables, and job separation. Well-defined changes to YAML configuration."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Fix ruleguard static analysis CGO issues",
+			"complexityScore": 3,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Resolve CGO analysis issues: 1) Configure ruleguard to exclude ebitengine/oto package from analysis, 2) Create separate workflow for non-CGO code analysis, 3) Add CGO_ENABLED=0 flag for static analysis where appropriate, 4) Verify static analysis still covers core application logic. Focus on maintaining code quality checks while working around CGO limitations.",
+			"reasoning": "Simple configuration fix for static analysis. The CGO issue is with the oto audio library dependency. Just needs exclusion rules or separate workflow configuration. Low complexity tooling adjustment."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Add CI environment detection and configuration",
+			"complexityScore": 5,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "Implement environment detection: 1) Create environment detection package checking CI, GITHUB_ACTIONS, and other CI variables, 2) Implement configuration loader that adapts based on environment, 3) Add automatic mock audio selection in CI environments, 4) Create fallback chains for missing dependencies, 5) Add structured logging for CI debugging, 6) Create environment-specific initialization paths. Ensure seamless adaptation to different environments.",
+			"reasoning": "Moderate complexity requiring new environment detection logic. Need to integrate with existing config system and coordinate with mock audio interface. Requires careful design to avoid breaking existing local development workflows."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Create comprehensive CI documentation and monitoring",
+			"complexityScore": 3,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Document CI system: 1) Create CI setup guide in docs/CI_SETUP.md explaining build tags and environment variables, 2) Add troubleshooting section for common CI failures, 3) Document test categories and how to run different suites, 4) Add workflow status badges to README.md, 5) Set up GitHub Actions failure notifications. Focus on making CI system approachable for new contributors.",
+			"reasoning": "Documentation-focused task with minimal code changes. Existing docs directory has some documentation. Mainly involves writing markdown files and adding badges. Status badges and notifications are simple GitHub configurations."
+		}
+	]
+}

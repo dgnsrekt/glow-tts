@@ -1,0 +1,49 @@
+# Task ID: 2
+# Title: Implement Audio Memory Management with OTO Integration
+# Status: done
+# Dependencies: 1
+# Priority: high
+# Description: Build cross-platform audio playback system with proper memory lifecycle management to prevent audio corruption
+# Details:
+Add github.com/ebitengine/oto/v3 to go.mod. Create pkg/tts/player.go with AudioStream struct containing data []byte, reader *bytes.Reader, and player oto.Player fields. Implement proper memory lifecycle management to keep audio data alive during playback. Add PCM audio format support (16-bit mono 22050Hz). Create playback controls (play, pause, stop) with proper resource cleanup.
+
+# Test Strategy:
+Audio playback tests with different PCM formats, memory lifecycle tests to prevent corruption, and cross-platform compatibility validation
+
+# Subtasks:
+## 1. Add OTO v3 dependency and initialize audio context [done]
+### Dependencies: None
+### Description: Add github.com/ebitengine/oto/v3 to go.mod and create initialization logic for the OTO audio context with proper error handling
+### Details:
+Run 'go get github.com/ebitengine/oto/v3' to add the dependency. Create an initialization function that sets up the OTO context with appropriate sample rate (22050Hz), channel count (1 for mono), and bit depth (16-bit). Include platform-specific initialization parameters and handle context creation errors gracefully. Validate that the audio context can be created on the target platform.
+
+## 2. Create AudioStream struct with memory management [done]
+### Dependencies: 2.1
+### Description: Implement the AudioStream struct in pkg/tts/player.go with proper fields for data persistence and memory lifecycle management
+### Details:
+Define AudioStream struct with fields: data []byte (to hold PCM audio data), reader *bytes.Reader (for streaming), player oto.Player (for playback control), and additional fields for state management (isPlaying bool, isPaused bool, mutex sync.RWMutex). Implement NewAudioStream constructor that properly initializes all fields and ensures data remains in memory during the stream's lifetime. Add methods to safely access and modify the audio data while preventing garbage collection during playback.
+
+## 3. Implement PCM audio format handling [done]
+### Dependencies: 2.2
+### Description: Add PCM format validation and conversion utilities for 16-bit mono 22050Hz audio data
+### Details:
+Create ValidatePCMFormat function to verify incoming audio data matches expected format (16-bit signed integer, mono channel, 22050Hz sample rate). Implement conversion utilities if needed to normalize audio data to the expected format. Add methods to calculate buffer sizes, duration, and byte positions based on PCM parameters. Include helper functions for reading/writing PCM headers if necessary for debugging or file output.
+
+## 4. Build playback controls with state management [done]
+### Dependencies: 2.3
+### Description: Implement Play, Pause, Stop, and Resume methods with proper state transitions and thread safety
+### Details:
+Implement Play() method that creates an OTO player instance, starts audio streaming from the bytes.Reader, and updates state flags. Add Pause() to temporarily halt playback while maintaining position. Implement Resume() to continue from paused position. Create Stop() to terminate playback and reset position. Use mutex locks to ensure thread-safe state transitions. Add GetState() method to query current playback status. Include position tracking for seek functionality foundation.
+
+## 5. Add resource cleanup and memory lifecycle management [done]
+### Dependencies: 2.4
+### Description: Implement proper cleanup mechanisms to prevent memory leaks and audio corruption during stream lifecycle
+### Details:
+Implement Close() method that properly releases OTO player resources, clears audio buffers, and signals garbage collection readiness. Add finalizer using runtime.SetFinalizer to ensure cleanup even if Close() isn't explicitly called. Implement reference counting or pinning mechanism to prevent premature garbage collection of audio data during playback. Create cleanup validation to ensure all resources are properly released. Add panic recovery in cleanup paths to prevent resource leaks on errors.
+
+## 6. Write cross-platform tests for audio playback [done]
+### Dependencies: 2.5
+### Description: Create comprehensive test suite validating audio playback, memory management, and cross-platform compatibility
+### Details:
+Write unit tests for AudioStream creation and initialization across different platforms (Linux, macOS, Windows). Create integration tests that play short PCM samples and verify proper playback without corruption. Add memory leak tests using runtime.MemStats to ensure proper cleanup. Implement stress tests with rapid play/stop cycles to validate resource management. Create benchmark tests for performance validation. Add platform-specific test cases for audio context initialization. Include tests for concurrent playback scenarios and edge cases like zero-length audio or invalid PCM data.
+

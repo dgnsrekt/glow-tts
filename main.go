@@ -16,6 +16,7 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/styles"
+	"github.com/charmbracelet/glow/v2/pkg/tts"
 	"github.com/charmbracelet/glow/v2/ui"
 	"github.com/charmbracelet/glow/v2/utils"
 	"github.com/charmbracelet/lipgloss"
@@ -42,6 +43,11 @@ var (
 	showLineNumbers  bool
 	preserveNewLines bool
 	mouse            bool
+	ttsEngine        string
+	checkDeps        bool
+	generateTTSConfig bool
+	debugMode        bool
+	traceMode        bool
 
 	rootCmd = &cobra.Command{
 		Use:   "glow [SOURCE|DIR]",
@@ -171,6 +177,19 @@ func validateOptions(cmd *cobra.Command) error {
 	showAllFiles = viper.GetBool("all")
 	preserveNewLines = viper.GetBool("preserveNewLines")
 	showLineNumbers = viper.GetBool("showLineNumbers")
+	ttsEngine = viper.GetString("tts")
+
+	// Validate TTS engine if specified
+	if ttsEngine != "" {
+		// Normalize engine name
+		ttsEngine = strings.ToLower(ttsEngine)
+		if ttsEngine != "piper" && ttsEngine != "gtts" {
+			return fmt.Errorf("invalid TTS engine: %s (must be 'piper' or 'gtts')", ttsEngine)
+		}
+		// Force TUI mode when TTS is enabled
+		tui = true
+		pager = false
+	}
 
 	if pager && tui {
 		return errors.New("cannot use both pager and tui")
@@ -220,6 +239,23 @@ func stdinIsPipe() (bool, error) {
 }
 
 func execute(cmd *cobra.Command, args []string) error {
+	// Initialize TTS logging if debug or trace mode
+	if debugMode || traceMode {
+		if err := tts.InitializeLogging(debugMode, traceMode); err != nil {
+			log.Warn("Failed to initialize TTS logging", "error", err)
+		}
+	}
+	
+	// Check dependencies if requested
+	if checkDeps {
+		return checkTTSDependencies()
+	}
+	
+	// Generate TTS config if requested
+	if generateTTSConfig {
+		return generateTTSConfigFile()
+	}
+	
 	// if stdin is a pipe then use stdin for input. note that you can also
 	// explicitly use a - to read from stdin.
 	if yes, err := stdinIsPipe(); err != nil {
@@ -359,6 +395,7 @@ func runTUI(path string, content string) error {
 	cfg.GlamourMaxWidth = width
 	cfg.EnableMouse = mouse
 	cfg.PreserveNewLines = preserveNewLines
+	cfg.TTSEngine = ttsEngine
 
 	// Run Bubble Tea program
 	if _, err := ui.NewProgram(cfg, content).Run(); err != nil {
@@ -374,11 +411,111 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	if err := rootCmd.Execute(); err != nil {
+	
+	// Set up cleanup on exit
+	defer func() {
+		// Perform TTS cleanup if it was initialized
+		if ttsEngine != "" {
+			log.Debug("Performing TTS cleanup on exit")
+			if err := tts.InitiateShutdown(); err != nil {
+				log.Warn("TTS shutdown completed with errors", "error", err)
+			}
+		}
 		_ = closer()
+	}()
+	
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-	_ = closer()
+}
+
+// checkTTSDependencies checks and reports TTS dependencies
+func checkTTSDependencies() error {
+	// Determine which engine to check
+	engine := ttsEngine
+	if engine == "" {
+		// Check all if no specific engine specified
+		fmt.Println("Checking all TTS dependencies...")
+		fmt.Println() // Add blank line for spacing
+	} else {
+		fmt.Printf("Checking dependencies for %s engine...\n\n", engine)
+	}
+	
+	// Run dependency check
+	deps, err := tts.CheckSystemDependencies(engine)
+	if err != nil && engine != "" {
+		// If a specific engine was requested and has missing deps, that's an error
+		fmt.Println(deps.PrintReport())
+		return fmt.Errorf("missing required dependencies for %s engine", engine)
+	}
+	
+	// Print the report
+	fmt.Println(deps.PrintReport())
+	
+	// Provide summary
+	fmt.Println("\nSummary:")
+	hasPiper := deps.Results["piper"].Installed && deps.Results["piper_models"].Installed
+	hasGTTS := deps.Results["gtts-cli"].Installed && deps.Results["ffmpeg"].Installed
+	
+	if hasPiper && hasGTTS {
+		fmt.Println("✓ Both Piper and Google TTS engines are available")
+	} else if hasPiper {
+		fmt.Println("✓ Piper TTS engine is available")
+		fmt.Println("○ Google TTS engine is not available (optional)")
+	} else if hasGTTS {
+		fmt.Println("✓ Google TTS engine is available")
+		fmt.Println("○ Piper TTS engine is not available (optional)")
+	} else {
+		fmt.Println("✗ No TTS engines are available")
+		fmt.Println("  Install at least one engine to use TTS features")
+	}
+	
+	return nil
+}
+
+// generateTTSConfigFile generates an example TTS configuration file
+func generateTTSConfigFile() error {
+	// Generate example config
+	example := tts.GenerateExampleConfig()
+	
+	// Determine output path
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+	
+	configPath := filepath.Join(home, ".config", "glow", "glow-tts.yml")
+	
+	// Check if file already exists
+	if _, err := os.Stat(configPath); err == nil {
+		fmt.Printf("Config file already exists at: %s\n", configPath)
+		fmt.Println("To see an example config, use: glow --generate-tts-config | cat")
+		fmt.Println("\nCurrent config location priorities:")
+		fmt.Println("  1. ./.glow/glow-tts.yml (project-specific)")
+		fmt.Println("  2. ~/.config/glow/glow-tts.yml (user-wide)")
+		return nil
+	}
+	
+	// Create directory if needed
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	
+	// Write the config file
+	if err := os.WriteFile(configPath, []byte(example), 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+	
+	fmt.Printf("Generated TTS config file at: %s\n", configPath)
+	fmt.Println("\nEdit this file to customize your TTS settings.")
+	fmt.Println("Settings include:")
+	fmt.Println("  - Default TTS engine")
+	fmt.Println("  - Voice preferences")
+	fmt.Println("  - Cache settings")
+	fmt.Println("  - Playback speed defaults")
+	
+	return nil
 }
 
 func init() {
@@ -404,6 +541,11 @@ func init() {
 	rootCmd.Flags().BoolVarP(&preserveNewLines, "preserve-new-lines", "n", false, "preserve newlines in the output")
 	rootCmd.Flags().BoolVarP(&mouse, "mouse", "m", false, "enable mouse wheel (TUI-mode only)")
 	_ = rootCmd.Flags().MarkHidden("mouse")
+	rootCmd.Flags().StringVar(&ttsEngine, "tts", "", "enable TTS with specified engine (piper or gtts)")
+	rootCmd.Flags().BoolVar(&checkDeps, "check-deps", false, "check TTS dependencies and exit")
+	rootCmd.Flags().BoolVar(&generateTTSConfig, "generate-tts-config", false, "generate example TTS config file and exit")
+	rootCmd.Flags().BoolVar(&debugMode, "debug", false, "enable debug logging for TTS operations")
+	rootCmd.Flags().BoolVar(&traceMode, "trace", false, "enable trace-level logging (very verbose)")
 
 	// Config bindings
 	_ = viper.BindPFlag("pager", rootCmd.Flags().Lookup("pager"))
@@ -415,6 +557,7 @@ func init() {
 	_ = viper.BindPFlag("preserveNewLines", rootCmd.Flags().Lookup("preserve-new-lines"))
 	_ = viper.BindPFlag("showLineNumbers", rootCmd.Flags().Lookup("line-numbers"))
 	_ = viper.BindPFlag("all", rootCmd.Flags().Lookup("all"))
+	_ = viper.BindPFlag("tts", rootCmd.Flags().Lookup("tts"))
 
 	viper.SetDefault("style", styles.AutoStyle)
 	viper.SetDefault("width", 0)

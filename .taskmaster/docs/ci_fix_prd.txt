@@ -1,0 +1,193 @@
+<context>
+# Overview  
+The glow-tts project's CI/CD pipeline is currently failing across multiple workflows due to compilation errors, security vulnerabilities, race conditions, and environment-specific issues. This PRD outlines a comprehensive plan to fix all CI/CD issues, establish robust testing practices, and ensure reliable continuous integration for the TTS-enhanced fork of Glow.
+
+# Core Features  
+## Compilation Fix
+- What it does: Removes redundant newlines from fmt.Println statements that cause build failures
+- Why it's important: This single issue blocks ALL workflows from running tests
+- How it works: Simple code fix to remove \n from Println calls
+
+## Security Updates
+- What it does: Updates vulnerable dependencies (mapstructure v2.2.1 to v2.3.0)
+- Why it's important: Addresses GO-2025-3787 vulnerability that could leak sensitive data
+- How it works: Update go.mod dependencies and run go mod tidy
+
+## Race Condition Resolution
+- What it does: Adds proper synchronization to TTS queue operations
+- Why it's important: Prevents data races that cause test failures and potential runtime issues
+- How it works: Implement mutexes and atomic operations for concurrent access
+
+## CI-Friendly Testing
+- What it does: Creates mock audio subsystem for CI environments without sound hardware
+- Why it's important: Allows tests to run in GitHub Actions runners that lack audio devices
+- How it works: Build tags to separate unit tests from hardware-dependent integration tests
+
+# User Experience  
+## Developer Experience
+- Clean CI dashboard with all workflows passing
+- Fast feedback on code changes
+- Reliable test results across all platforms
+- Clear separation between unit and integration tests
+
+## CI/CD Pipeline Users
+- GitHub Actions workflows that complete successfully
+- Coverage reports that accurately reflect code quality
+- Security scanning that identifies real issues
+- Static analysis that works with CGO dependencies
+</context>
+<PRD>
+# Technical Architecture  
+## System Components
+### Immediate Fixes
+- main.go compilation error fix
+- Dependency updates in go.mod
+- Race condition fixes in pkg/tts/queue.go
+
+### Testing Infrastructure
+- Mock audio context interface
+- Build tags for test separation
+- CI environment detection
+- Dummy audio driver implementation
+
+### Workflow Modifications
+- Updated GitHub Actions workflows
+- Platform-specific test configurations
+- Conditional test execution based on environment
+
+## Data Models
+### Test Categories
+- Unit tests: Pure logic, no external dependencies
+- Integration tests: Require audio hardware
+- CI tests: Mock implementations for CI environment
+
+### Configuration
+- CI-specific configuration files
+- Build tags: notts, ci, integration
+- Environment variables for test behavior
+
+## APIs and Integrations
+### Audio Subsystem Mocking
+- Interface for audio operations
+- Mock implementation for testing
+- Real implementation for production
+
+### Dependency Management
+- go.mod updates for security fixes
+- Vendor management for CI stability
+- Version pinning for reproducible builds
+
+# Development Roadmap  
+## Phase 1: Critical Fixes (Unblock CI)
+- Fix fmt.Println compilation errors in main.go
+- Update mapstructure to v2.3.0
+- Commit and verify basic workflow execution
+
+## Phase 2: Race Condition Resolution
+- Add mutex protection to TTSAudioQueue operations
+- Fix concurrent access in processTextQueue
+- Implement thread-safe counter operations
+- Add atomic operations for state management
+
+## Phase 3: Test Infrastructure
+- Create audio context interface
+- Implement mock audio context for testing
+- Add build tags to separate test categories
+- Create CI-specific test suite
+
+## Phase 4: Platform-Specific Fixes
+- Linux: Handle missing ALSA devices gracefully
+- macOS: Work around oto library race conditions
+- Windows: Ensure cross-platform compatibility
+
+## Phase 5: Workflow Optimization
+- Update GitHub Actions workflows with audio dependencies
+- Add conditional test execution
+- Implement test result caching
+- Create separate workflows for unit vs integration tests
+
+## Phase 6: Documentation and Monitoring
+- Document CI setup requirements
+- Create troubleshooting guide
+- Add workflow status badges to README
+- Set up failure notifications
+
+# Logical Dependency Chain
+## Foundation (Must be done first)
+1. Fix compilation errors - Nothing works until builds succeed
+2. Update vulnerable dependencies - Security baseline
+
+## Core Fixes (Enables testing)
+3. Fix race conditions - Makes tests reliable
+4. Create mock audio interface - Allows CI testing
+
+## Platform Stabilization
+5. Platform-specific test fixes - Full coverage
+6. CI environment detection - Smart test execution
+
+## Optimization and Polish
+7. Workflow improvements - Better performance
+8. Documentation updates - Maintainability
+
+# Risks and Mitigations  
+## Technical Challenges
+### Risk: Audio library (oto) has inherent race conditions
+- Mitigation: Wrap library calls with synchronization primitives
+- Alternative: Consider alternative audio libraries if issues persist
+
+### Risk: CI environments vary across platforms
+- Mitigation: Detect environment and adapt test strategy
+- Alternative: Use Docker containers for consistent environment
+
+### Risk: CGO dependencies break static analysis
+- Mitigation: Exclude CGO packages from certain checks
+- Alternative: Create separate analysis workflow for Go-only code
+
+## MVP Definition
+### Minimum Viable CI Pipeline
+- All workflows run without errors
+- Core functionality tests pass
+- Security vulnerabilities addressed
+- Basic platform coverage (Linux primary, others best-effort)
+
+## Resource Constraints
+### Risk: Complex fixes require deep audio subsystem knowledge
+- Mitigation: Focus on workarounds rather than library fixes
+- Alternative: Disable problematic tests temporarily with clear documentation
+
+### Risk: Maintaining fork compatibility with upstream
+- Mitigation: Minimize changes to core Glow functionality
+- Alternative: Isolate TTS code to separate package
+
+# Appendix  
+## Research Findings
+### CI Environment Limitations
+- GitHub Actions runners lack audio hardware
+- ALSA requires configuration files that assume hardware presence
+- macOS runners have CoreAudio but with timing issues
+- Windows runners have audio APIs but different behavior
+
+### Dependency Analysis
+- oto v3.3.3: Audio library with CGO dependencies
+- mapstructure v2.2.1: Has security vulnerability GO-2025-3787
+- viper: Configuration library using vulnerable mapstructure
+
+## Technical Specifications
+### Build Tags
+- `ci`: Run in CI mode with mocks
+- `integration`: Run only with real hardware
+- `notts`: Exclude TTS functionality entirely
+
+### Environment Variables
+- `CI`: Detect CI environment
+- `GLOW_TTS_MOCK_AUDIO`: Force mock audio
+- `GLOW_TTS_SKIP_AUDIO_TESTS`: Skip audio tests
+
+### Test Organization
+```
+tests/
+├── unit/        # No external dependencies
+├── integration/ # Requires audio hardware
+└── ci/          # CI-specific with mocks
+```
+</PRD>

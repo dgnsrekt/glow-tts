@@ -1,0 +1,197 @@
+name: CI Failure Notifications
+
+on:
+  workflow_call:
+    inputs:
+      workflow_name:
+        required: true
+        type: string
+      failure_type:
+        required: false
+        type: string
+        default: 'general'
+      create_issue:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  notify:
+    name: Send Failure Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare notification data
+        id: prepare
+        run: |
+          echo "timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_OUTPUT
+          echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "actor=${{ github.actor }}" >> $GITHUB_OUTPUT
+          
+      - name: Send Discord notification
+        if: vars.DISCORD_WEBHOOK_URL != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ vars.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST $DISCORD_WEBHOOK_URL \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "❌ CI Failure: ${{ inputs.workflow_name }}",
+                "color": 15158332,
+                "fields": [
+                  {
+                    "name": "Repository",
+                    "value": "${{ github.repository }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Branch",
+                    "value": "${{ github.ref_name }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Commit",
+                    "value": "${{ steps.prepare.outputs.short_sha }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Author",
+                    "value": "${{ steps.prepare.outputs.actor }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Failure Type",
+                    "value": "${{ inputs.failure_type }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Time",
+                    "value": "${{ steps.prepare.outputs.timestamp }}",
+                    "inline": true
+                  }
+                ],
+                "footer": {
+                  "text": "GitHub Actions"
+                },
+                "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }]
+            }'
+      
+      - name: Send Slack notification
+        if: vars.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -X POST $SLACK_WEBHOOK_URL \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "CI Failure Alert",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "❌ CI Failure: ${{ inputs.workflow_name }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref_name }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit:*\n${{ steps.prepare.outputs.short_sha }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author:*\n${{ steps.prepare.outputs.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }'
+      
+      - name: Create GitHub issue for critical failures
+        if: inputs.create_issue == true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ci-failure',
+              state: 'open'
+            });
+            
+            const duplicateIssue = existingIssues.data.find(issue => 
+              issue.title.includes('${{ inputs.workflow_name }}') && 
+              issue.title.includes('${{ github.ref_name }}')
+            );
+            
+            if (!duplicateIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `CI Failure: ${{ inputs.workflow_name }} on ${{ github.ref_name }}`,
+                body: `## CI Failure Report
+                
+                **Workflow:** ${{ inputs.workflow_name }}
+                **Branch:** ${{ github.ref_name }}
+                **Commit:** ${{ github.sha }}
+                **Author:** @${{ github.actor }}
+                **Failure Type:** ${{ inputs.failure_type }}
+                **Time:** ${{ steps.prepare.outputs.timestamp }}
+                
+                ### Details
+                [View failed workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+                
+                ### Action Required
+                Please investigate and fix the CI failure. Common solutions:
+                - Check the workflow logs for specific error messages
+                - Run tests locally to reproduce the issue
+                - Review recent changes that might have caused the failure
+                
+                This issue was automatically created by the CI system.`,
+                labels: ['ci-failure', 'automated']
+              });
+              
+              console.log('Created new CI failure issue');
+            } else {
+              console.log('Similar issue already exists, skipping creation');
+            }
+      
+      - name: Post failure summary
+        run: |
+          echo "### 📋 Failure Notification Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Workflow | ${{ inputs.workflow_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Repository | ${{ github.repository }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | ${{ steps.prepare.outputs.short_sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Author | ${{ steps.prepare.outputs.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failure Type | ${{ inputs.failure_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Time | ${{ steps.prepare.outputs.timestamp }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "[View Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
