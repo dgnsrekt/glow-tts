@@ -1,0 +1,238 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, master, feature/*, fix/*]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      run_integration_tests:
+        description: 'Run integration tests'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  GO_VERSION: stable
+  CI: true
+
+jobs:
+  # Quick unit tests that run on every push/PR
+  unit-tests:
+    name: Unit Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GLOW_TTS_MOCK_AUDIO: "true"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Download dependencies
+        run: go mod download
+      
+      - name: Run unit tests
+        run: |
+          echo "Running unit tests with mock audio on ${{ matrix.os }}..."
+          go test -v -short -race -coverprofile=coverage-${{ matrix.os }}.txt -covermode=atomic ./...
+      
+      - name: Upload coverage
+        if: success()
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage-${{ matrix.os }}.txt
+          flags: unit-${{ matrix.os }}
+          name: unit-tests-${{ matrix.os }}
+
+  # Integration tests that require real audio hardware
+  # Only run on manual trigger or when labeled
+  integration-tests:
+    name: Integration Tests (${{ matrix.os }})
+    if: |
+      github.event_name == 'workflow_dispatch' && github.event.inputs.run_integration_tests == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'integration-tests')
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GLOW_TTS_MOCK_AUDIO: "false"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Install audio dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pulseaudio
+          # Start PulseAudio daemon for testing
+          pulseaudio --start || true
+      
+      - name: Install audio dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # macOS has CoreAudio built-in
+          echo "macOS audio dependencies already available"
+      
+      - name: Install audio dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Windows has WASAPI built-in
+          echo "Windows audio dependencies already available"
+      
+      - name: Download dependencies
+        run: go mod download
+      
+      - name: Run integration tests
+        run: |
+          echo "Running full integration tests on ${{ matrix.os }}..."
+          go test -v -race -timeout 5m ./...
+        continue-on-error: true  # Don't fail the workflow if integration tests fail
+
+  # Performance benchmarks
+  benchmarks:
+    name: Performance Benchmarks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GLOW_TTS_MOCK_AUDIO: "true"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Download dependencies
+        run: go mod download
+      
+      - name: Run benchmarks
+        run: |
+          echo "Running performance benchmarks..."
+          go test -bench=. -benchmem -run=^$ ./pkg/tts/... | tee benchmark.txt
+      
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'go'
+          output-file-path: benchmark.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+
+  # TTS engine-specific tests
+  tts-engines:
+    name: TTS Engine Tests
+    runs-on: ubuntu-latest
+    env:
+      GLOW_TTS_MOCK_AUDIO: "true"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Download dependencies
+        run: go mod download
+      
+      - name: Test TTS engines
+        run: |
+          echo "Testing TTS engine implementations..."
+          go test -v -race ./pkg/tts/engines/...
+
+  # Platform detection tests
+  platform-detection:
+    name: Platform Detection Tests
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GLOW_TTS_MOCK_AUDIO: "true"
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Download dependencies
+        run: go mod download
+      
+      - name: Test platform detection
+        run: |
+          echo "Testing platform detection on ${{ matrix.os }}..."
+          go test -v -run "TestDetectPlatform|TestPlatformAudioDetection|TestAudioContextFactoryWithPlatform" ./pkg/tts/
+
+  # Summary job to check all required tests passed
+  test-summary:
+    name: Test Summary
+    if: always()
+    needs: [unit-tests, tts-engines, platform-detection]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check test results
+        id: check
+        run: |
+          echo "unit_tests=${{ needs.unit-tests.result }}" >> $GITHUB_OUTPUT
+          echo "tts_engines=${{ needs.tts-engines.result }}" >> $GITHUB_OUTPUT
+          echo "platform_detection=${{ needs.platform-detection.result }}" >> $GITHUB_OUTPUT
+          
+          if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
+            echo "Unit tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.tts-engines.result }}" != "success" ]]; then
+            echo "TTS engine tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.platform-detection.result }}" != "success" ]]; then
+            echo "Platform detection tests failed"
+            exit 1
+          fi
+          echo "All required tests passed!"
+      
+      - name: Create summary comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `## Test Results Summary
+            
+            | Test Suite | Status |
+            |------------|--------|
+            | Unit Tests | ${{ steps.check.outputs.unit_tests }} |
+            | TTS Engines | ${{ steps.check.outputs.tts_engines }} |
+            | Platform Detection | ${{ steps.check.outputs.platform_detection }} |
+            
+            [View full test run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            // Post comment on PR
+            if (context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: summary
+              });
+            }

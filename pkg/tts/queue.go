@@ -216,10 +216,15 @@ func (aq *TTSAudioQueue) AddText(text string) error {
 	
 	// Add each sentence to the queue
 	for i, sentence := range sentences {
+		// Lock for reading aq.order length
+		aq.mu.RLock()
+		position := len(aq.order) + i
+		aq.mu.RUnlock()
+		
 		segment := TextSegment{
 			ID:       fmt.Sprintf("seg-%d-%d", time.Now().UnixNano(), i),
 			Text:     sentence.Text,
-			Position: len(aq.order) + i,
+			Position: position,
 			Priority: 0,
 		}
 		
@@ -590,8 +595,8 @@ func (aq *TTSAudioQueue) checkLookahead() {
 
 // GetCurrent returns the current audio segment
 func (aq *TTSAudioQueue) GetCurrent() (*AudioSegment, error) {
-	aq.mu.RLock()
-	defer aq.mu.RUnlock()
+	aq.mu.Lock()
+	defer aq.mu.Unlock()
 	
 	log.Debug("TTS Queue: GetCurrent", 
 		"currentIndex", aq.currentIndex, 

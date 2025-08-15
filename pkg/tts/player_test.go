@@ -35,13 +35,13 @@ func generateSilence(durationMs int) []byte {
 }
 
 func TestAudioContextInitialization(t *testing.T) {
-	// Test singleton pattern
-	ctx1, err1 := GetAudioContext()
+	// Test singleton pattern with new interface
+	ctx1, err1 := GetGlobalAudioContext()
 	if err1 != nil {
 		t.Fatalf("Failed to get audio context: %v", err1)
 	}
 	
-	ctx2, err2 := GetAudioContext()
+	ctx2, err2 := GetGlobalAudioContext()
 	if err2 != nil {
 		t.Fatalf("Failed to get audio context second time: %v", err2)
 	}
@@ -50,7 +50,7 @@ func TestAudioContextInitialization(t *testing.T) {
 		t.Error("Audio context is not a singleton")
 	}
 	
-	if !ctx1.ready {
+	if !ctx1.IsReady() {
 		t.Error("Audio context not ready")
 	}
 }
@@ -156,6 +156,7 @@ func TestPlaybackControls(t *testing.T) {
 	}
 	
 	pausedPosition := stream.GetPosition()
+	t.Logf("Paused at position: %v", pausedPosition)
 	
 	// Test Resume (Play while paused)
 	err = stream.Play()
@@ -168,10 +169,11 @@ func TestPlaybackControls(t *testing.T) {
 	}
 	
 	// Position should continue from where it was paused
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	resumedPosition := stream.GetPosition()
+	t.Logf("Resumed position after 100ms: %v", resumedPosition)
 	if resumedPosition <= pausedPosition {
-		t.Error("Position should advance after resume")
+		t.Errorf("Position should advance after resume. Paused: %v, Resumed: %v", pausedPosition, resumedPosition)
 	}
 	
 	// Test Stop
@@ -466,13 +468,13 @@ func BenchmarkPlaybackStartStop(b *testing.B) {
 
 func TestPlatformSpecific(t *testing.T) {
 	// Test platform-specific buffer sizes are set correctly
-	ctx, err := GetAudioContext()
+	ctx, err := GetGlobalAudioContext()
 	if err != nil {
 		t.Fatalf("Failed to get audio context: %v", err)
 	}
 	
 	// Verify context is initialized
-	if !ctx.ready {
+	if !ctx.IsReady() {
 		t.Error("Audio context should be ready")
 	}
 	

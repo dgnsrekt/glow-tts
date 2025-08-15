@@ -1,5 +1,12 @@
 # Glow-TTS
 
+[![Build & Test](https://github.com/charmbracelet/glow/actions/workflows/build.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/build.yml)
+[![Test Suite](https://github.com/charmbracelet/glow/actions/workflows/test.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/test.yml)
+[![Static Analysis](https://github.com/charmbracelet/glow/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/static-analysis.yml)
+[![PR Checks](https://github.com/charmbracelet/glow/actions/workflows/pr.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/pr.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/charmbracelet/glow)](https://goreportcard.com/report/github.com/charmbracelet/glow)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/charmbracelet/glow)](go.mod)
+
 A fork of [Glow](https://github.com/charmbracelet/glow) with experimental Text-to-Speech capabilities.
 
 > **⚠️ DISCLAIMER**: This is an unofficial fork not affiliated with or maintained by the Charm team. See [FORK_NOTICE.md](FORK_NOTICE.md) for details.

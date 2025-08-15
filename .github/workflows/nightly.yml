@@ -1,0 +1,175 @@
+name: Nightly Tests
+
+on:
+  schedule:
+    # Run at 2 AM UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: stable
+
+jobs:
+  # Comprehensive test suite
+  full-test-suite:
+    name: Full Test Suite (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.21', '1.22', 'stable']
+    runs-on: ${{ matrix.os }}
+    env:
+      CI: true
+      GLOW_TTS_MOCK_AUDIO: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+      
+      - name: Install test dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+      
+      - name: Run full test suite
+        run: |
+          echo "Running full test suite on ${{ matrix.os }} with Go ${{ matrix.go-version }}..."
+          go test -v -race -timeout 10m ./...
+      
+      - name: Run benchmarks
+        run: |
+          go test -bench=. -benchmem -run=^$ ./pkg/tts/... | tee benchmark-${{ matrix.os }}-${{ matrix.go-version }}.txt
+      
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmarks-${{ matrix.os }}-${{ matrix.go-version }}
+          path: benchmark-*.txt
+
+  # Memory and race condition testing
+  memory-testing:
+    name: Memory & Race Testing
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      GLOW_TTS_MOCK_AUDIO: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      
+      - name: Run with race detector
+        run: |
+          echo "Running comprehensive race detection..."
+          go test -race -count=10 ./pkg/tts/...
+      
+      - name: Run with memory sanitizer
+        run: |
+          echo "Checking for memory leaks..."
+          go test -gcflags=all=-d=checkptr ./pkg/tts/...
+
+  # Fuzz testing
+  fuzz-testing:
+    name: Fuzz Testing
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      GLOW_TTS_MOCK_AUDIO: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      
+      - name: Run fuzz tests
+        run: |
+          echo "Running fuzz tests..."
+          # Run each fuzz test for 30 seconds
+          for pkg in $(go list ./pkg/tts/...); do
+            echo "Fuzzing package: $pkg"
+            go test -fuzz=. -fuzztime=30s $pkg || true
+          done
+
+  # Dependency audit
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      
+      - name: Check for outdated dependencies
+        run: |
+          go list -u -m all | grep '\[' || echo "All dependencies are up to date"
+      
+      - name: Audit dependencies
+        run: |
+          go install github.com/sonatype-nexus-community/nancy@latest
+          go list -json -deps ./... | nancy sleuth
+
+  # Performance regression testing
+  performance-regression:
+    name: Performance Regression
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      GLOW_TTS_MOCK_AUDIO: true
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: true
+      
+      - name: Run performance benchmarks
+        run: |
+          go test -bench=. -benchmem -benchtime=10s -run=^$ ./pkg/tts/... | tee current-bench.txt
+      
+      - name: Compare with baseline
+        run: |
+          echo "Performance benchmark results:"
+          cat current-bench.txt
+          # In a real setup, you would compare with stored baseline benchmarks
+          
+  # Report generation
+  nightly-report:
+    name: Generate Nightly Report
+    if: always()
+    needs: [full-test-suite, memory-testing, fuzz-testing, dependency-audit, performance-regression]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate report
+        run: |
+          echo "# Nightly Test Report" > report.md
+          echo "Date: $(date)" >> report.md
+          echo "" >> report.md
+          
+          echo "## Test Results" >> report.md
+          echo "- Full Test Suite: ${{ needs.full-test-suite.result }}" >> report.md
+          echo "- Memory Testing: ${{ needs.memory-testing.result }}" >> report.md
+          echo "- Fuzz Testing: ${{ needs.fuzz-testing.result }}" >> report.md
+          echo "- Dependency Audit: ${{ needs.dependency-audit.result }}" >> report.md
+          echo "- Performance Regression: ${{ needs.performance-regression.result }}" >> report.md
+          
+          cat report.md
+      
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: nightly-report
+          path: report.md

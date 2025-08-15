@@ -1,3 +1,6 @@
+//go:build !nocgo
+// +build !nocgo
+
 package tts
 
 import (
@@ -13,31 +16,8 @@ import (
 	"github.com/ebitengine/oto/v3"
 )
 
-// Audio format constants for TTS
-const (
-	// SampleRate is the audio sample rate in Hz (22050Hz for TTS)
-	SampleRate = 22050
-	// Channels is the number of audio channels (1 = mono)
-	Channels = 1
-	// BitDepth is the bit depth per sample (16-bit)
-	BitDepth = 16
-	// BytesPerSample is the number of bytes per sample
-	BytesPerSample = BitDepth / 8
-	// Format specifies the OTO format for our audio
-	Format = oto.FormatSignedInt16LE
-)
-
-// PlaybackState represents the current state of audio playback
-type PlaybackState int
-
-const (
-	// PlaybackStopped indicates no audio is playing
-	PlaybackStopped PlaybackState = iota
-	// PlaybackPlaying indicates audio is currently playing
-	PlaybackPlaying
-	// PlaybackPaused indicates audio is paused
-	PlaybackPaused
-)
+// Format specifies the OTO format for our audio
+const Format = oto.FormatSignedInt16LE
 
 // AudioContext manages the global OTO audio context
 type AudioContext struct {
@@ -151,8 +131,8 @@ type AudioStream struct {
 	// reader provides streaming access to the audio data
 	reader *bytes.Reader
 	
-	// player is the OTO player instance
-	player *oto.Player
+	// player is the audio player instance
+	player AudioPlayerInterface
 	
 	// State management
 	mu       sync.RWMutex
@@ -182,13 +162,13 @@ func NewAudioStream(pcmData []byte) (*AudioStream, error) {
 			len(pcmData), BytesPerSample)
 	}
 
-	// Get or create audio context
-	audioCtx, err := GetAudioContext()
+	// Get or create audio context using new interface
+	audioCtx, err := GetGlobalAudioContext()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get audio context: %w", err)
 	}
 
-	if !audioCtx.ready {
+	if !audioCtx.IsReady() {
 		return nil, errors.New("audio context not ready")
 	}
 
@@ -254,14 +234,18 @@ func (as *AudioStream) Play() error {
 
 // start begins playback from the beginning or current position
 func (as *AudioStream) start() error {
-	// Get audio context
-	audioCtx, err := GetAudioContext()
+	// Get audio context using new interface
+	audioCtx, err := GetGlobalAudioContext()
 	if err != nil {
 		return err
 	}
 
-	// Create new player
-	as.player = audioCtx.context.NewPlayer(as.reader)
+	// Create new player using interface
+	player, err := audioCtx.NewPlayer(as.reader)
+	if err != nil {
+		return fmt.Errorf("failed to create player: %w", err)
+	}
+	as.player = player
 	
 	// Start playback
 	as.player.Play()

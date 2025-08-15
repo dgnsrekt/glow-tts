@@ -1015,5 +1015,723 @@
       "updated": "2025-08-15T00:28:24.969Z",
       "description": "Tasks for master context"
     }
+  },
+  "ci_fixes": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Fix compilation errors in main.go",
+        "description": "Remove redundant newlines from fmt.Println statements that are causing build failures across all platforms",
+        "details": "Fix fmt.Println statements at line 438 and other instances where \\n is redundantly added to fmt.Println calls. The fmt.Println function automatically adds a newline, so manual \\n causes compilation errors. This is the critical blocker preventing all CI workflows from running. Search for all instances of fmt.Println with \\n and remove the redundant newlines.",
+        "testStrategy": "Run go build ./... to ensure compilation succeeds on all platforms. Verify that output formatting remains correct after removing redundant newlines.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Search and identify all fmt.Println calls with redundant newlines",
+            "description": "Scan the entire codebase to find all instances of fmt.Println that include \\n characters",
+            "dependencies": [],
+            "details": "Use grep or code search to find all occurrences of fmt.Println that contain \\n characters. Document the exact line numbers and files where these redundant newlines appear. Focus on patterns like fmt.Println(\"...\\n\") and fmt.Println(variable + \"\\n\"). Create a list of all locations that need to be fixed.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Fix the primary compilation error at line 438 in main.go",
+            "description": "Remove the redundant newline from the fmt.Println statement at line 438 that is causing the build failure",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "Navigate to line 438 in main.go and remove the \\n character from the fmt.Println call. Ensure the output formatting remains correct by verifying that fmt.Println's automatic newline provides the expected behavior. Test the fix by running 'go build ./...' to confirm this specific error is resolved.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Fix all remaining fmt.Println statements with redundant newlines",
+            "description": "Remove \\n characters from all other fmt.Println calls identified in the search",
+            "dependencies": [
+              "1.1",
+              "1.2"
+            ],
+            "details": "Using the list from subtask 1.1, systematically fix each remaining instance of fmt.Println with redundant newlines. Verify each change maintains the intended output format. After all fixes are complete, run 'go build ./...' on all target platforms to ensure no compilation errors remain. Run the application to verify output formatting is preserved.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Update mapstructure dependency for security fix",
+        "description": "Update github.com/go-viper/mapstructure from v2.2.1 to v2.3.0 to address GO-2025-3787 vulnerability",
+        "details": "Update go.mod to use mapstructure v2.3.0 which fixes vulnerability GO-2025-3787 that could leak sensitive information in logs. Run 'go mod tidy' after updating. The vulnerability affects configuration parsing in pkg/tts/config.go via viper. While non-critical, this security fix should be applied to maintain security baseline.",
+        "testStrategy": "Run govulncheck ./... to verify the vulnerability is resolved. Test configuration loading functionality to ensure no regressions. Check that all TTS configuration parsing still works correctly.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update mapstructure dependency version in go.mod",
+            "description": "Modify go.mod file to update github.com/go-viper/mapstructure from v2.2.1 to v2.3.0",
+            "dependencies": [],
+            "details": "Edit line 48 in go.mod to change the mapstructure dependency version from v2.2.1 to v2.3.0. This addresses the GO-2025-3787 vulnerability that could potentially leak sensitive information in logs during configuration parsing.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Run go mod tidy and verify dependency resolution",
+            "description": "Execute go mod tidy to update go.sum and ensure all dependencies are properly resolved",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "Run 'go mod tidy' command to update the go.sum file with the new dependency checksums. Verify that the command completes successfully without errors and that mapstructure v2.3.0 is properly downloaded and integrated into the module dependencies.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Test configuration loading and verify security fix",
+            "description": "Run govulncheck and test configuration parsing to ensure the vulnerability is resolved and no regressions occur",
+            "dependencies": [
+              "2.2"
+            ],
+            "details": "Execute 'govulncheck ./...' to confirm GO-2025-3787 vulnerability is resolved. Test the configuration loading functionality in pkg/tts/config.go that uses viper with mapstructure. Run existing tests with 'go test ./pkg/tts/...' to ensure configuration parsing works correctly without regressions.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Fix race conditions in TTS queue operations",
+        "description": "Add proper mutex synchronization to TTSAudioQueue operations to prevent data races during concurrent access",
+        "details": "Analyze pkg/tts/queue.go for race conditions, particularly in processTextQueue() method around line 261. Add proper mutex protection for concurrent access to TTSAudioQueue fields including segments map, order slice, and currentIndex. Implement atomic operations for counters and state management. Focus on areas where multiple goroutines access shared state without synchronization.",
+        "testStrategy": "Run go test -race ./pkg/tts/... to verify race conditions are eliminated. Specifically test TestPlaybackControls, TestAddText, TestQueueNavigation for race condition resolution. Monitor for 'Synthesis queue full' warnings that indicate synchronization issues.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Audit concurrent access patterns in queue.go",
+            "description": "Perform comprehensive analysis of all goroutine access patterns to shared state in pkg/tts/queue.go",
+            "dependencies": [],
+            "details": "Review pkg/tts/queue.go thoroughly to identify all locations where multiple goroutines access shared state. Document each concurrent access point including: segments map reads/writes, order slice operations, currentIndex modifications, and any other shared fields. Create a matrix of which methods access which shared resources to understand the complete synchronization requirements.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Add mutex protection to processTextQueue method",
+            "description": "Implement proper mutex locking in processTextQueue() method around line 244 to prevent concurrent access issues",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Add mutex.Lock() and defer mutex.Unlock() at appropriate points in processTextQueue() method. Ensure all access to shared state within this method is properly synchronized. Pay special attention to the loop iterations and any goroutines spawned from within this method. Consider using RLock() for read-only operations to improve performance.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Protect segments map operations",
+            "description": "Add synchronization for all read and write operations to the segments map in TTSAudioQueue",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Implement mutex protection for every access to the segments map. This includes map insertions, deletions, lookups, and iterations. Consider whether a sync.RWMutex would be more appropriate for better read concurrency. Ensure map operations in methods like AddSegment(), GetSegment(), and RemoveSegment() are atomic.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Synchronize order slice modifications",
+            "description": "Implement thread-safe access to the order slice that maintains segment ordering",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Add mutex protection for all operations on the order slice including appends, deletions, reordering, and iterations. Ensure that operations that read the slice length and then access elements are performed atomically. Pay special attention to slice resizing operations and index boundary checks.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Make currentIndex atomic",
+            "description": "Convert currentIndex to use atomic operations or protect with appropriate synchronization",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "Replace direct currentIndex access with atomic.LoadInt32() and atomic.StoreInt32() operations, or protect all currentIndex modifications with mutex. Ensure increment, decrement, and reset operations are atomic. Consider using atomic.AddInt32() for modifications and atomic.CompareAndSwapInt32() for conditional updates.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add synchronization to callback invocations",
+            "description": "Ensure callback functions are invoked safely without causing deadlocks or race conditions",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4"
+            ],
+            "details": "Review all callback invocation points and ensure they're called in a thread-safe manner. Consider whether callbacks should be invoked while holding locks or if they should be deferred. Implement a callback queue if necessary to avoid holding locks during potentially long-running callback operations.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Fix race conditions in memory manager goroutine",
+            "description": "Address synchronization issues in any background goroutines managing memory or cleanup operations",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4",
+              "3.5"
+            ],
+            "details": "Identify and fix race conditions in memory management goroutines. Ensure proper synchronization when accessing shared memory statistics, cleaning up segments, or performing garbage collection. Add appropriate channel synchronization or mutex protection for communication between the memory manager and other components.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Comprehensive race detector testing",
+            "description": "Run extensive tests with Go race detector to verify all race conditions are eliminated",
+            "dependencies": [
+              "3.2",
+              "3.3",
+              "3.4",
+              "3.5",
+              "3.6",
+              "3.7"
+            ],
+            "details": "Execute 'go test -race ./pkg/tts/...' multiple times to ensure race conditions are consistently resolved. Focus on TestPlaybackControls, TestAddText, and TestQueueNavigation test cases. Create additional stress tests that spawn multiple goroutines to exercise concurrent access patterns. Monitor for 'Synthesis queue full' warnings that may indicate remaining synchronization issues. Document any performance impact from added synchronization.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Create mock audio interface for CI testing",
+        "description": "Implement a mock audio context interface that allows tests to run in CI environments without audio hardware",
+        "details": "Create an audio context interface and mock implementation for testing. Add build tags (ci, notts, integration) to separate unit tests from hardware-dependent integration tests. Implement dummy audio driver that simulates audio operations without requiring actual sound hardware. This allows CI environments to run tests without ALSA/CoreAudio/WASAPI dependencies.",
+        "testStrategy": "Run tests with CI build tag to verify mock audio context works. Ensure all unit tests pass in mock environment while integration tests are properly skipped. Test on GitHub Actions runners to confirm ALSA configuration issues are resolved.",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define audio context interface",
+            "description": "Create the core AudioContext interface that abstracts all oto audio operations",
+            "dependencies": [],
+            "details": "Define an AudioContext interface in a new file audio_context.go that includes all necessary methods for audio operations: NewContext(), NewPlayer(), Close(), SampleRate(), ChannelCount(), Format(). The interface should fully abstract the oto.Context and oto.Player types to allow for both real and mock implementations.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement production audio context",
+            "description": "Create the real audio context implementation that wraps the actual oto library",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Implement ProductionAudioContext struct that wraps real oto.Context and implements the AudioContext interface. This should delegate all calls to the actual oto library while maintaining the interface contract. Include proper error handling and resource management.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create mock audio context implementation",
+            "description": "Build a mock audio context that simulates audio operations without hardware",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Implement MockAudioContext struct that simulates audio behavior without requiring hardware. Include mock player that accepts audio data but doesn't play it, maintains state for testing assertions, and provides controllable behavior for different test scenarios. Add methods to inspect mock state for test verification.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement audio context factory",
+            "description": "Create factory pattern for audio context creation based on environment",
+            "dependencies": [
+              "4.2",
+              "4.3"
+            ],
+            "details": "Build NewAudioContext() factory function that detects environment (CI, testing, production) and returns appropriate implementation. Check for CI environment variables (CI=true, GITHUB_ACTIONS=true), test build tags, and provide configuration options. Include fallback logic when audio hardware is unavailable.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Update player.go to use audio interface",
+            "description": "Refactor the main player code to use the new audio context interface",
+            "dependencies": [
+              "4.4"
+            ],
+            "details": "Modify player.go to use AudioContext interface instead of direct oto calls. Update NewPlayer() to accept AudioContext parameter or use factory. Ensure all audio operations go through the interface. Maintain backward compatibility where possible and update any dependent code.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Update test files to use mock context",
+            "description": "Refactor all test files to use the mock audio context",
+            "dependencies": [
+              "4.5"
+            ],
+            "details": "Update player_test.go, queue_test.go, and cache_test.go to use MockAudioContext. Replace direct oto initialization with mock context creation. Add test helper functions for common mock setup. Ensure tests can verify audio behavior through mock inspection rather than actual playback.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Add CI environment detection and configuration",
+            "description": "Implement automatic CI detection with proper logging and configuration",
+            "dependencies": [
+              "4.6"
+            ],
+            "details": "Add environment detection logic to automatically configure mock audio in CI. Implement IsCI() function checking standard CI environment variables. Add debug logging for audio context selection. Create configuration system that adapts behavior based on environment. Include documentation comments explaining the detection logic.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Add build tags for test separation",
+        "description": "Implement build tags to separate unit tests from integration tests that require audio hardware",
+        "details": "Add build tags: '//go:build !ci' for hardware-dependent tests, '//go:build ci' for CI-safe tests. Create separate test files for unit tests (pure logic) vs integration tests (requiring audio). Configure CI environment detection to automatically use appropriate build tags. This allows full test coverage locally while running safe subset in CI.",
+        "testStrategy": "Run 'go test -tags=ci ./...' to verify CI-safe tests pass. Run 'go test -tags=integration ./...' locally with audio hardware to verify integration tests work. Confirm that CI workflows can run tests without audio hardware errors.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze and categorize existing tests",
+            "description": "Review all test files in pkg/tts to identify which tests require audio hardware (integration) vs pure logic tests (unit)",
+            "dependencies": [],
+            "details": "Examine player_test.go, queue_test.go, and other test files in pkg/tts. Create a comprehensive list categorizing each test function as either unit test (pure logic, no audio hardware needed) or integration test (requires audio context/hardware). Document test dependencies and identify helper functions that need build tag consideration.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Add build tags to hardware-dependent tests",
+            "description": "Apply '//go:build !ci' tags to all integration tests that require audio hardware",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Add '//go:build !ci' directive at the top of test files or sections containing hardware-dependent tests. Focus on player_test.go and queue_test.go files that contain audio playback tests. Ensure proper spacing and syntax for build tags. Group related integration tests together for cleaner organization.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create CI-safe test files with unit tests",
+            "description": "Extract pure logic unit tests into new files with '//go:build ci' tags",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "Create new test files like player_ci_test.go and queue_ci_test.go containing only unit tests that don't require audio hardware. Add '//go:build ci' tag at the top of these files. Move or duplicate pure logic tests from original files, ensuring they test business logic, data structures, and algorithms without audio dependencies.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Update test helper functions for build tags",
+            "description": "Modify shared test utilities and helper functions to respect build tag boundaries",
+            "dependencies": [
+              "5.2",
+              "5.3"
+            ],
+            "details": "Review test helper functions and utilities to ensure they're available in the correct build contexts. Create separate helper files if needed with appropriate build tags. Ensure mock implementations and test fixtures are accessible to CI-safe tests. Handle any shared test data or configuration that needs to be available across build contexts.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Document build tag usage and test categories",
+            "description": "Create documentation explaining the build tag strategy and how to run different test suites",
+            "dependencies": [
+              "5.4"
+            ],
+            "details": "Add comments in test files explaining the build tag strategy. Create or update testing documentation (possibly in docs/TESTING.md or similar) explaining: how to run CI-safe tests with 'go test -tags=ci ./...', how to run integration tests locally with 'go test -tags=!ci ./...', guidelines for categorizing new tests, and the rationale behind the separation. Include examples of running specific test suites.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement platform-specific test fixes",
+        "description": "Add platform-specific handling for Linux ALSA, macOS CoreAudio, and Windows audio system differences in test environment",
+        "details": "Handle Linux ALSA configuration errors by providing fallback configurations or detecting missing sound cards. Address macOS CoreAudio race conditions in oto library by adding retry logic or timeouts. Ensure Windows WASAPI tests work properly after compilation fixes. Add platform-specific audio system detection and graceful fallbacks.",
+        "testStrategy": "Test on each platform (Linux, macOS, Windows) to verify platform-specific fixes work. Check that ALSA configuration errors are handled gracefully on Linux. Verify macOS oto race conditions are mitigated. Ensure Windows tests pass after audio dependencies are resolved.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement OS and audio subsystem detection",
+            "description": "Create a platform detection module that identifies the operating system and available audio subsystems at runtime",
+            "dependencies": [],
+            "details": "Implement a detection system that checks runtime.GOOS for OS identification and probes for available audio subsystems (ALSA on Linux, CoreAudio on macOS, WASAPI on Windows). Create a platform.go file with detection functions that return platform type and available audio capabilities. Include checks for audio device availability and system audio service status.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create Linux ALSA fallback handler",
+            "description": "Implement fallback mechanisms for Linux systems when ALSA is unavailable or misconfigured",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create ALSA-specific error handling that detects missing sound cards or ALSA configuration issues. Implement fallback to dummy audio driver when ALSA is unavailable. Add configuration detection for common ALSA issues like missing /dev/snd devices or permission problems. Include graceful degradation that allows tests to continue with limited audio functionality.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Add macOS CoreAudio retry logic",
+            "description": "Implement retry mechanisms and timeouts for macOS CoreAudio operations to handle oto library race conditions",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create CoreAudio-specific wrapper functions that add exponential backoff retry logic for audio context initialization. Implement configurable timeouts for CoreAudio operations that may experience race conditions in the oto library. Add synchronization mechanisms to prevent concurrent CoreAudio access. Include diagnostic logging to identify when retries are triggered.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Ensure Windows WASAPI compatibility",
+            "description": "Implement Windows-specific audio handling to ensure WASAPI tests work correctly after compilation fixes",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "Create WASAPI-specific initialization and error handling for Windows platforms. Verify audio COM initialization is properly handled in test environments. Add fallback to Windows Audio Session API when WASAPI is unavailable. Include Windows-specific audio device enumeration and selection logic. Handle Windows-specific permission and service availability issues.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Create platform-specific test helpers",
+            "description": "Develop a set of test helper functions tailored for each platform's audio system requirements",
+            "dependencies": [
+              "6.2",
+              "6.3",
+              "6.4"
+            ],
+            "details": "Create test_helpers_linux.go, test_helpers_darwin.go, and test_helpers_windows.go with platform-specific utilities. Implement skip conditions based on platform capabilities and audio availability. Add helper functions for platform-specific audio context setup and teardown. Include utilities for detecting and reporting platform-specific audio issues in test output.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Implement graceful degradation system",
+            "description": "Create a comprehensive fallback system that allows tests to run with reduced functionality when audio hardware is unavailable",
+            "dependencies": [
+              "6.5"
+            ],
+            "details": "Implement a multi-tier fallback system: hardware audio → virtual audio → mock audio → skip test. Create capability detection that determines which test features can run on current platform. Add test annotations to specify minimum audio requirements for each test. Implement clear logging that explains why certain tests are skipped or running in degraded mode. Ensure all platforms can run core functionality tests even without audio hardware.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Update GitHub Actions workflows for CI-friendly testing",
+        "description": "Modify CI workflows to use build tags, install minimal audio dependencies, and run appropriate test suites for each environment",
+        "details": "Update .github/workflows/build.yml to use CI build tags when running tests. Add conditional test execution that runs integration tests only when audio hardware is available. Include environment variables like CI=true, GLOW_TTS_MOCK_AUDIO=true for test configuration. Optimize workflow performance by separating unit tests from integration tests.",
+        "testStrategy": "Run updated workflows on GitHub Actions to verify they pass. Check that unit tests run in CI while integration tests are appropriately skipped. Monitor workflow execution time and ensure performance improvements. Verify all platforms (Linux, macOS, Windows) work with updated configuration.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add CI build tags to test commands in build.yml",
+            "description": "Modify the go test commands in .github/workflows/build.yml to use -tags=ci flag for running CI-safe tests only",
+            "dependencies": [],
+            "details": "Update all 'go test' commands in build.yml to include '-tags=ci' flag. This ensures only tests marked as CI-safe will run in the GitHub Actions environment. Locate all test execution steps across different job matrices (Linux, macOS, Windows) and consistently apply the build tag.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Set CI environment variables in workflow",
+            "description": "Add CI=true and GLOW_TTS_MOCK_AUDIO=true environment variables to the workflow configuration",
+            "dependencies": [],
+            "details": "Add environment variables at the workflow level or job level in build.yml. Set 'CI: true' and 'GLOW_TTS_MOCK_AUDIO: true' to ensure tests detect CI environment and use mock audio instead of real hardware. These variables should be available to all test execution steps.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Separate unit and integration test jobs",
+            "description": "Split the current test job into two distinct jobs: one for unit tests and another for optional integration tests",
+            "dependencies": [
+              "7.1",
+              "7.2"
+            ],
+            "details": "Create two separate jobs in the workflow: 'unit-tests' that runs with -tags=ci, and 'integration-tests' that runs full test suite. The integration-tests job should have a condition to run only on specific events or when manually triggered. Update job dependencies to ensure proper execution order.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add conditional logic for integration test execution",
+            "description": "Implement conditional execution logic to skip integration tests in standard CI runs",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "Add 'if' conditions to the integration-tests job using GitHub Actions conditional syntax. Consider conditions like: manual workflow dispatch, presence of specific labels on PRs, or scheduled runs. Ensure integration tests are skipped by default in PR checks but can be triggered when needed.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Optimize workflow with parallel platform builds",
+            "description": "Configure parallel execution of platform-specific builds to improve CI performance",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "Restructure the workflow matrix strategy to run Linux, macOS, and Windows builds in parallel. Ensure each platform's unit tests run independently without waiting for others. Consider using job outputs and needs declarations to coordinate between jobs while maximizing parallelization. Monitor and document performance improvements.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Fix ruleguard static analysis CGO issues",
+        "description": "Resolve CGO import issues preventing ruleguard static analysis from running by excluding problematic packages",
+        "details": "Address 'could not import C (no metadata for C)' error in ebitengine/oto/v3 package. Configure ruleguard to exclude CGO-dependent packages from analysis or create separate workflow for Go-only code analysis. This is a nice-to-have improvement that doesn't affect core functionality but helps maintain code quality.",
+        "testStrategy": "Verify ruleguard workflow passes without CGO import errors. Check that static analysis covers appropriate Go code while properly excluding CGO dependencies. Ensure code quality checks still function for core application logic.",
+        "priority": "low",
+        "dependencies": [
+          7
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Analyze ruleguard configuration and CGO dependencies",
+            "description": "Investigate current ruleguard setup and identify all CGO-dependent packages that need exclusion",
+            "dependencies": [],
+            "details": "Examine the current ruleguard configuration in the project. Identify the ebitengine/oto/v3 package and any other CGO-dependent packages causing 'could not import C' errors. Document all packages that require exclusion from static analysis. Review the current static analysis workflow to understand how ruleguard is integrated.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Configure ruleguard exclusion rules",
+            "description": "Add exclusion patterns to ruleguard configuration to skip CGO-dependent packages",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Modify ruleguard configuration file or command-line arguments to exclude the ebitengine/oto/v3 package and any other identified CGO dependencies. Use appropriate exclusion patterns like '-exclude=vendor/github.com/ebitengine/oto' or similar. Ensure the exclusion is specific enough to not skip legitimate Go code analysis.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create alternative workflow for non-CGO analysis",
+            "description": "Set up a separate static analysis workflow that runs with CGO_ENABLED=0 for pure Go code",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Create a new GitHub Actions workflow or modify existing one to run ruleguard with CGO_ENABLED=0 environment variable. This workflow should focus on analyzing pure Go code without CGO dependencies. Configure the workflow to run in parallel with regular tests but skip CGO-dependent code paths. Add appropriate job names and descriptions to clarify the purpose.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Verify static analysis coverage and functionality",
+            "description": "Test that ruleguard still provides adequate code quality checks after CGO exclusions",
+            "dependencies": [
+              "8.2",
+              "8.3"
+            ],
+            "details": "Run the modified ruleguard configuration locally and in CI to ensure no CGO import errors occur. Verify that core application logic in pkg/tts, cmd, and other non-CGO packages are still being analyzed. Check that important static analysis rules are still being applied. Document any limitations or trade-offs from excluding CGO packages. Ensure the solution maintains effective code quality checks.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Add CI environment detection and configuration",
+        "description": "Implement automatic detection of CI environments with appropriate test configuration and fallback behavior",
+        "details": "Add environment variable detection (CI=true, GITHUB_ACTIONS=true) to automatically configure test behavior. Implement smart fallbacks when audio hardware is unavailable. Create configuration system that adapts to CI vs local development environments. Include proper logging to help debug CI-specific issues.",
+        "testStrategy": "Test environment detection locally by setting CI environment variables. Verify automatic fallback behavior works correctly. Check that debug logging provides useful information for troubleshooting CI issues. Ensure smooth experience for both local development and CI environments.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create environment detection package",
+            "description": "Implement a dedicated package for detecting CI environments and runtime conditions",
+            "dependencies": [],
+            "details": "Create pkg/environment/detector.go with functions to detect CI=true, GITHUB_ACTIONS, GITLAB_CI, TRAVIS, JENKINS_HOME, and other common CI environment variables. Implement IsCI(), IsCIEnvironment(name string), and GetEnvironmentType() functions. Include detection for Docker containers and minimal environments. Return structured environment info including platform, CI type, and available capabilities.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement adaptive configuration loader",
+            "description": "Create configuration system that automatically adapts settings based on detected environment",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Extend pkg/config/loader.go to use environment detection results. Create LoadWithEnvironment() function that applies CI-specific defaults when CI is detected. Automatically set mock_audio=true, disable_hardware_tests=true, and verbose_logging=true in CI environments. Support configuration precedence: explicit config > environment-based defaults > standard defaults. Add methods to override specific settings programmatically.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Add automatic mock audio selection",
+            "description": "Implement logic to automatically use mock audio backend in CI environments",
+            "dependencies": [
+              "9.1",
+              "9.2"
+            ],
+            "details": "Modify pkg/tts/audio/factory.go to check environment and automatically select mock backend when CI is detected. Create fallback chain: try hardware audio -> try pulse/alsa -> fallback to mock. Add GLOW_TTS_FORCE_MOCK_AUDIO environment variable for explicit control. Ensure mock backend is always available as last resort. Log audio backend selection decisions for debugging.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Create dependency fallback system",
+            "description": "Implement graceful fallback mechanisms for missing system dependencies",
+            "dependencies": [
+              "9.3"
+            ],
+            "details": "Create pkg/fallback/manager.go to handle missing dependencies gracefully. Implement checks for audio libraries, TTS engines, and system tools. When dependencies are missing, automatically switch to mock implementations or skip non-critical features. Add IsDependencyAvailable(name string) and RegisterFallback(dependency, fallbackFunc) methods. Include specific handling for piper, gtts, and audio subsystems.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Add structured CI debugging logs",
+            "description": "Implement comprehensive logging system for debugging CI-specific issues",
+            "dependencies": [
+              "9.1",
+              "9.4"
+            ],
+            "details": "Create pkg/logging/ci.go with structured logging for CI environments. Add log levels: CI_DEBUG, CI_INFO, CI_WARN, CI_ERROR. Log environment detection results, configuration decisions, fallback activations, and test skips. Include timestamps, component names, and correlation IDs. Output in GitHub Actions format when GITHUB_ACTIONS is detected (::debug::, ::warning::, etc.). Add GLOW_TTS_CI_DEBUG=true for verbose CI logging.",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Create environment-specific initialization",
+            "description": "Implement different initialization paths for CI vs local development",
+            "dependencies": [
+              "9.1",
+              "9.2",
+              "9.3",
+              "9.4",
+              "9.5"
+            ],
+            "details": "Modify cmd/glow-tts/main.go to use environment-aware initialization. Create InitForCI() and InitForLocal() functions with appropriate setup. In CI mode: skip interactive prompts, use defaults, enable verbose logging, activate mocks. In local mode: allow full configuration, check hardware, enable all features. Add --ci flag to force CI mode locally for testing. Ensure clean separation between initialization paths.",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Create comprehensive CI documentation and monitoring",
+        "description": "Document CI setup requirements, create troubleshooting guide, and implement workflow status monitoring",
+        "details": "Create documentation explaining CI setup, build tags usage, and troubleshooting common issues. Add workflow status badges to README. Set up failure notifications for maintainers. Document which tests require hardware and how to run different test suites locally. Include examples of running tests with various build tags and configurations.",
+        "testStrategy": "Verify documentation is accurate by following setup instructions on clean environment. Test that troubleshooting guide helps resolve common issues. Check that status badges reflect current workflow state. Ensure new contributors can understand and work with CI system.",
+        "priority": "low",
+        "dependencies": [
+          8
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create CI_SETUP.md with build tags and environment documentation",
+            "description": "Write comprehensive CI setup guide explaining build tags system, environment variables, and test categorization",
+            "dependencies": [],
+            "details": "Create docs/CI_SETUP.md file documenting: 1) Build tag system (ci, notts, integration) and their purpose, 2) Required environment variables (GLOW_TTS_CACHE_MAX_SIZE, GLOW_TTS_PIPER_SPEED, etc.), 3) Test categories (unit vs integration) and when each runs, 4) How to configure local development environment to match CI, 5) Matrix testing strategy across OS platforms (Linux, macOS, Windows)",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Add CI troubleshooting section with common failure scenarios",
+            "description": "Document common CI failures and their solutions to help contributors quickly resolve issues",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "Add troubleshooting section to CI_SETUP.md covering: 1) ALSA configuration errors on Linux runners, 2) Audio hardware dependency failures and mock audio context usage, 3) Build tag misconfigurations and how to diagnose them, 4) Compilation errors from redundant newlines or similar issues, 5) Vulnerability scan failures and dependency update procedures, 6) Include specific error messages and their solutions",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Document test suites and local execution examples",
+            "description": "Create detailed documentation for running different test suites locally with various configurations",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "Document in CI_SETUP.md: 1) Commands for running unit tests only: 'go test -tags=ci ./...', 2) Running integration tests with hardware: 'go test -tags=integration ./...', 3) Running specific test suites (TTS tests, cache tests, etc.), 4) Examples with different build tags combinations, 5) How to test with mock audio context vs real audio, 6) Performance testing with different cache sizes and TTS speeds",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Add workflow status badges to README.md",
+            "description": "Implement GitHub Actions workflow status badges for all CI workflows in the main README",
+            "dependencies": [],
+            "details": "Add status badges to README.md for: 1) Quality workflow badge showing build/test status, 2) Security workflow badge for vulnerability scanning, 3) Platform-specific badges (Linux, macOS, Windows) if separate workflows exist, 4) Position badges near the top of README after project title, 5) Use standard GitHub Actions badge format with links to workflow runs, 6) Consider adding coverage badge if coverage reporting is implemented",
+            "status": "done",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Configure GitHub Actions failure notifications",
+            "description": "Set up automated notifications for CI workflow failures to alert maintainers",
+            "dependencies": [
+              "10.4"
+            ],
+            "details": "Configure failure notifications: 1) Add notification step to .github/workflows/quality.yml and security.yml on failure, 2) Use GitHub Actions built-in notifications or webhook integration, 3) Document notification setup in CI_SETUP.md for maintainers, 4) Include failure context in notifications (workflow name, branch, commit), 5) Consider using GitHub Issues API to auto-create issues for repeated failures, 6) Test notification system with intentional failure",
+            "status": "done",
+            "testStrategy": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-08-15T02:16:47.751Z",
+      "updated": "2025-08-15T04:32:10.049Z",
+      "description": "Tasks for ci_fixes context"
+    }
   }
 }

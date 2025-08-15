@@ -1,6 +1,16 @@
 version: "2"
 run:
   tests: false
+  # Skip files that import CGO packages
+  skip-files:
+    - "pkg/tts/player.go"
+    - "pkg/tts/audio_context_production.go"
+  # Skip directories
+  skip-dirs:
+    - vendor
+  # Build tags to exclude CGO
+  build-tags:
+    - nocgo
 linters:
   enable:
     - bodyclose

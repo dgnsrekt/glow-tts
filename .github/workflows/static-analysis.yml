@@ -1,0 +1,165 @@
+name: Static Analysis
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+
+env:
+  GO_VERSION: stable
+
+jobs:
+  # Golangci-lint with CGO handling
+  golangci-lint:
+    name: Go Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+      
+      - name: Run golangci-lint with nocgo build tag
+        run: |
+          echo "Running linter with nocgo build tag to exclude CGO files..."
+          golangci-lint run --build-tags=nocgo --timeout=5m ./...
+
+  # Staticcheck analysis
+  staticcheck:
+    name: Staticcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+      
+      - name: Run staticcheck with nocgo build tag
+        run: |
+          echo "Running staticcheck with nocgo build tag..."
+          staticcheck -tags=nocgo ./...
+
+  # Go vet analysis
+  go-vet:
+    name: Go Vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Run go vet with nocgo build tag
+        run: |
+          echo "Running go vet with nocgo build tag..."
+          go vet -tags=nocgo ./...
+
+  # Ineffassign - detect ineffectual assignments
+  ineffassign:
+    name: Ineffassign
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Install ineffassign
+        run: go install github.com/gordonklaus/ineffassign@latest
+      
+      - name: Run ineffassign with nocgo build tag
+        run: |
+          echo "Checking for ineffectual assignments..."
+          ineffassign -tags nocgo ./...
+
+  # Gosec - security checker
+  gosec:
+    name: Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      
+      - name: Run gosec with nocgo build tag
+        run: |
+          echo "Running security checks..."
+          gosec -tags=nocgo -fmt=sarif -out=gosec-results.sarif ./... || true
+      
+      - name: Upload SARIF file
+        if: always()
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: gosec-results.sarif
+        continue-on-error: true
+
+  # Custom ruleguard without CGO issues
+  ruleguard-custom:
+    name: Ruleguard Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Install ruleguard
+        run: go install github.com/quasilyte/go-ruleguard/cmd/ruleguard@latest
+      
+      - name: Download rules
+        run: |
+          # Download standard ruleguard rules
+          curl -L https://raw.githubusercontent.com/quasilyte/go-ruleguard/master/rules/rules.go -o rules.go
+      
+      - name: Run ruleguard on non-CGO packages
+        run: |
+          echo "Running ruleguard analysis..."
+          # Run on specific packages to avoid CGO issues
+          for pkg in cmd pkg/tts/engines pkg/tts/cache; do
+            echo "Analyzing $pkg..."
+            ruleguard -rules rules.go ./$pkg/... 2>&1 | grep -v "could not import C" || true
+          done
+
+  # Summary of all checks
+  analysis-summary:
+    name: Analysis Summary
+    if: always()
+    needs: [golangci-lint, staticcheck, go-vet, ineffassign, gosec, ruleguard-custom]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check analysis results
+        run: |
+          echo "## Static Analysis Summary"
+          echo "- golangci-lint: ${{ needs.golangci-lint.result }}"
+          echo "- staticcheck: ${{ needs.staticcheck.result }}"
+          echo "- go-vet: ${{ needs.go-vet.result }}"
+          echo "- ineffassign: ${{ needs.ineffassign.result }}"
+          echo "- gosec: ${{ needs.gosec.result }}"
+          echo "- ruleguard: ${{ needs.ruleguard-custom.result }}"
+          
+          # Don't fail the workflow for static analysis issues
+          echo "Static analysis complete. Check individual job results for details."

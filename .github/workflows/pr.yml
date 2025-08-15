@@ -1,0 +1,137 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  GO_VERSION: stable
+  CI: true
+  GLOW_TTS_MOCK_AUDIO: true
+
+jobs:
+  # Quick lint and format checks
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Check formatting
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "Go files are not formatted. Please run 'go fmt ./...'"
+            gofmt -d .
+            exit 1
+          fi
+      
+      - name: Run go vet
+        run: go vet ./...
+      
+      - name: Run staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
+  # Fast unit tests with coverage
+  quick-test:
+    name: Quick Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Run fast unit tests
+        run: |
+          go test -v -short -race -coverprofile=coverage.txt -covermode=atomic ./...
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.txt
+          flags: unittests
+          name: pr-coverage
+
+  # Parallel platform builds for verification
+  platform-build:
+    name: Platform Build (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      
+      - name: Build
+        run: go build -v ./...
+
+  # Documentation check
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for missing documentation
+        run: |
+          # Check if key documentation files exist
+          for file in README.md LICENSE; do
+            if [ ! -f "$file" ]; then
+              echo "Missing required documentation: $file"
+              exit 1
+            fi
+          done
+          
+          # Check if docs directory has content
+          if [ -d "docs" ]; then
+            if [ -z "$(ls -A docs)" ]; then
+              echo "docs directory is empty"
+            else
+              echo "Documentation found in docs/"
+              ls -la docs/
+            fi
+          fi
+
+  # PR status check
+  pr-status:
+    name: PR Status Check
+    if: always()
+    needs: [lint, quick-test, platform-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR status
+        run: |
+          echo "Lint status: ${{ needs.lint.result }}"
+          echo "Test status: ${{ needs.quick-test.result }}"
+          echo "Build status: ${{ needs.platform-build.result }}"
+          
+          if [[ "${{ needs.lint.result }}" == "failure" ]]; then
+            echo "❌ Linting failed. Please fix formatting and linting issues."
+            exit 1
+          fi
+          
+          if [[ "${{ needs.quick-test.result }}" == "failure" ]]; then
+            echo "❌ Tests failed. Please fix test failures."
+            exit 1
+          fi
+          
+          if [[ "${{ needs.platform-build.result }}" == "failure" ]]; then
+            echo "❌ Platform builds failed. Please ensure code builds on all platforms."
+            exit 1
+          fi
+          
+          echo "✅ All PR checks passed!"

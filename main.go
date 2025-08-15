@@ -435,7 +435,8 @@ func checkTTSDependencies() error {
 	engine := ttsEngine
 	if engine == "" {
 		// Check all if no specific engine specified
-		fmt.Println("Checking all TTS dependencies...\n")
+		fmt.Println("Checking all TTS dependencies...")
+		fmt.Println() // Add blank line for spacing
 	} else {
 		fmt.Printf("Checking dependencies for %s engine...\n\n", engine)
 	}
