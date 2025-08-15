@@ -314,7 +314,7 @@ func TestControllerStartStop(t *testing.T) {
 	controller.SetSpeedController(newMockSpeedController())
 
 	// Try to start without initialization
-	err := controller.Start(nil)
+	err := controller.Start(context.TODO())
 	if err == nil {
 		t.Error("Expected error starting uninitialized controller")
 	}
@@ -325,7 +325,7 @@ func TestControllerStartStop(t *testing.T) {
 	}
 
 	// Start controller
-	if err := controller.Start(nil); err != nil {
+	if err := controller.Start(context.TODO()); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
 
@@ -334,7 +334,7 @@ func TestControllerStartStop(t *testing.T) {
 	}
 
 	// Try to start again
-	err = controller.Start(nil)
+	err = controller.Start(context.TODO())
 	if err == nil {
 		t.Error("Expected error starting already running controller")
 	}
@@ -417,7 +417,7 @@ func TestControllerSetters(t *testing.T) {
 
 	// Initialize and start
 	controller.Initialize()
-	controller.Start(nil)
+	controller.Start(context.TODO())
 
 	// Test that setters fail when running
 	if err := controller.SetEngine(engine); err == nil {

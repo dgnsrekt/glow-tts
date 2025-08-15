@@ -125,8 +125,8 @@ func (mp *MarkdownProcessor) processNode(node ast.Node, source string) *Markdown
 			return nil
 		}
 		lang := ""
-		if n.Info != nil {
-			lang = string(n.Info.Text([]byte(source)))
+		if n.Info != nil && n.Info.Segment.Len() > 0 {
+			lang = string(n.Info.Segment.Value([]byte(source)))
 		}
 		return &MarkdownElement{
 			Type:     ElementCodeBlock,
@@ -213,7 +213,7 @@ func (mp *MarkdownProcessor) extractText(node ast.Node, source string) string {
 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 		switch c := child.(type) {
 		case *ast.Text:
-			text.Write(c.Text([]byte(source)))
+			text.Write(c.Segment.Value([]byte(source)))
 		case *ast.CodeSpan:
 			if mp.config.IncludeCodeBlocks {
 				text.WriteString(mp.extractText(c, source))

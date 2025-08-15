@@ -185,47 +185,44 @@ func (m *MockAudioPlayer) simulatePlayback() {
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
 	
-	for {
-		select {
-		case <-ticker.C:
-			if !m.playing.Load() || m.closed.Load() {
+	for range ticker.C {
+		if !m.playing.Load() || m.closed.Load() {
+			return
+		}
+		
+		if m.paused.Load() {
+			// Don't advance position while paused
+			continue
+		}
+		
+		// Calculate current playback position
+		m.mu.Lock()
+		if !m.startTime.IsZero() {
+			elapsed := time.Since(m.startTime) - m.pausedTime
+			bytesPlayed := int64(elapsed.Seconds() * bytesPerSecond)
+			
+			// Update reader position to match playback
+			if bytesPlayed < int64(len(m.data)) {
+				_, _ = m.reader.Seek(bytesPlayed, io.SeekStart)
+				// Also update the original reader if it exists
+				if m.originalReader != nil {
+					_, _ = m.originalReader.Seek(bytesPlayed, io.SeekStart)
+				}
+				m.position = bytesPlayed
+			} else {
+				// Playback completed
+				m.playing.Store(false)
+				_, _ = m.reader.Seek(0, io.SeekStart)
+				if m.originalReader != nil {
+					_, _ = m.originalReader.Seek(0, io.SeekStart)
+				}
+				m.position = 0
+				m.mu.Unlock()
+				log.Debug("Mock playback completed", "duration", duration)
 				return
 			}
-			
-			if m.paused.Load() {
-				// Don't advance position while paused
-				continue
-			}
-			
-			// Calculate current playback position
-			m.mu.Lock()
-			if !m.startTime.IsZero() {
-				elapsed := time.Since(m.startTime) - m.pausedTime
-				bytesPlayed := int64(elapsed.Seconds() * bytesPerSecond)
-				
-				// Update reader position to match playback
-				if bytesPlayed < int64(len(m.data)) {
-					_, _ = m.reader.Seek(bytesPlayed, io.SeekStart)
-					// Also update the original reader if it exists
-					if m.originalReader != nil {
-						_, _ = m.originalReader.Seek(bytesPlayed, io.SeekStart)
-					}
-					m.position = bytesPlayed
-				} else {
-					// Playback completed
-					m.playing.Store(false)
-					_, _ = m.reader.Seek(0, io.SeekStart)
-					if m.originalReader != nil {
-						_, _ = m.originalReader.Seek(0, io.SeekStart)
-					}
-					m.position = 0
-					m.mu.Unlock()
-					log.Debug("Mock playback completed", "duration", duration)
-					return
-				}
-			}
-			m.mu.Unlock()
 		}
+		m.mu.Unlock()
 	}
 }
 

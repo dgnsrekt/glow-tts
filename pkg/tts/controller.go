@@ -232,14 +232,14 @@ func (c *Controller) Play(text string) error {
 		if segment != nil {
 			// Use ProcessedAudio if available, otherwise fall back to raw Audio
 			audioToPlay := segment.ProcessedAudio
-			if audioToPlay == nil || len(audioToPlay) == 0 {
+			if len(audioToPlay) == 0 {
 				log.Debug("Controller: ProcessedAudio not available, using raw Audio",
 					"hasAudio", segment.Audio != nil,
 					"audioSize", len(segment.Audio))
 				audioToPlay = segment.Audio
 			}
 			
-			if audioToPlay != nil && len(audioToPlay) > 0 {
+			if len(audioToPlay) > 0 {
 				player := GetGlobalAudioPlayer()
 				if player == nil {
 					return fmt.Errorf("audio player not initialized")

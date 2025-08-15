@@ -769,19 +769,21 @@ func (aq *TTSAudioQueue) Clear() {
 			select {
 			case <-aq.textQueue:
 			default:
-				// If queue is empty, break
-				break
+				// If queue is empty, exit loop
+				goto doneTextQueue
 			}
 		}
+		doneTextQueue:
 		// Clear synthesis queue  
 		for len(aq.synthesisQueue) > 0 {
 			select {
 			case <-aq.synthesisQueue:
 			default:
-				// If queue is empty, break
-				break
+				// If queue is empty, exit loop
+				goto doneSynthQueue
 			}
 		}
+		doneSynthQueue:
 		close(done)
 	}()
 	
@@ -981,7 +983,7 @@ func (aq *TTSAudioQueue) DumpState() string {
 	aq.mu.RLock()
 	defer aq.mu.RUnlock()
 	
-	dump := fmt.Sprintf("TTSAudioQueue State Dump:\n")
+	dump := "TTSAudioQueue State Dump:\n"
 	dump += fmt.Sprintf("  State: %v\n", aq.state)
 	dump += fmt.Sprintf("  Current Index: %d\n", aq.currentIndex)
 	dump += fmt.Sprintf("  Queue Depth: %d\n", len(aq.order))
@@ -991,7 +993,7 @@ func (aq *TTSAudioQueue) DumpState() string {
 	dump += fmt.Sprintf("  Workers: %d\n", len(aq.workers))
 	
 	// Segment details
-	dump += fmt.Sprintf("\nSegments:\n")
+	dump += "\nSegments:\n"
 	for i, segmentID := range aq.order {
 		segment := aq.segments[segmentID]
 		if segment != nil {

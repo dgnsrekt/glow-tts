@@ -705,16 +705,6 @@ func (dc *DiskCache) saveIndex() error {
 	return os.WriteFile(dc.indexFile, data, 0600)
 }
 
-// saveIndexData saves the given index data to disk (can be called without lock)
-func (dc *DiskCache) saveIndexData(index map[string]*CacheMetadata) error {
-	data, err := json.MarshalIndent(index, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(dc.indexFile, data, 0600)
-}
-
 // calculateSize calculates the current cache size
 func (dc *DiskCache) calculateSize() {
 	dc.size = 0

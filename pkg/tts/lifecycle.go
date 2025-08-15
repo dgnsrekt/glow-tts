@@ -381,8 +381,6 @@ func (sl *SubprocessLifecycle) ForceStop() error {
 // ResourceMonitor tracks resource usage and detects leaks (debug mode only)
 type ResourceMonitor struct {
 	enabled      bool
-	goroutineCount int
-	memoryUsage  uint64
 	ticker       *time.Ticker
 	done         chan struct{}
 }

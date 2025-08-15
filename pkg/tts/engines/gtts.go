@@ -35,7 +35,6 @@ type GTTSEngine struct {
 	// State
 	mu            sync.RWMutex
 	initialized   bool
-	lastError     error
 	
 	// Temp directory for intermediate files
 	tempDir string
