@@ -1,3 +1,5 @@
+# golangci-lint configuration
+# See https://golangci-lint.run/usage/configuration/
 run:
   tests: false
   # Build tags to exclude CGO
