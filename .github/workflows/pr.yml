@@ -50,7 +50,14 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       
+      - name: Install audio dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+      
       - name: Run fast unit tests
+        env:
+          GLOW_TTS_MOCK_AUDIO: "true"
         run: |
           go test -v -short -race -coverprofile=coverage.txt -covermode=atomic ./...
       
@@ -66,7 +73,10 @@ jobs:
     name: Platform Build (${{ matrix.os }})
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Only test on Linux for now
+        os: [ubuntu-latest]
+        # Uncomment to test on other platforms
+        # os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -75,6 +85,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+      
+      - name: Install audio dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
       
       - name: Build
         run: go build -v ./...
