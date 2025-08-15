@@ -1,11 +1,10 @@
 # golangci-lint configuration
 # See https://golangci-lint.run/usage/configuration/
+
 run:
   tests: false
-  # Skip directories to reduce noise
-  skip-dirs:
-    - ui
-    - utils
+  timeout: 5m
+
 linters:
   enable:
     - bodyclose
@@ -30,16 +29,19 @@ linters:
     - unparam
     - whitespace
     - wrapcheck
-  exclusions:
-    generated: lax
-    presets:
-      - common-false-positives
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-formatters:
-  enable:
-    - gofumpt
-    - goimports
-  exclusions:
-    generated: lax
+  exclude-rules:
+    # Exclude ui and utils directories
+    - path: "^ui/"
+      linters:
+        - ".*"
+    - path: "^utils/"
+      linters:
+        - ".*"
+    # Exclude wrapcheck from test files
+    - path: "_test\\.go"
+      linters:
+        - wrapcheck
