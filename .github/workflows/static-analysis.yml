@@ -36,7 +36,7 @@ jobs:
           echo "Running linter..."
           # Run without nocgo tag as it causes too many import issues
           # The linter will still check for code quality issues
-          golangci-lint run --config=.golangci.manual.yml --timeout=5m ./...
+          golangci-lint run --timeout=5m ./...
 
   # Staticcheck analysis
   staticcheck:
