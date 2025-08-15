@@ -438,3 +438,11 @@ func (e *PiperEngine) GetInfo() map[string]string {
 
 	return info
 }
+
+// Cleanup performs cleanup for the Piper engine
+func (e *PiperEngine) Cleanup() error {
+	// Piper doesn't create temp files by default, 
+	// but we should ensure any running processes are terminated
+	// This is handled by the subprocess lifecycle manager
+	return nil
+}

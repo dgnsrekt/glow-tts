@@ -313,6 +313,27 @@ func initTTSWithTimeout(engine string, ttsState *TTSState) tea.Msg {
 		// Store the controller in the TTS state
 		ttsState.controller = controller
 		
+		// Register components for lifecycle management
+		lifecycle := tts.GetLifecycleManager()
+		
+		// Register engine for cleanup
+		lifecycle.Register(tts.NewEngineLifecycle(selectedEngine, engine))
+		
+		// Register queue if it exists
+		if queue := controller.GetQueue(); queue != nil {
+			lifecycle.Register(tts.NewQueueLifecycle(queue))
+		}
+		
+		// Register audio player
+		if player := tts.GetGlobalAudioPlayer(); player != nil {
+			lifecycle.Register(tts.NewPlayerLifecycle(player))
+		}
+		
+		// Register cache if enabled
+		if cache := controller.GetCache(); cache != nil {
+			lifecycle.Register(tts.NewCacheLifecycle(cache, true))
+		}
+		
 		// Don't modify state flags here - let the Update function handle it
 		
 		log.Info("TTS initialization complete", "engine", engine)

@@ -380,10 +380,23 @@ func (e *GTTSEngine) IsAvailable() bool {
 	return true
 }
 
-// Cleanup removes temporary files
+// Cleanup removes temporary files and performs cleanup
 func (e *GTTSEngine) Cleanup() error {
+	log.Debug("GTTS: Cleaning up engine resources")
+	
+	// Clean up temp directory
 	if e.tempDir != "" {
-		return os.RemoveAll(e.tempDir)
+		if err := os.RemoveAll(e.tempDir); err != nil {
+			log.Warn("GTTS: Failed to remove temp directory", "error", err)
+			return err
+		}
 	}
+	
+	// Mark as not initialized
+	e.mu.Lock()
+	e.initialized = false
+	e.mu.Unlock()
+	
+	log.Info("GTTS: Engine cleanup complete")
 	return nil
 }

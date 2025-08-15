@@ -667,3 +667,16 @@ func (c *Controller) WaitForReady(timeout time.Duration) error {
 	
 	return fmt.Errorf("timeout waiting for controller to be ready")
 }
+
+// GetQueue returns the audio queue if available
+func (c *Controller) GetQueue() *TTSAudioQueue {
+	return c.queue
+}
+
+// GetCache returns the cache manager if available
+func (c *Controller) GetCache() *TTSCache {
+	// Note: We currently have a type mismatch between CacheManager interface
+	// and TTSCache implementation. For now, return nil.
+	// TODO: Unify cache interfaces
+	return nil
+}

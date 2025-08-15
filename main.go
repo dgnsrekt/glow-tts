@@ -411,11 +411,22 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	if err := rootCmd.Execute(); err != nil {
+	
+	// Set up cleanup on exit
+	defer func() {
+		// Perform TTS cleanup if it was initialized
+		if ttsEngine != "" {
+			log.Debug("Performing TTS cleanup on exit")
+			if err := tts.InitiateShutdown(); err != nil {
+				log.Warn("TTS shutdown completed with errors", "error", err)
+			}
+		}
 		_ = closer()
+	}()
+	
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-	_ = closer()
 }
 
 // checkTTSDependencies checks and reports TTS dependencies
