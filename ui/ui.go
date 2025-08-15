@@ -335,8 +335,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				
-				skipChildUpdate = true  // Don't pass space to pager
-				
 				// Clear any previous errors when starting a new action
 				m.tts.lastError = nil
 				
