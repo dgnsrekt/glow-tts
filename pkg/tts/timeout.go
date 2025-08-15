@@ -163,12 +163,10 @@ func (te *TimeoutExecutor) gracefulShutdown(proc *os.Process) {
 		close(graceDone)
 	}()
 	
-	// Check if process exited during grace period
-	select {
-	case <-graceDone:
-		// Grace period expired, process may still be running
-		log.Debug("Grace period expired, process may need forceful termination")
-	}
+	// Wait for grace period to expire
+	<-graceDone
+	// Grace period expired, process may still be running
+	log.Debug("Grace period expired, process may need forceful termination")
 }
 
 // sendInterrupt sends an interrupt signal to the process (platform-specific)
