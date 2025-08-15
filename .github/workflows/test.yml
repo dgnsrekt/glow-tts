@@ -39,6 +39,12 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       
+      - name: Install audio dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+      
       - name: Download dependencies
         run: go mod download
       
@@ -121,6 +127,11 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       
+      - name: Install audio dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+      
       - name: Download dependencies
         run: go mod download
       
@@ -151,6 +162,12 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       
+      - name: Install audio dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
+      
       - name: Download dependencies
         run: go mod download
       
@@ -175,6 +192,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+      
+      - name: Install audio dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
       
       - name: Download dependencies
         run: go mod download
