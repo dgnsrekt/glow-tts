@@ -118,11 +118,11 @@ func (sm *SubprocessManager) Execute(ctx context.Context, name string, args ...s
 // StreamProcess handles processes that produce streaming output.
 // This is useful for TTS engines that output audio data progressively.
 func (sm *SubprocessManager) StreamProcess(ctx context.Context, input string, name string, args ...string) (io.ReadCloser, error) {
+	var cancel context.CancelFunc
 	// Create context with timeout if not already set
 	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
-		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, sm.defaultTimeout)
-		defer cancel()
+		// Don't defer cancel here - it will be called by processReader.Close()
 	}
 
 	// Create command with context
@@ -136,11 +136,17 @@ func (sm *SubprocessManager) StreamProcess(ctx context.Context, input string, na
 	// Get stdout pipe
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		if cancel != nil {
+			cancel()
+		}
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
+		if cancel != nil {
+			cancel()
+		}
 		return nil, fmt.Errorf("failed to start process: %w", err)
 	}
 
@@ -149,6 +155,7 @@ func (sm *SubprocessManager) StreamProcess(ctx context.Context, input string, na
 		reader: stdout,
 		cmd:    cmd,
 		ctx:    ctx,
+		cancel: cancel,
 	}, nil
 }
 
@@ -157,6 +164,7 @@ type processReader struct {
 	reader io.ReadCloser
 	cmd    *exec.Cmd
 	ctx    context.Context
+	cancel context.CancelFunc // May be nil if context already had deadline
 	once   sync.Once
 }
 
@@ -178,22 +186,56 @@ func (pr *processReader) Close() error {
 			err = closeErr
 		}
 
-		// Wait for process to finish or kill it
+		// Don't cancel context immediately - let process finish naturally if possible
+		// Wait for process to finish or timeout
 		done := make(chan error, 1)
 		go func() {
 			done <- pr.cmd.Wait()
 		}()
 
+		// Give the process reasonable time to complete
+		waitTimeout := 5 * time.Second
 		select {
 		case waitErr := <-done:
+			// Process finished naturally
+			// Ignore "signal: killed" errors as they're expected when context is cancelled
 			if err == nil && waitErr != nil {
-				err = waitErr
+				// Check if it's a killed signal error
+				if !strings.Contains(waitErr.Error(), "signal: killed") &&
+					!strings.Contains(waitErr.Error(), "context canceled") {
+					err = waitErr
+				}
 			}
-		case <-time.After(1 * time.Second):
-			// Force kill if process doesn't exit gracefully
-			if killErr := pr.cmd.Process.Kill(); killErr != nil && err == nil {
-				err = killErr
+		case <-time.After(waitTimeout):
+			// Timeout - cancel context and force kill
+			if pr.cancel != nil {
+				pr.cancel()
 			}
+			
+			// Give it a moment to respond to context cancellation
+			select {
+			case waitErr := <-done:
+				if err == nil && waitErr != nil {
+					if !strings.Contains(waitErr.Error(), "signal: killed") &&
+						!strings.Contains(waitErr.Error(), "context canceled") {
+						err = waitErr
+					}
+				}
+			case <-time.After(100 * time.Millisecond):
+				// Force kill if still not dead
+				if pr.cmd.Process != nil {
+					if killErr := pr.cmd.Process.Kill(); killErr != nil && err == nil {
+						err = killErr
+					}
+					// Wait for the process to actually exit after kill
+					<-done
+				}
+			}
+		}
+		
+		// Finally cancel the context if we haven't already
+		if pr.cancel != nil {
+			pr.cancel()
 		}
 	})
 	return err
