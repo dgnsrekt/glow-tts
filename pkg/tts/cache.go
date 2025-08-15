@@ -539,6 +539,9 @@ func (dc *DiskCache) Get(key string) (*AudioData, error) {
 
 // Put stores data in disk cache
 func (dc *DiskCache) Put(key string, data *AudioData) error {
+	if dc == nil {
+		return fmt.Errorf("disk cache is nil")
+	}
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 
@@ -570,8 +573,22 @@ func (dc *DiskCache) Put(key string, data *AudioData) error {
 	dc.index[key] = metadata
 	dc.size += metadata.Size
 
-	// Save index
-	return dc.saveIndex()
+	// Make a copy of the index for saving
+	indexCopy := make(map[string]*CacheMetadata)
+	for k, v := range dc.index {
+		indexCopy[k] = v
+	}
+	
+	// Release lock before saving to disk
+	dc.mu.Unlock()
+	
+	// Save index without holding lock
+	err := dc.saveIndexData(indexCopy)
+	
+	// Re-acquire lock to maintain defer semantics
+	dc.mu.Lock()
+	
+	return err
 }
 
 // Delete removes entry from disk cache
@@ -592,7 +609,22 @@ func (dc *DiskCache) Delete(key string) error {
 	delete(dc.index, key)
 	dc.size -= metadata.Size
 
-	return dc.saveIndex()
+	// Make a copy of the index for saving
+	indexCopy := make(map[string]*CacheMetadata)
+	for k, v := range dc.index {
+		indexCopy[k] = v
+	}
+	
+	// Release lock before saving to disk
+	dc.mu.Unlock()
+	
+	// Save index without holding lock
+	err := dc.saveIndexData(indexCopy)
+	
+	// Re-acquire lock to maintain defer semantics
+	dc.mu.Lock()
+	
+	return err
 }
 
 // Size returns current cache size
@@ -687,9 +719,19 @@ func (dc *DiskCache) loadIndex() error {
 	return json.Unmarshal(data, &dc.index)
 }
 
-// saveIndex saves the cache index to disk
+// saveIndex saves the cache index to disk (must be called with lock held)
 func (dc *DiskCache) saveIndex() error {
 	data, err := json.MarshalIndent(dc.index, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(dc.indexFile, data, 0600)
+}
+
+// saveIndexData saves the given index data to disk (can be called without lock)
+func (dc *DiskCache) saveIndexData(index map[string]*CacheMetadata) error {
+	data, err := json.MarshalIndent(index, "", "  ")
 	if err != nil {
 		return err
 	}
