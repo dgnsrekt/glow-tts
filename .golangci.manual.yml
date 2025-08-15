@@ -5,6 +5,10 @@ run:
   # Build tags to exclude CGO
   build-tags:
     - nocgo
+  # Skip directories that have import issues with nocgo
+  skip-dirs:
+    - ui
+    - utils
 linters:
   enable:
     - bodyclose

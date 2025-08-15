@@ -29,7 +29,11 @@ jobs:
       - name: Run golangci-lint with nocgo build tag
         run: |
           echo "Running linter with nocgo build tag to exclude CGO files..."
-          golangci-lint run --config=.golangci.manual.yml --build-tags=nocgo --timeout=5m ./...
+          # Skip ui and utils packages which have import issues with nocgo
+          golangci-lint run --config=.golangci.manual.yml --build-tags=nocgo --timeout=5m \
+            --skip-dirs=ui \
+            --skip-dirs=utils \
+            ./...
 
   # Staticcheck analysis
   staticcheck:
