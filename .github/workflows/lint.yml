@@ -16,6 +16,6 @@ jobs:
           args: --issues-exit-code=0 --build-tags=nocgo
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           only-new-issues: true
-          # Skip config file since it's causing version issues
+          # Skip cache to avoid issues with config
           skip-cache: true
-          skip-pkg-cache: true
+          skip-save-cache: true
