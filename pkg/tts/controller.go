@@ -538,9 +538,11 @@ func (c *Controller) Start(ctx context.Context) error {
 		return fmt.Errorf("cannot start controller in state %s", c.state)
 	}
 
-	// Update context if provided
+	// Create or update context
 	if ctx != nil {
-		c.ctx = ctx
+		c.ctx, c.cancel = context.WithCancel(ctx)
+	} else {
+		c.ctx, c.cancel = context.WithCancel(context.Background())
 	}
 
 	// Set state to running
