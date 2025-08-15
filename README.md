@@ -1,283 +1,126 @@
-# Glow
+# Glow-TTS
 
-Render markdown on the CLI, with _pizzazz_!
+A fork of [Glow](https://github.com/charmbracelet/glow) with experimental Text-to-Speech capabilities.
 
-<p align="center">
-    <img src="https://stuff.charm.sh/glow/glow-banner-github.gif" alt="Glow Logo">
-    <a href="https://github.com/charmbracelet/glow/releases"><img src="https://img.shields.io/github/release/charmbracelet/glow.svg" alt="Latest Release"></a>
-    <a href="https://pkg.go.dev/github.com/charmbracelet/glow?tab=doc"><img src="https://godoc.org/github.com/golang/gddo?status.svg" alt="GoDoc"></a>
-    <a href="https://github.com/charmbracelet/glow/actions"><img src="https://github.com/charmbracelet/glow/workflows/build/badge.svg" alt="Build Status"></a>
-    <a href="https://goreportcard.com/report/github.com/charmbracelet/glow"><img src="https://goreportcard.com/badge/charmbracelet/glow" alt="Go ReportCard"></a>
-</p>
+> **⚠️ DISCLAIMER**: This is an unofficial fork not affiliated with or maintained by the Charm team. See [FORK_NOTICE.md](FORK_NOTICE.md) for details.
 
-<p align="center">
-    <img src="https://github.com/user-attachments/assets/c2246366-f84b-4847-b431-32a61ca07b74" width="800" alt="Glow UI Demo">
-</p>
+## What is this?
 
-## What is it?
+Glow-TTS adds Text-to-Speech functionality to the excellent [Glow markdown reader](https://github.com/charmbracelet/glow). This experimental fork allows you to listen to your markdown documents using either:
 
-Glow is a terminal based markdown reader designed from the ground up to bring
-out the beauty—and power—of the CLI.
+- **Piper TTS** - Fast, offline, privacy-focused
+- **Google TTS** - Online, easy setup, multiple languages
 
-Use it to discover markdown files, read documentation directly on the command
-line. Glow will find local markdown files in subdirectories or a local
-Git repository.
+## Features
+
+### TTS Capabilities
+- 🎯 Two TTS engines (Piper offline, Google online)
+- ⏯️ Playback controls (play, pause, stop, skip)
+- 🎚️ Speed control (0.5x to 2.0x)
+- 💾 Audio caching for repeated content
+- 🎵 Sentence-by-sentence navigation
+- ⌨️ Keyboard shortcuts in TUI mode
+
+### Keyboard Controls
+
+When TTS is enabled in TUI mode:
+
+| Key | Action |
+|-----|--------|
+| `Space` | Play/Pause |
+| `s` | Stop |
+| `→` / `n` | Next sentence |
+| `←` / `p` | Previous sentence |
+| `↑` | Increase speed |
+| `↓` | Decrease speed |
+
+## Quick Start
+
+```bash
+# Check TTS dependencies
+glow --check-deps
+
+# Use Piper TTS (offline)
+glow --tts piper README.md
+
+# Use Google TTS (online)
+glow --tts gtts README.md
+
+# Generate TTS config file
+glow --generate-tts-config
+```
 
 ## Installation
 
-### Package Manager
+### Base Installation
+
+This fork maintains the same installation methods as the original Glow. Clone and build from source:
 
 ```bash
-# macOS or Linux
-brew install glow
+git clone https://github.com/yourusername/glow-tts.git
+cd glow-tts
+go build -o glow
 ```
 
+### TTS Dependencies
+
+#### For Piper TTS (Offline)
+1. Download Piper from [releases](https://github.com/rhasspy/piper/releases)
+2. Download voice models from [Hugging Face](https://huggingface.co/rhasspy/piper-voices)
+3. See [TTS Setup Guide](docs/TTS_SETUP.md) for detailed instructions
+
+#### For Google TTS (Online)
 ```bash
-# macOS (with MacPorts)
-sudo port install glow
-```
-
-```bash
-# Arch Linux (btw)
-pacman -S glow
-```
-
-```bash
-# Void Linux
-xbps-install -S glow
-```
-
-```bash
-# Nix shell
-nix-shell -p glow --command glow
-```
-
-```bash
-# FreeBSD
-pkg install glow
-```
-
-```bash
-# Solus
-eopkg install glow
-```
-
-```bash
-# Windows (with Chocolatey, Scoop, or Winget)
-choco install glow
-scoop install glow
-winget install charmbracelet.glow
-```
-
-```bash
-# Android (with termux)
-pkg install glow
-```
-
-```bash
-# Ubuntu (Snapcraft)
-sudo snap install glow
-```
-
-```bash
-# Debian/Ubuntu
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
-echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
-sudo apt update && sudo apt install glow
-```
-
-```bash
-# Fedora/RHEL
-echo '[charm]
-name=Charm
-baseurl=https://repo.charm.sh/yum/
-enabled=1
-gpgcheck=1
-gpgkey=https://repo.charm.sh/yum/gpg.key' | sudo tee /etc/yum.repos.d/charm.repo
-sudo yum install glow
-```
-
-Or download a binary from the [releases][releases] page. MacOS, Linux, Windows,
-FreeBSD and OpenBSD binaries are available, as well as Debian, RPM, and Alpine
-packages. ARM builds are also available for macOS, Linux, FreeBSD and OpenBSD.
-
-### Go
-
-Or just install it with `go`:
-
-```bash
-go install github.com/charmbracelet/glow@latest
-```
-
-### Build (requires Go 1.21+)
-
-```bash
-git clone https://github.com/charmbracelet/glow.git
-cd glow
-go build
-```
-
-[releases]: https://github.com/charmbracelet/glow/releases
-
-## The TUI
-
-Simply run `glow` without arguments to start the textual user interface and
-browse local. Glow will find local markdown files in the
-current directory and below or, if you’re in a Git repository, Glow will search
-the repo.
-
-Markdown files can be read with Glow's high-performance pager. Most of the
-keystrokes you know from `less` are the same, but you can press `?` to list
-the hotkeys.
-
-## The CLI
-
-In addition to a TUI, Glow has a CLI for working with Markdown. To format a
-document use a markdown source as the primary argument:
-
-```bash
-# Read from file
-glow README.md
-
-# Read from stdin
-echo "[Glow](https://github.com/charmbracelet/glow)" | glow -
-
-# Fetch README from GitHub / GitLab
-glow github.com/charmbracelet/glow
-
-# Fetch markdown from HTTP
-glow https://host.tld/file.md
-```
-
-### Word Wrapping
-
-The `-w` flag lets you set a maximum width at which the output will be wrapped:
-
-```bash
-glow -w 60
-```
-
-### Paging
-
-CLI output can be displayed in your preferred pager with the `-p` flag. This defaults
-to the ANSI-aware `less -r` if `$PAGER` is not explicitly set.
-
-### Styles
-
-You can choose a style with the `-s` flag. When no flag is provided `glow` tries
-to detect your terminal's current background color and automatically picks
-either the `dark` or the `light` style for you.
-
-```bash
-glow -s [dark|light]
-```
-
-Alternatively you can also supply a custom JSON stylesheet:
-
-```bash
-glow -s mystyle.json
-```
-
-For additional usage details see:
-
-```bash
-glow --help
-```
-
-Check out the [Glamour Style Section](https://github.com/charmbracelet/glamour/blob/master/styles/gallery/README.md)
-to find more styles. Or [make your own](https://github.com/charmbracelet/glamour/tree/master/styles)!
-
-### Text-to-Speech (TTS)
-
-Glow can read markdown documents aloud using Text-to-Speech engines. This feature supports both offline (Piper) and online (Google TTS) engines.
-
-```bash
-# Use Piper for offline TTS
-glow --tts piper README.md
-
-# Use Google TTS (requires internet)
-glow --tts gtts README.md
-
-# Check available TTS engines
-glow --check-deps
-```
-
-#### TTS Controls (TUI Mode)
-
-When TTS is enabled, use these keyboard shortcuts:
-
-- `Space` - Play/Pause
-- `s` - Stop
-- `→` / `n` - Next sentence  
-- `←` / `p` - Previous sentence
-- `↑` - Increase speed
-- `↓` - Decrease speed
-
-#### Quick Setup
-
-```bash
-# Generate TTS configuration
-glow --generate-tts-config
-
-# Install Piper (offline TTS)
-# See docs/TTS_SETUP.md for detailed instructions
-
-# Install Google TTS
 pip install gtts
+# or
+pipx install gtts
 ```
 
-For detailed setup instructions, see [TTS Setup Guide](docs/TTS_SETUP.md) and [TTS Troubleshooting](docs/TTS_TROUBLESHOOTING.md).
+## Documentation
 
-## The Config File
+- 📖 [TTS Setup Guide](docs/TTS_SETUP.md) - Detailed installation instructions
+- 🔧 [TTS Troubleshooting](docs/TTS_TROUBLESHOOTING.md) - Common issues and solutions
+- 📚 [Original Glow Docs](https://github.com/charmbracelet/glow#readme) - For base markdown features
 
-If you find yourself supplying the same flags to `glow` all the time, it's
-probably a good idea to create a config file. Run `glow config`, which will open
-it in your favorite $EDITOR. Alternatively you can manually put a file named
-`glow.yml` in the default config path of you platform. If you're not sure where
-that is, please refer to `glow --help`.
+## Configuration
 
-Here's an example config:
-
-```yaml
-# style name or JSON path (default "auto")
-style: "light"
-# mouse wheel support (TUI-mode only)
-mouse: true
-# use pager to display markdown
-pager: true
-# at which column should we word wrap?
-width: 80
-# show all files, including hidden and ignored.
-all: false
-# show line numbers (TUI-mode only)
-showLineNumbers: false
-# preserve newlines in the output
-preserveNewLines: false
+Generate a TTS config file:
+```bash
+glow --generate-tts-config
 ```
 
-## Contributing
+This creates `~/.config/glow/glow-tts.yml` with options for:
+- Default TTS engine selection
+- Voice preferences
+- Cache settings
+- Speed defaults
 
-See [contributing][contribute].
+## Original Glow Features
 
-[contribute]: https://github.com/charmbracelet/glow/contribute
+This fork retains all original Glow functionality. For information about:
+- Markdown rendering
+- GitHub/GitLab integration  
+- Stashing documents
+- Configuration options
 
-## Feedback
+Please refer to the [original Glow documentation](https://github.com/charmbracelet/glow#readme).
 
-We’d love to hear your thoughts on this project. Feel free to drop us a note!
+## Important Notes
 
-- [Twitter](https://twitter.com/charmcli)
-- [The Fediverse](https://mastodon.social/@charmcli)
-- [Discord](https://charm.sh/chat)
+- **Experimental**: TTS features are experimental and may have bugs
+- **Upstream Sync**: This fork attempts to stay synchronized with upstream Glow
+- **No Support**: This is a personal project with no official support
+- **Original Credit**: All base functionality credit goes to [Charm](https://charm.sh)
 
 ## License
 
-[MIT](https://github.com/charmbracelet/glow/raw/master/LICENSE)
+MIT - See [LICENSE](LICENSE)
 
----
+- Original Glow Copyright (c) Charm
+- TTS modifications Copyright (c) 2024 Contributors
 
-Part of [Charm](https://charm.sh).
+## Acknowledgments
 
-<a href="https://charm.sh/"><img alt="The Charm logo" src="https://stuff.charm.sh/charm-badge.jpg" width="400"></a>
-
-Charm热爱开源 • Charm loves open source
+- The [Charm](https://charm.sh) team for creating Glow
+- [Piper](https://github.com/rhasspy/piper) for offline TTS
+- [gTTS](https://github.com/pndurette/gTTS) for Google TTS interface
