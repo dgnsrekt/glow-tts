@@ -6,11 +6,11 @@ Quick reference for monitoring CI/CD health and performance.
 
 | Workflow | Badge | Purpose | Schedule |
 |----------|-------|---------|----------|
-| Build & Test | [![Build & Test](https://github.com/charmbracelet/glow/actions/workflows/build.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/build.yml) | Quick build verification | On push/PR |
-| Test Suite | [![Test Suite](https://github.com/charmbracelet/glow/actions/workflows/test.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/test.yml) | Comprehensive testing | On push/PR |
-| Static Analysis | [![Static Analysis](https://github.com/charmbracelet/glow/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/static-analysis.yml) | Code quality checks | On push/PR |
-| PR Checks | [![PR Checks](https://github.com/charmbracelet/glow/actions/workflows/pr.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/pr.yml) | PR validation | On PR events |
-| Nightly | [![Nightly](https://github.com/charmbracelet/glow/actions/workflows/nightly.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/nightly.yml) | Extended testing | Daily 2 AM UTC |
+| Build & Test | [![Build & Test](https://github.com/dgnsrekt/glow-tts/actions/workflows/build.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/build.yml) | Quick build verification | On push/PR |
+| Test Suite | [![Test Suite](https://github.com/dgnsrekt/glow-tts/actions/workflows/test.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/test.yml) | Comprehensive testing | On push/PR |
+| Static Analysis | [![Static Analysis](https://github.com/dgnsrekt/glow-tts/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/static-analysis.yml) | Code quality checks | On push/PR |
+| PR Checks | [![PR Checks](https://github.com/dgnsrekt/glow-tts/actions/workflows/pr.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/pr.yml) | PR validation | On PR events |
+| Nightly | [![Nightly](https://github.com/dgnsrekt/glow-tts/actions/workflows/nightly.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/nightly.yml) | Extended testing | Daily 2 AM UTC |
 
 ## Performance Metrics
 
@@ -68,7 +68,7 @@ gh run rerun <run-id>
 ```
 
 ### Monitor Performance Trends
-1. Go to [Actions tab](https://github.com/charmbracelet/glow/actions)
+1. Go to [Actions tab](https://github.com/dgnsrekt/glow-tts/actions)
 2. Click on a workflow name
 3. View "Workflow runs" timing chart
 4. Check for performance degradation

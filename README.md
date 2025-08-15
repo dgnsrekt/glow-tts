@@ -1,11 +1,11 @@
 # Glow-TTS
 
-[![Build & Test](https://github.com/charmbracelet/glow/actions/workflows/build.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/build.yml)
-[![Test Suite](https://github.com/charmbracelet/glow/actions/workflows/test.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/test.yml)
-[![Static Analysis](https://github.com/charmbracelet/glow/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/static-analysis.yml)
-[![PR Checks](https://github.com/charmbracelet/glow/actions/workflows/pr.yml/badge.svg)](https://github.com/charmbracelet/glow/actions/workflows/pr.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/charmbracelet/glow)](https://goreportcard.com/report/github.com/charmbracelet/glow)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/charmbracelet/glow)](go.mod)
+[![Build & Test](https://github.com/dgnsrekt/glow-tts/actions/workflows/build.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/build.yml)
+[![Test Suite](https://github.com/dgnsrekt/glow-tts/actions/workflows/test.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/test.yml)
+[![Static Analysis](https://github.com/dgnsrekt/glow-tts/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/static-analysis.yml)
+[![PR Checks](https://github.com/dgnsrekt/glow-tts/actions/workflows/pr.yml/badge.svg)](https://github.com/dgnsrekt/glow-tts/actions/workflows/pr.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dgnsrekt/glow-tts)](https://goreportcard.com/report/github.com/dgnsrekt/glow-tts)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/dgnsrekt/glow-tts)](go.mod)
 
 A fork of [Glow](https://github.com/charmbracelet/glow) with experimental Text-to-Speech capabilities.
 

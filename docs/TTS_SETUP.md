@@ -287,4 +287,4 @@ See [TTS Troubleshooting Guide](TTS_TROUBLESHOOTING.md) for common issues and so
 - Try different voice models to find your preference
 - Customize the configuration file for your needs
 - Enable debug logging with `--debug` to diagnose issues
-- Report issues at [GitHub Issues](https://github.com/charmbracelet/glow/issues)
+- Report issues at [GitHub Issues](https://github.com/dgnsrekt/glow-tts/issues)

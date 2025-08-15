@@ -373,7 +373,7 @@ If these solutions don't resolve your issue:
    ```
 
 3. **Report Issue:**
-   - [GitHub Issues](https://github.com/charmbracelet/glow/issues)
+   - [GitHub Issues](https://github.com/dgnsrekt/glow-tts/issues)
    - Include debug.log and system information
    - Describe steps to reproduce
 
