@@ -135,3 +135,49 @@ jobs:
           fi
           
           echo "✅ All PR checks passed!"
+
+  # Send notifications to ntfy.sh
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [lint, quick-test, platform-build, docs, pr-summary]
+    if: always()
+    steps:
+      - name: Send success notification
+        if: ${{ success() }}
+        run: |
+          curl -H "Title: Glow-TTS PR - Checks Passed ✅" \
+               -H "Priority: 3" \
+               -H "Tags: white_check_mark" \
+               -d "PR checks completed successfully for ${{ github.repository }}
+
+          PR: #${{ github.event.pull_request.number }}
+          Branch: ${{ github.head_ref }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd
+
+      - name: Send failure notification
+        if: ${{ failure() }}
+        run: |
+          curl -H "Title: Glow-TTS PR - Checks Failed ❌" \
+               -H "Priority: 4" \
+               -H "Tags: x" \
+               -d "PR checks failed for ${{ github.repository }}
+
+          PR: #${{ github.event.pull_request.number }}
+          Branch: ${{ github.head_ref }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd
+
+      - name: Send cancellation notification
+        if: ${{ cancelled() }}
+        run: |
+          curl -H "Title: Glow-TTS PR - Checks Cancelled ⚠️" \
+               -H "Priority: 3" \
+               -H "Tags: warning" \
+               -d "PR checks were cancelled for ${{ github.repository }}
+
+          PR: #${{ github.event.pull_request.number }}
+          Branch: ${{ github.head_ref }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd

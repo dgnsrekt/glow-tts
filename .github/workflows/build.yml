@@ -82,31 +82,48 @@ jobs:
   # Ruleguard moved to static-analysis.yml due to CGO issues
   # See .github/workflows/static-analysis.yml for comprehensive static analysis
 
-  # Workflow status notification
-  notify-on-failure:
-    name: Notify on Failure
-    if: failure() && github.ref == 'refs/heads/main'
-    needs: [govulncheck, build]
+  # Send notifications to ntfy.sh
+  notify:
+    name: Send Notification
     runs-on: ubuntu-latest
+    needs: [govulncheck, build, semgrep]
+    if: always()
     steps:
-      - name: Create failure notification
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const workflow = '${{ github.workflow }}';
-            const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
-            const commit = '${{ github.sha }}'.substring(0, 7);
-            const branch = '${{ github.ref_name }}';
-            
-            // Create issue comment or notification
-            console.log(`Workflow ${workflow} failed on ${branch} (${commit})`);
-            console.log(`View run: ${runUrl}`);
-            
-            // For critical failures, you could create an issue:
-            // await github.rest.issues.create({
-            //   owner: context.repo.owner,
-            //   repo: context.repo.repo,
-            //   title: `CI Failure: ${workflow} on ${branch}`,
-            //   body: `The ${workflow} workflow failed on branch ${branch}.\n\nCommit: ${commit}\n[View failed run](${runUrl})`,
-            //   labels: ['ci-failure']
-            // });
+      - name: Send success notification
+        if: ${{ success() }}
+        run: |
+          curl -H "Title: Glow-TTS CI - Build Success ✅" \
+               -H "Priority: 3" \
+               -H "Tags: white_check_mark" \
+               -d "Build completed successfully for ${{ github.repository }}
+
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd
+
+      - name: Send failure notification
+        if: ${{ failure() }}
+        run: |
+          curl -H "Title: Glow-TTS CI - Build Failed ❌" \
+               -H "Priority: 5" \
+               -H "Tags: x" \
+               -d "Build failed for ${{ github.repository }}
+
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd
+
+      - name: Send cancellation notification
+        if: ${{ cancelled() }}
+        run: |
+          curl -H "Title: Glow-TTS CI - Build Cancelled ⚠️" \
+               -H "Priority: 3" \
+               -H "Tags: warning" \
+               -d "Build was cancelled for ${{ github.repository }}
+
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+               https://ntfy.sh/glow-tts-cicd
