@@ -7,6 +7,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/dgnsrekt/glow-tts)](https://goreportcard.com/report/github.com/dgnsrekt/glow-tts)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/dgnsrekt/glow-tts)](go.mod)
 
+<video src="docs/demo.webm" controls></video>
+
 A fork of [Glow](https://github.com/charmbracelet/glow) with experimental Text-to-Speech capabilities.
 
 > **⚠️ DISCLAIMER**: This is an unofficial fork not affiliated with or maintained by the Charm team. See [FORK_NOTICE.md](FORK_NOTICE.md) for details.
@@ -58,6 +60,8 @@ glow-tts --generate-tts-config
 ```
 
 ## Installation
+
+![Demo](docs/demo.gif)
 
 ### Base Installation
 
