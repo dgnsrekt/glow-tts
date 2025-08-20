@@ -75,7 +75,9 @@ func (lm *LifecycleManager) monitorSignals() {
 	select {
 	case sig := <-sigCh:
 		log.Info("Received shutdown signal", "signal", sig)
-		lm.Shutdown()
+		if err := lm.Shutdown(); err != nil {
+			log.Error("Failed to shutdown gracefully", "error", err)
+		}
 	case <-lm.shutdownCh:
 		log.Debug("Shutdown initiated programmatically")
 	}
@@ -249,8 +251,13 @@ func (pl *PlayerLifecycle) Name() string {
 func (pl *PlayerLifecycle) Shutdown(ctx context.Context) error {
 	player := GetGlobalAudioPlayer()
 	if player != nil {
-		player.Stop()
-		player.Close()
+		if err := player.Stop(); err != nil {
+			log.Error("Failed to stop audio player during shutdown", "error", err)
+		}
+		if err := player.Close(); err != nil {
+			log.Error("Failed to close audio player during shutdown", "error", err)
+			return err
+		}
 	}
 	return nil
 }

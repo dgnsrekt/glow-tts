@@ -300,7 +300,9 @@ func (m *MockAudioPlayer) Seek(offset int64, whence int) (int64, error) {
 		m.position = pos
 		// Also update the original reader if it exists
 		if m.originalReader != nil {
-			m.originalReader.Seek(offset, whence)
+			if _, err := m.originalReader.Seek(offset, whence); err != nil {
+				// Log error but continue
+			}
 		}
 		m.SeekCount++
 		log.Debug("Mock player seeked", "position", pos, "seek_count", m.SeekCount)

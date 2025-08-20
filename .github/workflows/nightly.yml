@@ -46,7 +46,7 @@ jobs:
           go test -bench=. -benchmem -run=^$ ./pkg/tts/... | tee benchmark-${{ matrix.os }}-${{ matrix.go-version }}.txt
       
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: benchmarks-${{ matrix.os }}-${{ matrix.go-version }}
           path: benchmark-*.txt
@@ -65,6 +65,11 @@ jobs:
         with:
           go-version: stable
           cache: true
+      
+      - name: Install test dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev
       
       - name: Run with race detector
         run: |
@@ -169,7 +174,7 @@ jobs:
           cat report.md
       
       - name: Upload report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: nightly-report
           path: report.md

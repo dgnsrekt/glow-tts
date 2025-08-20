@@ -354,7 +354,9 @@ func (c *Controller) Next() error {
 		// Stop current playback
 		player := GetGlobalAudioPlayer()
 		if player != nil {
-			player.Stop()
+			if err := player.Stop(); err != nil {
+				// Log error but continue
+			}
 			// Play the next segment
 			return player.PlayPCM(segment.ProcessedAudio)
 		}
@@ -379,7 +381,9 @@ func (c *Controller) Previous() error {
 		// Stop current playback
 		player := GetGlobalAudioPlayer()
 		if player != nil {
-			player.Stop()
+			if err := player.Stop(); err != nil {
+				// Log error but continue
+			}
 			// Play the previous segment
 			return player.PlayPCM(segment.ProcessedAudio)
 		}
@@ -599,7 +603,9 @@ func (c *Controller) Stop() error {
 	// Stop audio player
 	player := GetGlobalAudioPlayer()
 	if player != nil {
-		player.Stop()
+		if err := player.Stop(); err != nil {
+			errors = append(errors, fmt.Errorf("failed to stop audio player: %w", err))
+		}
 	}
 
 	// Clear cache if configured

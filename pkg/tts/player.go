@@ -301,7 +301,9 @@ func (as *AudioStream) start() error {
 func (as *AudioStream) resume() error {
 	if as.player == nil {
 		// Need to recreate player at current position
-		as.reader.Seek(as.position, io.SeekStart)
+		if _, err := as.reader.Seek(as.position, io.SeekStart); err != nil {
+			return fmt.Errorf("failed to seek to position: %w", err)
+		}
 		return as.start()
 	}
 	
@@ -340,13 +342,21 @@ func (as *AudioStream) Stop() error {
 
 	if as.player != nil {
 		as.player.Pause()
-		as.player.Close()
+		if err := as.player.Close(); err != nil {
+			// Log the error but continue with cleanup
+			as.state = PlaybackStopped
+			as.player = nil
+			return fmt.Errorf("failed to close player: %w", err)
+		}
 		as.player = nil
 	}
 
 	// Reset position
 	as.position = 0
-	as.reader.Seek(0, io.SeekStart)
+	if _, err := as.reader.Seek(0, io.SeekStart); err != nil {
+		as.state = PlaybackStopped
+		return fmt.Errorf("failed to reset position: %w", err)
+	}
 	as.state = PlaybackStopped
 	
 	return nil
@@ -412,11 +422,15 @@ func (as *AudioStream) monitorPlayback() {
 				as.mu.Lock()
 				as.state = PlaybackStopped
 				if as.player != nil {
-					as.player.Close()
+					if err := as.player.Close(); err != nil {
+						// Log error but continue cleanup
+					}
 					as.player = nil
 				}
 				as.position = 0
-				as.reader.Seek(0, io.SeekStart)
+				if _, err := as.reader.Seek(0, io.SeekStart); err != nil {
+					// Log error but continue cleanup
+				}
 				as.mu.Unlock()
 				return
 			}
@@ -483,8 +497,12 @@ func (ap *TTSAudioPlayer) PlayPCM(pcmData []byte) error {
 
 	// Stop current stream if playing
 	if ap.currentStream != nil {
-		ap.currentStream.Stop()
-		ap.currentStream.Close()
+		if err := ap.currentStream.Stop(); err != nil {
+			// Log error but continue with cleanup
+		}
+		if err := ap.currentStream.Close(); err != nil {
+			// Log error but continue with cleanup
+		}
 	}
 
 	// Create new stream
